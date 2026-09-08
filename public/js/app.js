@@ -15,6 +15,11 @@ const THEMES = {
   panda: { label: 'Panda', icon: '🐼', mascot: '🐼' },
   unicorn: { label: 'Jednorožec', icon: '🦄', mascot: '🦄' },
   ocean: { label: 'Oceán', icon: '🐬', mascot: '🐬' },
+  kawaii: { label: 'Kawaii', icon: '🌸', mascot: '🌸' },
+  aesthetic: { label: 'Aesthetic', icon: '✨', mascot: '✨' },
+  gamer: { label: 'Gamer', icon: '🎮', mascot: '🎮' },
+  skate: { label: 'Skate', icon: '🛹', mascot: '🛹' },
+  music: { label: 'Hudba', icon: '🎧', mascot: '🎧' },
   space: { label: 'Vesmír', icon: '🚀', mascot: '🚀' },
 };
 
@@ -100,6 +105,13 @@ function applyTheme() {
   const key = currentTheme();
   document.body.dataset.theme = key;
   el('heroMascot').textContent = THEMES[key].mascot;
+
+  const dark = !!state.dark;
+  document.body.classList.toggle('is-dark', dark);
+  const btn = el('darkBtn');
+  btn.textContent = dark ? '☀️' : '🌙';
+  btn.setAttribute('aria-pressed', String(dark));
+  btn.setAttribute('aria-label', dark ? 'Přepnout světlý režim' : 'Přepnout tmavý režim');
 }
 
 function renderConfigScreen() {
@@ -150,6 +162,12 @@ function renderLastHint() {
   hint.textContent = `Naposledy: ${last.correct} z ${last.total} (${pct} %).${focus}`;
   hint.hidden = false;
 }
+
+el('darkBtn').addEventListener('click', () => {
+  state.dark = !state.dark;
+  store.save(state);
+  applyTheme();
+});
 
 el('themeChips').addEventListener('click', (e) => {
   const chip = e.target.closest('.chip');
@@ -216,13 +234,12 @@ el('soundBtn').addEventListener('click', () => {
 
 el('resetBtn').addEventListener('click', () => {
   if (!confirm('Smazat uložené výsledky a chyby z tohoto prohlížeče?')) return;
-  const { sound, theme } = state;
+  const { sound, theme, dark } = state;
   state = store.load();
   state.skills = {};
   state.missed = [];
   state.rounds = [];
-  state.sound = sound;
-  state.theme = theme;
+  Object.assign(state, { sound, theme, dark });
   store.save(state);
   renderConfigScreen();
 });
