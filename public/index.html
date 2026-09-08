@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Počítání – hravý trénink matematiky</title>
+<title>Počítání pro Alžbětu</title>
 <meta name="description" content="Hravý trénink sčítání, odčítání, násobení a dělení pro děti. Příklady s chybějícím číslem i pyramidy.">
 <meta name="theme-color" content="#7dd3fc">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A7%AE%3C/text%3E%3C/svg%3E">
@@ -29,12 +29,17 @@
   <!-- ============ 1. NASTAVENÍ ============ -->
   <section id="screen-config" class="screen is-active">
     <header class="hero">
-      <div class="hero-mascot" aria-hidden="true">🦊</div>
-      <h1 class="hero-title">Počítání</h1>
+      <div id="heroMascot" class="hero-mascot" aria-hidden="true">🐼</div>
+      <h1 class="hero-title">Počítání pro Alžbětu</h1>
       <p class="hero-sub">Vyber si, co budeme trénovat!</p>
     </header>
 
     <p id="lastRoundHint" class="last-hint" hidden></p>
+
+    <div class="card">
+      <h2 class="card-title"><span aria-hidden="true">🎨</span> Jak to má vypadat?</h2>
+      <div id="themeChips" class="chips chips-theme"></div>
+    </div>
 
     <div class="card">
       <h2 class="card-title"><span aria-hidden="true">🎯</span> Co budeme počítat?</h2>

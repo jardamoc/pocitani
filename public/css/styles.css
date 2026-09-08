@@ -16,6 +16,75 @@
   --radius: 26px;
 }
 
+/* ---------- varianty vzhledu ---------- */
+:root, body[data-theme="panda"] {
+  --bg: linear-gradient(180deg, #7dd3fc 0%, #a7f3d0 55%, #fef3c7 100%);
+  --on-bg: #14314d;
+  --title-grad: linear-gradient(100deg, #7c5cff, #3fa9f5 40%, #0ecfa0 75%);
+  --orb: radial-gradient(circle at 35% 35%, #fff3b0, #ffd60a 60%, #ffb703);
+  --orb-glow: rgba(255, 183, 3, .55);
+  --cloud-color: #fff;
+  --cloud-opacity: .82;
+  --hill-1: #34d399;
+  --hill-2: #10b981;
+  --accent-a: #ffb703;
+  --accent-b: #ff6b6b;
+  --accent-shadow: #d9455c;
+  --slot: #7c5cff;
+  --slot-bg: #f6f3ff;
+}
+
+body[data-theme="unicorn"] {
+  --bg: linear-gradient(180deg, #fbcfe8 0%, #ddd6fe 45%, #fef9c3 100%);
+  --on-bg: #4a1d47;
+  --title-grad: linear-gradient(100deg, #db2777, #8b5cf6 45%, #f59e0b 80%);
+  --orb: radial-gradient(circle at 35% 35%, #fff0f7, #f9a8d4 55%, #ec4899);
+  --orb-glow: rgba(236, 72, 153, .45);
+  --cloud-color: #fff;
+  --cloud-opacity: .9;
+  --hill-1: #c4b5fd;
+  --hill-2: #f0abfc;
+  --accent-a: #f472b6;
+  --accent-b: #a855f7;
+  --accent-shadow: #7e22ce;
+  --slot: #c026d3;
+  --slot-bg: #fdf4ff;
+}
+
+body[data-theme="ocean"] {
+  --bg: linear-gradient(180deg, #67e8f9 0%, #38bdf8 45%, #2563eb 100%);
+  --on-bg: #06283d;
+  --title-grad: linear-gradient(100deg, #0e7490, #1d4ed8 50%, #06b6d4 85%);
+  --orb: radial-gradient(circle at 35% 35%, #fffbe6, #fde68a 60%, #fbbf24);
+  --orb-glow: rgba(251, 191, 36, .4);
+  --cloud-color: #fff;
+  --cloud-opacity: .65;
+  --hill-1: #1d4ed8;
+  --hill-2: #0e7490;
+  --accent-a: #22d3ee;
+  --accent-b: #2563eb;
+  --accent-shadow: #1e40af;
+  --slot: #0891b2;
+  --slot-bg: #ecfeff;
+}
+
+body[data-theme="space"] {
+  --bg: linear-gradient(180deg, #1e1b4b 0%, #4c1d95 55%, #831843 100%);
+  --on-bg: #f5f3ff;
+  --title-grad: linear-gradient(100deg, #a78bfa, #f0abfc 45%, #fcd34d 85%);
+  --orb: radial-gradient(circle at 35% 35%, #fde68a, #fb923c 55%, #c2410c);
+  --orb-glow: rgba(251, 146, 60, .5);
+  --cloud-color: rgba(196, 181, 253, .16);
+  --cloud-opacity: 1;
+  --hill-1: #312e81;
+  --hill-2: #1e1b4b;
+  --accent-a: #a855f7;
+  --accent-b: #ec4899;
+  --accent-shadow: #86198f;
+  --slot: #7c3aed;
+  --slot-bg: #f5f3ff;
+}
+
 * { box-sizing: border-box; }
 
 html, body {
@@ -25,11 +94,15 @@ html, body {
 
 body {
   font-family: 'Nunito', system-ui, -apple-system, sans-serif;
-  color: var(--ink);
-  background: linear-gradient(180deg, #7dd3fc 0%, #a7f3d0 55%, #fef3c7 100%);
+  color: var(--on-bg);
+  background: var(--bg);
   background-attachment: fixed;
   -webkit-text-size-adjust: 100%;
+  transition: background .5s ease, color .3s ease;
 }
+
+/* obsah karet je vždy na bílém, takže si drží tmavý text bez ohledu na téma */
+.card, .feedback, .ring-inner, .key, .quiz-counter, .quiz-score, .last-hint, .chip { color: var(--ink); }
 
 h1, h2, h3, .num, .box-value, .key, .score-big { font-family: 'Baloo 2', 'Nunito', system-ui, sans-serif; }
 
@@ -37,15 +110,15 @@ h1, h2, h3, .num, .box-value, .key, .score-big { font-family: 'Baloo 2', 'Nunito
 .scenery { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
 .sun {
   position: absolute; top: -60px; right: -50px; width: 220px; height: 220px; border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #fff3b0, #ffd60a 60%, #ffb703);
-  box-shadow: 0 0 90px rgba(255, 183, 3, .55);
+  background: var(--orb);
+  box-shadow: 0 0 90px var(--orb-glow);
   animation: pulse 6s ease-in-out infinite;
 }
 .cloud {
-  position: absolute; background: #fff; border-radius: 100px; opacity: .82;
+  position: absolute; background: var(--cloud-color); border-radius: 100px; opacity: var(--cloud-opacity);
   filter: drop-shadow(0 8px 16px rgba(20, 49, 77, .08));
 }
-.cloud::before, .cloud::after { content: ''; position: absolute; background: #fff; border-radius: 50%; }
+.cloud::before, .cloud::after { content: ''; position: absolute; background: var(--cloud-color); border-radius: 50%; }
 .cloud-1 { width: 150px; height: 46px; top: 12%; left: -160px; animation: drift 46s linear infinite; }
 .cloud-1::before { width: 62px; height: 62px; top: -26px; left: 22px; }
 .cloud-1::after { width: 46px; height: 46px; top: -18px; right: 24px; }
@@ -56,9 +129,22 @@ h1, h2, h3, .num, .box-value, .key, .score-big { font-family: 'Baloo 2', 'Nunito
 .hills {
   position: absolute; bottom: 0; left: -5%; width: 110%; height: 190px;
   background:
-    radial-gradient(120% 100% at 20% 100%, #34d399 0 60%, transparent 61%),
-    radial-gradient(120% 100% at 75% 100%, #10b981 0 58%, transparent 59%);
+    radial-gradient(120% 100% at 20% 100%, var(--hill-1) 0 60%, transparent 61%),
+    radial-gradient(120% 100% at 75% 100%, var(--hill-2) 0 58%, transparent 59%);
   opacity: .6;
+}
+
+/* hvězdné pole navíc, jen ve vesmírném tématu */
+body[data-theme="space"] .scenery::after {
+  content: ''; position: absolute; inset: 0;
+  background-image:
+    radial-gradient(1.7px 1.7px at 25% 15%, #fff 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 70% 32%, #fff 50%, transparent 51%),
+    radial-gradient(1.2px 1.2px at 45% 62%, #c7d2fe 50%, transparent 51%),
+    radial-gradient(2px 2px at 86% 78%, #fff 50%, transparent 51%),
+    radial-gradient(1.3px 1.3px at 12% 84%, #fff 50%, transparent 51%);
+  background-size: 240px 240px;
+  animation: pulse 5s ease-in-out infinite;
 }
 @keyframes drift { from { transform: translateX(0); } to { transform: translateX(130vw); } }
 @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
@@ -76,12 +162,11 @@ h1, h2, h3, .num, .box-value, .key, .score-big { font-family: 'Baloo 2', 'Nunito
 .hero { text-align: center; margin: 8px 0 18px; }
 .hero-mascot { font-size: 68px; line-height: 1; animation: bob 3s ease-in-out infinite; }
 .hero-title {
-  margin: 4px 0 2px; font-size: clamp(2.4rem, 11vw, 3.4rem); font-weight: 800; letter-spacing: -.5px;
-  background: linear-gradient(100deg, #7c5cff, #3fa9f5 40%, #0ecfa0 75%);
+  margin: 4px 0 2px; font-size: clamp(1.9rem, 8.4vw, 2.9rem); font-weight: 800; letter-spacing: -.5px;
+  background: var(--title-grad);
   -webkit-background-clip: text; background-clip: text; color: transparent;
-  text-shadow: 0 3px 0 rgba(255, 255, 255, .6);
 }
-.hero-sub { margin: 0; font-weight: 700; color: #14314d; opacity: .75; }
+.hero-sub { margin: 0; font-weight: 700; color: var(--on-bg); opacity: .8; }
 @keyframes bob { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-10px) rotate(3deg); } }
 
 .last-hint {
@@ -103,17 +188,29 @@ h1, h2, h3, .num, .box-value, .key, .score-big { font-family: 'Baloo 2', 'Nunito
   border: 3px solid #e2eaf1; background: #f5f9fc; color: var(--ink);
   padding: 11px 16px; border-radius: 999px;
   display: inline-flex; align-items: center; gap: 7px;
+  box-shadow: var(--ring);
   transition: transform .12s ease, background .18s ease, border-color .18s ease, color .18s ease;
 }
 .chip:hover { transform: translateY(-2px); }
 .chip:active { transform: translateY(1px) scale(.97); }
-.chip.is-on { color: #fff; border-color: transparent; box-shadow: 0 6px 16px rgba(20, 49, 77, .18); }
+.chip.is-on { color: #fff; border-color: transparent; box-shadow: var(--ring), 0 6px 16px rgba(20, 49, 77, .18); }
 .chip.is-on[data-value="add"] { background: linear-gradient(135deg, #34d399, #0ea672); }
 .chip.is-on[data-value="sub"] { background: linear-gradient(135deg, #60a5fa, #2563eb); }
 .chip.is-on[data-value="mul"] { background: linear-gradient(135deg, #c084fc, #7c3aed); }
 .chip.is-on[data-value="div"] { background: linear-gradient(135deg, #fb923c, #ea580c); }
 .chips:not(.chips-ops) .chip.is-on { background: linear-gradient(135deg, #38bdf8, #6366f1); }
-.chip:focus-visible { outline: 4px solid rgba(124, 92, 255, .45); outline-offset: 2px; }
+.chips-theme .chip { flex-direction: column; gap: 2px; padding: 12px 18px; }
+.chips-theme .chip span:first-child { font-size: 1.5rem; }
+.chips-theme .chip.is-on[data-value="panda"] { background: linear-gradient(135deg, #38bdf8, #10b981); }
+.chips-theme .chip.is-on[data-value="unicorn"] { background: linear-gradient(135deg, #f472b6, #a855f7); }
+.chips-theme .chip.is-on[data-value="ocean"] { background: linear-gradient(135deg, #22d3ee, #2563eb); }
+.chips-theme .chip.is-on[data-value="space"] { background: linear-gradient(135deg, #7c3aed, #ec4899); }
+/* Focus prstenec kreslíme box-shadow, ne outline - outline nerespektuje
+   border-radius ve všech prohlížečích a u pilulkových tlačítek pak trčí do hran. */
+:root { --ring-off: 0 0 0 0 rgba(0, 0, 0, 0); --ring-on: 0 0 0 4px rgba(124, 92, 255, .55); }
+.btn, .chip, .key, .icon-btn, .custom-max input { --ring: var(--ring-off); }
+.btn:focus-visible, .chip:focus-visible, .key:focus-visible,
+.icon-btn:focus-visible, .custom-max input:focus-visible { --ring: var(--ring-on); outline: none; }
 
 .field-error { margin: 12px 0 0; color: var(--bad-dark); font-weight: 800; }
 
@@ -127,15 +224,14 @@ h1, h2, h3, .num, .box-value, .key, .score-big { font-family: 'Baloo 2', 'Nunito
 /* ---------- tlačítka ---------- */
 .btn {
   font: inherit; font-weight: 800; cursor: pointer; border: 0; border-radius: 999px;
-  padding: 15px 26px; color: #fff; background: var(--blue);
+  padding: 15px 26px; color: #fff; background: var(--blue); box-shadow: var(--ring);
   transition: transform .12s ease, box-shadow .12s ease, filter .18s ease;
 }
 .btn:active { transform: translateY(3px); }
-.btn:focus-visible { outline: 4px solid rgba(124, 92, 255, .45); outline-offset: 3px; }
-.btn-primary { background: linear-gradient(135deg, #ffb703, #ff6b6b); box-shadow: 0 7px 0 #d9455c, 0 16px 28px rgba(255, 107, 107, .3); }
-.btn-primary:active { box-shadow: 0 3px 0 #d9455c, 0 8px 16px rgba(255, 107, 107, .3); }
-.btn-ghost { background: #fff; color: var(--ink); box-shadow: 0 6px 0 #d7e3ec, 0 12px 24px rgba(20, 49, 77, .12); }
-.btn-ghost:active { box-shadow: 0 2px 0 #d7e3ec; }
+.btn-primary { background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); box-shadow: var(--ring), 0 7px 0 var(--accent-shadow), 0 16px 28px rgba(20, 49, 77, .25); }
+.btn-primary:active { box-shadow: var(--ring), 0 3px 0 var(--accent-shadow), 0 8px 16px rgba(20, 49, 77, .25); }
+.btn-ghost { background: #fff; color: var(--ink); box-shadow: var(--ring), 0 6px 0 #d7e3ec, 0 12px 24px rgba(20, 49, 77, .12); }
+.btn-ghost:active { box-shadow: var(--ring), 0 2px 0 #d7e3ec; }
 .btn-huge { display: block; width: 100%; font-size: 1.28rem; padding: 18px; }
 .btn-small { padding: 10px 16px; font-size: .95rem; }
 .toolbar { display: flex; gap: 10px; justify-content: center; margin-top: 18px; flex-wrap: wrap; }
@@ -143,7 +239,7 @@ h1, h2, h3, .num, .box-value, .key, .score-big { font-family: 'Baloo 2', 'Nunito
 .icon-btn {
   font: inherit; font-size: 1.1rem; font-weight: 800; cursor: pointer;
   width: 44px; height: 44px; border-radius: 50%; border: 0;
-  background: rgba(255, 255, 255, .85); color: var(--ink-soft); box-shadow: var(--shadow);
+  background: rgba(255, 255, 255, .85); color: var(--ink-soft); box-shadow: var(--ring), var(--shadow);
 }
 .icon-btn:active { transform: scale(.94); }
 
@@ -173,8 +269,8 @@ h1, h2, h3, .num, .box-value, .key, .score-big { font-family: 'Baloo 2', 'Nunito
 .slot {
   display: inline-flex; align-items: center; justify-content: center;
   min-width: clamp(80px, 22vw, 116px); height: clamp(62px, 16vw, 84px);
-  border-radius: 18px; border: 4px dashed var(--violet);
-  background: #f6f3ff; box-shadow: inset 0 -4px 0 rgba(124, 92, 255, .12);
+  border-radius: 18px; border: 4px dashed var(--slot);
+  background: var(--slot-bg); box-shadow: inset 0 -4px 0 rgba(124, 92, 255, .12);
   animation: slotGlow 2.2s ease-in-out infinite;
 }
 .slot input {
@@ -199,19 +295,35 @@ h1, h2, h3, .num, .box-value, .key, .score-big { font-family: 'Baloo 2', 'Nunito
   60% { transform: translateX(-5px); } 80% { transform: translateX(4px); }
 }
 
-/* pyramida / rozklad čísla */
-.bond { display: flex; flex-direction: column; align-items: center; }
-.bond-row { display: flex; justify-content: center; gap: clamp(22px, 9vw, 56px); }
-.bond-arms { width: min(280px, 74vw); height: 44px; }
+/* pyramida / rozklad čísla
+   Mezera mezi spodními boxy je pevný podíl jejich šířky, takže celá řada
+   měří vždy 2.5x box. Ramena pak v poměrovém viewBoxu (20 % / 50 % / 80 %)
+   míří přesně do středů boxů při jakékoli velikosti obrazovky. */
+.bond {
+  --box-w: clamp(78px, 21vw, 104px);
+  --box-h: clamp(66px, 17vw, 88px);
+  display: flex; flex-direction: column; align-items: center;
+}
+.bond-row { display: flex; justify-content: center; gap: calc(var(--box-w) * .5); }
+/* Operátor je mimo tok (absolutně), aby řada zůstala široká přesně 2.5x box
+   a ramena dál mířila do středů. */
+.bond-row-bottom { position: relative; }
+.bond-op {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  font-family: 'Baloo 2', sans-serif; font-size: clamp(1.4rem, 5.5vw, 2.1rem);
+  font-weight: 700; color: var(--coral);
+}
+.bond-arms { width: calc(var(--box-w) * 2.5); height: 42px; }
 .bond-arms line { stroke: var(--ink); stroke-width: 5; stroke-linecap: round; opacity: .5; }
 .box {
+  flex: none;
   display: inline-flex; align-items: center; justify-content: center;
-  min-width: clamp(78px, 21vw, 104px); height: clamp(66px, 17vw, 88px);
+  width: var(--box-w); min-width: var(--box-w); height: var(--box-h);
   border: 5px solid var(--ink); border-radius: 20px; background: #fff;
   box-shadow: 0 6px 0 rgba(20, 49, 77, .14);
 }
 .box-value { font-size: clamp(1.9rem, 9vw, 2.9rem); font-weight: 800; }
-.box.slot { border-color: var(--violet); }
+.box.slot { border-color: var(--slot); background: var(--slot-bg); }
 
 /* ---------- vyhodnocení ---------- */
 .feedback { border-radius: var(--radius); padding: 18px; margin-bottom: 16px; box-shadow: var(--shadow); }
@@ -232,15 +344,14 @@ h1, h2, h3, .num, .box-value, .key, .score-big { font-family: 'Baloo 2', 'Nunito
 .key {
   font-size: 1.7rem; font-weight: 800; cursor: pointer; border: 0;
   padding: 16px 0; border-radius: 20px; background: #fff; color: var(--ink);
-  box-shadow: 0 6px 0 #d7e3ec, 0 10px 20px rgba(20, 49, 77, .12);
+  box-shadow: var(--ring), 0 6px 0 #d7e3ec, 0 10px 20px rgba(20, 49, 77, .12);
   transition: transform .1s ease, box-shadow .1s ease;
 }
-.key:active { transform: translateY(4px); box-shadow: 0 2px 0 #d7e3ec; }
-.key:focus-visible { outline: 4px solid rgba(124, 92, 255, .45); outline-offset: 2px; }
-.key-del { background: #fff1f2; color: var(--bad-dark); box-shadow: 0 6px 0 #f7c9d2, 0 10px 20px rgba(244, 63, 94, .18); }
-.key-del:active { box-shadow: 0 2px 0 #f7c9d2; }
-.key-ok { background: linear-gradient(135deg, #34d399, #10b981); color: #fff; box-shadow: 0 6px 0 #047857, 0 10px 20px rgba(16, 185, 129, .3); }
-.key-ok:active { box-shadow: 0 2px 0 #047857; }
+.key:active { transform: translateY(4px); box-shadow: var(--ring), 0 2px 0 #d7e3ec; }
+.key-del { background: #fff1f2; color: var(--bad-dark); box-shadow: var(--ring), 0 6px 0 #f7c9d2, 0 10px 20px rgba(244, 63, 94, .18); }
+.key-del:active { box-shadow: var(--ring), 0 2px 0 #f7c9d2; }
+.key-ok { background: linear-gradient(135deg, #34d399, #10b981); color: #fff; box-shadow: var(--ring), 0 6px 0 #047857, 0 10px 20px rgba(16, 185, 129, .3); }
+.key-ok:active { box-shadow: var(--ring), 0 2px 0 #047857; }
 .keypad[data-disabled="true"] { opacity: .45; pointer-events: none; }
 
 /* ---------- výsledky ---------- */

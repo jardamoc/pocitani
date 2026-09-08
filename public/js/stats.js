@@ -4,6 +4,7 @@ const KEY = 'pocitani.v1';
 
 const emptyState = () => ({
   config: null,
+  theme: 'panda',
   sound: true,
   skills: {},
   missed: [],

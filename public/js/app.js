@@ -11,6 +11,13 @@ const screens = {
 const COUNT_PRESETS = [10, 20, 30];
 const MAX_PRESETS = [10, 20, 30, 50, 100];
 
+const THEMES = {
+  panda: { label: 'Panda', icon: '🐼', mascot: '🐼' },
+  unicorn: { label: 'Jednorožec', icon: '🦄', mascot: '🦄' },
+  ocean: { label: 'Oceán', icon: '🐬', mascot: '🐬' },
+  space: { label: 'Vesmír', icon: '🚀', mascot: '🚀' },
+};
+
 let state = store.load();
 let config = normalizeConfig(state.config) || { ops: ['add', 'sub'], count: 10, max: 20 };
 
@@ -85,7 +92,24 @@ function confetti(amount = 16) {
 }
 
 /* ---------------- nastavení ---------------- */
+function currentTheme() {
+  return THEMES[state.theme] ? state.theme : 'panda';
+}
+
+function applyTheme() {
+  const key = currentTheme();
+  document.body.dataset.theme = key;
+  el('heroMascot').textContent = THEMES[key].mascot;
+}
+
 function renderConfigScreen() {
+  el('themeChips').innerHTML = Object.entries(THEMES)
+    .map(([key, theme]) => {
+      const on = key === currentTheme();
+      return `<button type="button" class="chip${on ? ' is-on' : ''}" data-value="${key}" aria-pressed="${on}"><span aria-hidden="true">${theme.icon}</span><span>${theme.label}</span></button>`;
+    })
+    .join('');
+
   el('opChips').innerHTML = Object.entries(OPS)
     .map(([key, op]) => chipHTML(key, `${op.emoji} ${op.label}`, config.ops.includes(key)))
     .join('');
@@ -126,6 +150,15 @@ function renderLastHint() {
   hint.textContent = `Naposledy: ${last.correct} z ${last.total} (${pct} %).${focus}`;
   hint.hidden = false;
 }
+
+el('themeChips').addEventListener('click', (e) => {
+  const chip = e.target.closest('.chip');
+  if (!chip) return;
+  state.theme = chip.dataset.value;
+  store.save(state);
+  applyTheme();
+  renderConfigScreen();
+});
 
 el('opChips').addEventListener('click', (e) => {
   const chip = e.target.closest('.chip');
@@ -183,12 +216,13 @@ el('soundBtn').addEventListener('click', () => {
 
 el('resetBtn').addEventListener('click', () => {
   if (!confirm('Smazat uložené výsledky a chyby z tohoto prohlížeče?')) return;
-  const sound = state.sound;
+  const { sound, theme } = state;
   state = store.load();
   state.skills = {};
   state.missed = [];
   state.rounds = [];
   state.sound = sound;
+  state.theme = theme;
   store.save(state);
   renderConfigScreen();
 });
@@ -257,11 +291,11 @@ function bondHTML(ex) {
       : `<span class="box"><span class="box-value">${ex[key]}</span></span>`;
   return `<div class="bond">
       <div class="bond-row">${box('c')}</div>
-      <svg class="bond-arms" viewBox="0 0 280 44" preserveAspectRatio="none" aria-hidden="true">
-        <line x1="140" y1="6" x2="56" y2="38"></line>
-        <line x1="140" y1="6" x2="224" y2="38"></line>
+      <svg class="bond-arms" viewBox="0 0 100 44" preserveAspectRatio="none" aria-hidden="true">
+        <line x1="50" y1="2" x2="20" y2="42" vector-effect="non-scaling-stroke"></line>
+        <line x1="50" y1="2" x2="80" y2="42" vector-effect="non-scaling-stroke"></line>
       </svg>
-      <div class="bond-row">${box('a')}${box('b')}</div>
+      <div class="bond-row bond-row-bottom">${box('a')}<span class="bond-op" aria-hidden="true">${ex.op === 'mul' ? '×' : '+'}</span>${box('b')}</div>
     </div>`;
 }
 
@@ -374,7 +408,7 @@ function renderFeedback(ex, given, correct) {
     <div class="fb-answer">Správně je <b>${ex.answer}</b>${Number.isFinite(given) ? ` <span class="retry-given">(napsala jsi ${given})</span>` : ''}</div>
     <p class="fb-steps-title">Jak na to:</p>
     <ul class="fb-steps">${steps}</ul>
-    <button type="button" class="btn btn-ghost">Rozumím, další <span aria-hidden="true">➜</span></button>`;
+    <button type="button" class="btn btn-primary">Rozumím, další <span aria-hidden="true">➜</span></button>`;
   fb.hidden = false;
   fb.querySelector('.btn').addEventListener('click', next);
 }
@@ -407,7 +441,7 @@ function verdictFor(pct) {
   if (pct >= 80) return { mascot: '🎉', text: 'Moc dobře!' };
   if (pct >= 60) return { mascot: '💪', text: 'Dobrá práce!' };
   if (pct >= 40) return { mascot: '🌱', text: 'Zlepšuješ se!' };
-  return { mascot: '🦊', text: 'Nevzdávej to!' };
+  return { mascot: THEMES[currentTheme()].mascot, text: 'Nevzdávej to!' };
 }
 
 function renderResult(r) {
@@ -488,4 +522,5 @@ el('backToConfigBtn').addEventListener('click', () => {
   renderConfigScreen();
 });
 
+applyTheme();
 renderConfigScreen();
