@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Počítání – hravý trénink matematiky</title>
+<meta name="description" content="Hravý trénink sčítání, odčítání, násobení a dělení pro děti. Příklady s chybějícím číslem i pyramidy.">
+<meta name="theme-color" content="#7dd3fc">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A7%AE%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<div class="scenery" aria-hidden="true">
+  <div class="sun"></div>
+  <div class="cloud cloud-1"></div>
+  <div class="cloud cloud-2"></div>
+  <div class="cloud cloud-3"></div>
+  <div class="hills"></div>
+</div>
+
+<div id="confetti" class="confetti-layer" aria-hidden="true"></div>
+
+<main class="wrap">
+
+  <!-- ============ 1. NASTAVENÍ ============ -->
+  <section id="screen-config" class="screen is-active">
+    <header class="hero">
+      <div class="hero-mascot" aria-hidden="true">🦊</div>
+      <h1 class="hero-title">Počítání</h1>
+      <p class="hero-sub">Vyber si, co budeme trénovat!</p>
+    </header>
+
+    <p id="lastRoundHint" class="last-hint" hidden></p>
+
+    <div class="card">
+      <h2 class="card-title"><span aria-hidden="true">🎯</span> Co budeme počítat?</h2>
+      <div id="opChips" class="chips chips-ops"></div>
+      <p id="opsError" class="field-error" hidden>Vyber aspoň jednu možnost.</p>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title"><span aria-hidden="true">🔢</span> Kolik příkladů?</h2>
+      <div id="countChips" class="chips"></div>
+      <label class="custom-max">
+        <span>Nebo vlastní počet:</span>
+        <input id="countCustom" type="number" min="3" max="60" step="1" inputmode="numeric" aria-label="Vlastní počet příkladů">
+      </label>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title"><span aria-hidden="true">📏</span> Do kolika počítáme?</h2>
+      <div id="maxChips" class="chips"></div>
+      <label class="custom-max">
+        <span>Nebo vlastní číslo:</span>
+        <input id="maxCustom" type="number" min="5" max="1000" step="1" inputmode="numeric" aria-label="Vlastní maximální číslo">
+      </label>
+    </div>
+
+    <button id="startBtn" class="btn btn-primary btn-huge">Začít <span aria-hidden="true">🚀</span></button>
+
+    <div class="toolbar">
+      <button id="soundBtn" class="btn btn-ghost btn-small" aria-pressed="true">🔊 Zvuk</button>
+      <button id="resetBtn" class="btn btn-ghost btn-small">🧹 Smazat historii</button>
+    </div>
+  </section>
+
+  <!-- ============ 2. POČÍTÁNÍ ============ -->
+  <section id="screen-quiz" class="screen">
+    <div class="quiz-top">
+      <button id="quitBtn" class="icon-btn" aria-label="Ukončit trénink">✕</button>
+      <div class="quiz-counter"><span id="quizCounter">1 / 10</span></div>
+      <div class="quiz-score" aria-live="off"><span aria-hidden="true">⭐</span> <span id="quizScore">0</span></div>
+    </div>
+    <div id="dots" class="dots" aria-hidden="true"></div>
+
+    <div class="card card-exercise">
+      <p id="exerciseHint" class="exercise-hint"></p>
+      <div id="exerciseBody" class="exercise-body"></div>
+    </div>
+
+    <div id="feedback" class="feedback" hidden aria-live="polite"></div>
+
+    <div id="keypad" class="keypad"></div>
+  </section>
+
+  <!-- ============ 3. VÝSLEDEK ============ -->
+  <section id="screen-result" class="screen">
+    <div id="resultBody"></div>
+    <div class="result-actions">
+      <button id="againBtn" class="btn btn-primary btn-huge">Hrát znovu <span aria-hidden="true">🔁</span></button>
+      <button id="backToConfigBtn" class="btn btn-ghost btn-huge">Změnit nastavení <span aria-hidden="true">⚙️</span></button>
+    </div>
+  </section>
+
+</main>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

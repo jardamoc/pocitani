@@ -1,0 +1,7 @@
+.netlify/
+node_modules/
+
+# fotky zadani - jen lokalni podklady, nepatri do repozitare
+*.jpeg
+*.jpg
+*.png
