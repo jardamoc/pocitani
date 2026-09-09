@@ -78,6 +78,19 @@ body[data-theme="ocean"] {
   --slot-bg: #ecfeff;
 }
 
+/* Svetelne vlnky pod hladinou - jen v oceanu, aby pozadi nebylo jen gradient. */
+body[data-theme="ocean"] .scenery::after {
+  content: ''; position: absolute; inset: 0;
+  /* jen jeden smer - dva by se zkrizily do mrizky a vypadalo by to
+     jako milimetrovy papir, ne jako svetlo pod hladinou */
+  background-image: repeating-linear-gradient(97deg,
+    rgba(255, 255, 255, 0) 0 22px,
+    rgba(255, 255, 255, .11) 26px 34px,
+    rgba(255, 255, 255, 0) 38px 62px);
+  animation: pulse 7s ease-in-out infinite;
+  opacity: .85;
+}
+
 /* "Aesthetic" - jemnější, dospělejší holčičí vzhled (lila, rose, jiskry) */
 body[data-theme="aesthetic"] {
   --bg: linear-gradient(180deg, #f5e9ff 0%, #e9d5ff 34%, #ffd7e2 100%);
@@ -105,57 +118,6 @@ body[data-theme="aesthetic"] .scenery::after {
   background-size: 250px 250px;
   animation: pulse 5s ease-in-out infinite;
   opacity: .8;
-}
-
-body[data-theme="space"] {
-  --bg: linear-gradient(180deg, #1e1b4b 0%, #4c1d95 55%, #831843 100%);
-  --on-bg: #f5f3ff;
-  --title-grad: linear-gradient(100deg, #a78bfa, #f0abfc 45%, #fcd34d 85%);
-  --orb: radial-gradient(circle at 35% 35%, #fde68a, #fb923c 55%, #c2410c);
-  --orb-glow: rgba(251, 146, 60, .5);
-  --cloud-color: rgba(196, 181, 253, .16);
-  --cloud-opacity: 1;
-  --hill-1: #312e81;
-  --hill-2: #1e1b4b;
-  --accent-a: #a855f7;
-  --accent-b: #ec4899;
-  --accent-shadow: #86198f;
-  --slot: #7c3aed;
-  --slot-bg: #f5f3ff;
-}
-
-body[data-theme="gamer"] {
-  --bg: linear-gradient(180deg, #0b1020 0%, #131a33 45%, #1f1147 100%);
-  --on-bg: #e8f7ff;
-  --title-grad: linear-gradient(100deg, #22c55e, #38bdf8 45%, #a855f7 85%);
-  --orb: radial-gradient(circle at 35% 35%, #bbf7d0, #22c55e 55%, #15803d);
-  --orb-glow: rgba(34, 197, 94, .5);
-  --cloud-color: rgba(56, 189, 248, .12);
-  --cloud-opacity: 1;
-  --hill-1: #1e293b;
-  --hill-2: #0f172a;
-  --accent-a: #22c55e;
-  --accent-b: #0ea5e9;
-  --accent-shadow: #065f46;
-  --slot: #38bdf8;
-  --slot-bg: #eff9ff;
-}
-
-body[data-theme="skate"] {
-  --bg: linear-gradient(180deg, #1c1917 0%, #3f2a1d 45%, #9a3412 100%);
-  --on-bg: #fafaf9;
-  --title-grad: linear-gradient(100deg, #fbbf24, #f97316 50%, #ef4444 88%);
-  --orb: radial-gradient(circle at 35% 35%, #fde68a, #f59e0b 55%, #b45309);
-  --orb-glow: rgba(245, 158, 11, .45);
-  --cloud-color: rgba(250, 250, 249, .1);
-  --cloud-opacity: 1;
-  --hill-1: #292524;
-  --hill-2: #1c1917;
-  --accent-a: #f97316;
-  --accent-b: #ef4444;
-  --accent-shadow: #9a3412;
-  --slot: #ea580c;
-  --slot-bg: #fff7ed;
 }
 
 body[data-theme="music"] {
@@ -264,34 +226,100 @@ h1, h2, h3, .num, .box-value, .key, .score-big { font-family: 'Baloo 2', 'Nunito
   opacity: .6;
 }
 
-/* hvězdné pole navíc, jen ve vesmírném tématu */
-body[data-theme="space"] .scenery::after {
-  content: ''; position: absolute; inset: 0;
-  background-image:
-    radial-gradient(1.7px 1.7px at 25% 15%, #fff 50%, transparent 51%),
-    radial-gradient(1.5px 1.5px at 70% 32%, #fff 50%, transparent 51%),
-    radial-gradient(1.2px 1.2px at 45% 62%, #c7d2fe 50%, transparent 51%),
-    radial-gradient(2px 2px at 86% 78%, #fff 50%, transparent 51%),
-    radial-gradient(1.3px 1.3px at 12% 84%, #fff 50%, transparent 51%);
-  background-size: 240px 240px;
-  animation: pulse 5s ease-in-out infinite;
-}
 @keyframes drift { from { transform: translateX(0); } to { transform: translateX(130vw); } }
 @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+
+/* ---------- tematická dekorace ----------
+   Prvky sklada JS podle zvoleneho tematu (SCENERY v app.js). Vodorovne se
+   pohybuji zprava doleva, protoze emoji zviratka se vetsinou "koukaji" vlevo
+   a jinak by plavala pozadu. Vse jen pres transform/opacity, at to na mobilu
+   nezere baterku. */
+.decor-layer { position: absolute; inset: 0; }
+.decor {
+  position: absolute; line-height: 1; font-size: var(--size);
+  filter: drop-shadow(0 5px 9px rgba(20, 49, 77, .2));
+}
+.decor-float, .decor-swim, .decor-walk { left: 108vw; top: var(--top); }
+.decor-float { animation: decorFloat var(--dur) linear infinite var(--delay); }
+.decor-swim { animation: decorSwim var(--dur) linear infinite var(--delay); }
+.decor-walk { animation: decorWalk var(--dur) linear infinite var(--delay); }
+.decor-fall { left: var(--left); top: -10vh; animation: decorFall var(--dur) linear infinite var(--delay); }
+.decor-rise { left: var(--left); bottom: -10vh; animation: decorRise var(--dur) linear infinite var(--delay); }
+.decor-sway {
+  left: var(--left); top: var(--top); transform-origin: 50% 90%;
+  animation: decorSway var(--dur) ease-in-out infinite var(--delay);
+}
+.decor-twinkle { left: var(--left); top: var(--top); animation: decorTwinkle var(--dur) ease-in-out infinite var(--delay); }
+
+@keyframes decorFloat {
+  0% { transform: translate(0, 0); }
+  50% { transform: translate(-64vw, -20px); }
+  100% { transform: translate(-128vw, 0); }
+}
+@keyframes decorSwim {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(-32vw, 18px); }
+  50% { transform: translate(-64vw, -14px); }
+  75% { transform: translate(-96vw, 15px); }
+  100% { transform: translate(-128vw, 0); }
+}
+/* poskakovani - panda "pobiha" po kopcich, ne klouze */
+@keyframes decorWalk {
+  0% { transform: translate(0, 0); }
+  12.5% { transform: translate(-16vw, -13px); }
+  25% { transform: translate(-32vw, 0); }
+  37.5% { transform: translate(-48vw, -13px); }
+  50% { transform: translate(-64vw, 0); }
+  62.5% { transform: translate(-80vw, -13px); }
+  75% { transform: translate(-96vw, 0); }
+  87.5% { transform: translate(-112vw, -13px); }
+  100% { transform: translate(-128vw, 0); }
+}
+@keyframes decorFall {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+  8% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translate(var(--sway), 120vh) rotate(340deg); opacity: 0; }
+}
+@keyframes decorRise {
+  0% { transform: translate(0, 0) scale(.65); opacity: 0; }
+  15% { opacity: .9; }
+  85% { opacity: .9; }
+  100% { transform: translate(var(--sway), -120vh) scale(1.15); opacity: 0; }
+}
+@keyframes decorSway {
+  0%, 100% { transform: rotate(-8deg); }
+  50% { transform: rotate(8deg); }
+}
+@keyframes decorTwinkle {
+  0%, 100% { transform: scale(.8); opacity: .45; }
+  50% { transform: scale(1.15); opacity: 1; }
+}
+
+/* Bez animaci kulisa nezmizi, jen se zastavi - JS proto kazdemu prvku
+   nastavuje i --left/--top, aby mel kde stat. */
+@media (prefers-reduced-motion: reduce) {
+  .decor, .cloud, .sun { animation: none; }
+  .decor-float, .decor-swim, .decor-walk { left: var(--left); }
+  .decor-fall { top: var(--top); }
+  .decor-rise { bottom: auto; top: var(--top); }
+}
 
 /* ---------- layout ---------- */
 .wrap {
   position: relative; z-index: 1;
   max-width: 620px; margin: 0 auto;
-  padding: 66px 16px 48px;
+  /* Dole je vic mista zamerne: Netlify si vpravo dole vykresluje svuj odznak
+     a bez rezervy prekryval klavesu ✓. */
+  padding: 66px 16px calc(84px + env(safe-area-inset-bottom, 0px));
 }
 
 /* Prepinac tmaveho rezimu je v horni casti obsahoveho sloupce, aby na uzkych
    displejich nekolidoval s liskou hornich prvku kvizu. */
 .dark-toggle {
   position: absolute; top: 12px; right: 16px; z-index: 5;
-  width: 46px; height: 46px; border-radius: 50%; border: 0; cursor: pointer;
-  font-size: 1.25rem; line-height: 1;
+  width: 42px; height: 42px; border-radius: 50%; border: 0; cursor: pointer;
+  font-size: 1.15rem; line-height: 1;
   background: var(--panel); color: var(--ink);
   box-shadow: var(--ring), var(--shadow);
   transition: transform .12s ease;
@@ -352,17 +380,17 @@ body[data-theme="space"] .scenery::after {
 .chip.is-on[data-value="mul"] { background: linear-gradient(135deg, #c084fc, #7c3aed); }
 .chip.is-on[data-value="div"] { background: linear-gradient(135deg, #fb923c, #ea580c); }
 .chips:not(.chips-ops) .chip.is-on { background: linear-gradient(135deg, #38bdf8, #6366f1); }
+/* Specificita musi dorovnat pravidlo vys, jinak by obecny modry gradient vyhral. */
+.chips .chip.is-on[data-value="word"] { background: linear-gradient(135deg, #fbbf24, #f97316); }
+.chips .chip.is-on[data-value="bond"] { background: linear-gradient(135deg, #2dd4bf, #0d9488); }
 .chips-theme .chip { flex-direction: column; gap: 2px; padding: 12px 18px; }
 .chips-theme .chip span:first-child { font-size: 1.5rem; }
 .chips-theme .chip.is-on[data-value="panda"] { background: linear-gradient(135deg, #38bdf8, #10b981); }
 .chips-theme .chip.is-on[data-value="unicorn"] { background: linear-gradient(135deg, #f472b6, #a855f7); }
 .chips-theme .chip.is-on[data-value="ocean"] { background: linear-gradient(135deg, #22d3ee, #2563eb); }
 .chips-theme .chip.is-on[data-value="aesthetic"] { background: linear-gradient(135deg, #c084fc, #f472b6); }
-.chips-theme .chip.is-on[data-value="gamer"] { background: linear-gradient(135deg, #22c55e, #0ea5e9 60%, #a855f7); }
-.chips-theme .chip.is-on[data-value="skate"] { background: linear-gradient(135deg, #fbbf24, #f97316 55%, #ef4444); }
 .chips-theme .chip.is-on[data-value="music"] { background: linear-gradient(135deg, #e879f9, #8b5cf6); }
 .chips-theme .chip.is-on[data-value="kawaii"] { background: linear-gradient(135deg, #fb7185, #c084fc); }
-.chips-theme .chip.is-on[data-value="space"] { background: linear-gradient(135deg, #7c3aed, #ec4899); }
 /* Focus prstenec kreslíme box-shadow, ne outline - outline nerespektuje
    border-radius ve všech prohlížečích a u pilulkových tlačítek pak trčí do hran. */
 :root { --ring-off: 0 0 0 0 rgba(0, 0, 0, 0); --ring-on: 0 0 0 4px rgba(124, 92, 255, .55); }
@@ -371,6 +399,7 @@ body[data-theme="space"] .scenery::after {
 .custom-max input:focus-visible, .dark-toggle:focus-visible { --ring: var(--ring-on); outline: none; }
 
 .field-error { margin: 12px 0 0; color: var(--bad-dark); font-weight: 800; }
+.field-note { margin: 12px 0 0; color: var(--ink-soft); font-weight: 700; font-size: .95rem; }
 
 .custom-max { display: flex; align-items: center; gap: 10px; margin-top: 16px; font-weight: 700; color: var(--ink-soft); flex-wrap: wrap; }
 .custom-max input {
@@ -383,7 +412,7 @@ body[data-theme="space"] .scenery::after {
 /* ---------- tlačítka ---------- */
 .btn {
   font: inherit; font-weight: 800; cursor: pointer; border: 0; border-radius: 999px;
-  padding: 15px 26px; color: #fff; background: var(--blue); box-shadow: var(--ring);
+  padding: 13px 22px; color: #fff; background: var(--blue); box-shadow: var(--ring);
   transition: transform .12s ease, box-shadow .12s ease, filter .18s ease;
 }
 .btn:active { transform: translateY(3px); }
@@ -399,22 +428,52 @@ body[data-theme="space"] .scenery::after {
 .btn-primary:active { box-shadow: var(--ring), 0 3px 0 var(--accent-shadow), 0 8px 16px rgba(20, 49, 77, .25); }
 .btn-ghost { background: var(--card); color: var(--ink); box-shadow: var(--ring), 0 6px 0 var(--line-strong), 0 12px 24px rgba(20, 49, 77, .12); }
 .btn-ghost:active { box-shadow: var(--ring), 0 2px 0 var(--line-strong); }
-.btn-huge { display: block; width: 100%; font-size: 1.28rem; padding: 18px; }
-.btn-small { padding: 10px 16px; font-size: .95rem; }
+.btn-huge { display: block; width: 100%; font-size: 1.12rem; padding: 14px; }
+.btn-small { padding: 8px 14px; font-size: .9rem; }
 .toolbar { display: flex; gap: 10px; justify-content: center; margin-top: 18px; flex-wrap: wrap; }
 
 .icon-btn {
   font: inherit; font-size: 1.1rem; font-weight: 800; cursor: pointer;
-  width: 44px; height: 44px; border-radius: 50%; border: 0;
+  width: 40px; height: 40px; border-radius: 50%; border: 0;
   background: var(--panel); color: var(--ink-soft); box-shadow: var(--ring), var(--shadow);
 }
 .icon-btn:active { transform: scale(.94); }
+.icon-btn-sm { width: 36px; height: 36px; font-size: 1rem; }
 
 /* ---------- horní lišta kvízu ---------- */
-.quiz-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.quiz-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 12px; }
 .quiz-counter, .quiz-score {
-  font-weight: 800; background: var(--panel);
-  padding: 10px 18px; border-radius: 999px; box-shadow: var(--shadow);
+  font-weight: 800; background: var(--panel); font-size: .88rem; white-space: nowrap;
+  padding: 7px 11px; border-radius: 999px; box-shadow: var(--shadow);
+}
+/* Behem kvizu je prepinac v teto listě, takze plovouci verzi schovame
+   a uvolneny horni odstup vratime obsahu. */
+body.is-quiz .dark-toggle { display: none; }
+body.is-quiz .wrap { padding-top: 18px; }
+
+/* ---------- hodiny u příkladu ---------- */
+/* --clock nastavuje JS podle uplynulych sekund, aby barva prechazela plynule. */
+.quiz-clock {
+  --clock: #22c55e;
+  display: flex; align-items: center; gap: 5px;
+  background: var(--panel); padding: 4px 9px 4px 6px; border-radius: 999px; box-shadow: var(--shadow);
+}
+.clock-face { width: 24px; height: 24px; flex: none; display: block; }
+.clock-track { fill: none; stroke: currentColor; stroke-width: 3.5; opacity: .16; }
+.clock-progress {
+  fill: none; stroke: var(--clock); stroke-width: 3.5; stroke-linecap: round;
+  stroke-dasharray: 100.53; stroke-dashoffset: 100.53;
+}
+.clock-hand { stroke: var(--clock); stroke-width: 2.6; stroke-linecap: round; }
+.clock-pin { fill: var(--clock); }
+.clock-text {
+  font-weight: 800; font-size: .85rem; color: var(--clock);
+  font-variant-numeric: tabular-nums; min-width: 28px; text-align: right;
+}
+/* po minute uz jen jemne pulzuje, aby bylo poznat, ze cas bezi dal */
+.quiz-clock.is-over .clock-face { animation: pulse 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .quiz-clock.is-over .clock-face { animation: none; }
 }
 .dots { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 14px; }
 .dot { width: 13px; height: 13px; border-radius: 50%; background: var(--panel); box-shadow: inset 0 0 0 2px rgba(20, 49, 77, .08); }
@@ -527,10 +586,10 @@ body[data-theme="space"] .scenery::after {
 .tenframe-caption { margin: 10px 0 0; font-weight: 700; color: var(--ink-soft); line-height: 1.45; }
 
 /* ---------- klávesnice ---------- */
-.keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .key {
-  font-size: 1.7rem; font-weight: 800; cursor: pointer; border: 0;
-  padding: 16px 0; border-radius: 20px; background: var(--card); color: var(--ink);
+  font-size: 1.45rem; font-weight: 800; cursor: pointer; border: 0;
+  padding: 12px 0; border-radius: 18px; background: var(--card); color: var(--ink);
   box-shadow: var(--ring), 0 6px 0 var(--line-strong), 0 10px 20px rgba(20, 49, 77, .12);
   transition: transform .1s ease, box-shadow .1s ease;
 }

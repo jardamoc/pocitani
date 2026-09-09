@@ -1,4 +1,4 @@
-import { OPS, MISSING_LABEL, buildRound, explain, diagnose } from './generator.js';
+import { OPS, EXTRA_KINDS, MISSING_LABEL, buildRound, explain, diagnose } from './generator.js';
 import * as store from './stats.js';
 
 const el = (id) => document.getElementById(id);
@@ -17,14 +17,83 @@ const THEMES = {
   ocean: { label: 'Oceán', icon: '🐬', mascot: '🐬' },
   kawaii: { label: 'Kawaii', icon: '🌸', mascot: '🌸' },
   aesthetic: { label: 'Aesthetic', icon: '✨', mascot: '✨' },
-  gamer: { label: 'Gamer', icon: '🎮', mascot: '🎮' },
-  skate: { label: 'Skate', icon: '🛹', mascot: '🛹' },
   music: { label: 'Hudba', icon: '🎧', mascot: '🎧' },
-  space: { label: 'Vesmír', icon: '🚀', mascot: '🚀' },
+};
+
+/* Kulisa pro kazde tema. `m` je druh pohybu (viz .decor-* v CSS), `top`/`left`
+   jsou procenta okna, `size` px, `dur` sekundy jednoho cyklu, `delay` sekundy
+   posunu, aby prvky nesly v zakrytu. Mraky nechavame jen tam, kde je nad
+   scenou obloha - pod vodou ani v koncertnim svetle nedavaly smysl. */
+const SCENERY = {
+  panda: {
+    clouds: 2,
+    items: [
+      { e: '🐼', m: 'walk', top: 74, left: 14, size: 34, dur: 32 },
+      { e: '🐼', m: 'walk', top: 83, left: 62, size: 26, dur: 44, delay: 8 },
+      { e: '🎍', m: 'walk', top: 79, left: 38, size: 30, dur: 56, delay: 19 },
+      { e: '🌿', m: 'sway', top: 86, left: 8, size: 26, dur: 5 },
+      { e: '🌿', m: 'sway', top: 88, left: 88, size: 22, dur: 6, delay: 1.5 },
+    ],
+  },
+  unicorn: {
+    clouds: 2,
+    items: [
+      { e: '🦄', m: 'float', top: 11, left: 18, size: 36, dur: 40 },
+      { e: '🌈', m: 'float', top: 70, left: 64, size: 34, dur: 58, delay: 12 },
+      { e: '⭐', m: 'twinkle', top: 7, left: 78, size: 20, dur: 3.4 },
+      { e: '⭐', m: 'twinkle', top: 78, left: 12, size: 16, dur: 4.2, delay: 1.1 },
+      { e: '✨', m: 'twinkle', top: 44, left: 46, size: 18, dur: 3.8, delay: 2 },
+    ],
+  },
+  ocean: {
+    clouds: 0,
+    items: [
+      { e: '🐬', m: 'swim', top: 9, left: 22, size: 38, dur: 36 },
+      { e: '🐠', m: 'swim', top: 75, left: 66, size: 28, dur: 26, delay: 5 },
+      { e: '🐟', m: 'swim', top: 17, left: 34, size: 24, dur: 32, delay: 13 },
+      { e: '🐡', m: 'swim', top: 68, left: 78, size: 26, dur: 44, delay: 21 },
+      { e: '🫧', m: 'rise', top: 40, left: 16, size: 20, dur: 14 },
+      { e: '🫧', m: 'rise', top: 30, left: 84, size: 16, dur: 18, delay: 6 },
+      { e: '🪸', m: 'sway', top: 84, left: 50, size: 28, dur: 6 },
+    ],
+  },
+  kawaii: {
+    clouds: 1,
+    items: [
+      { e: '🌸', m: 'fall', top: 20, left: 14, size: 24, dur: 17, sway: -50 },
+      { e: '🌸', m: 'fall', top: 44, left: 54, size: 18, dur: 22, delay: 5, sway: 70 },
+      { e: '🌷', m: 'fall', top: 66, left: 82, size: 22, dur: 26, delay: 11, sway: -40 },
+      { e: '🌼', m: 'sway', top: 84, left: 12, size: 28, dur: 5 },
+      { e: '🌷', m: 'sway', top: 86, left: 44, size: 26, dur: 6, delay: 1.2 },
+      { e: '🌼', m: 'sway', top: 83, left: 78, size: 24, dur: 5.5, delay: 2.4 },
+    ],
+  },
+  aesthetic: {
+    clouds: 1,
+    items: [
+      { e: '✨', m: 'twinkle', top: 8, left: 20, size: 24, dur: 3.2 },
+      { e: '✨', m: 'twinkle', top: 76, left: 76, size: 20, dur: 4, delay: 1.3 },
+      { e: '🦋', m: 'float', top: 14, left: 40, size: 28, dur: 42 },
+      { e: '🫧', m: 'rise', top: 46, left: 62, size: 18, dur: 20, delay: 4 },
+      { e: '🌷', m: 'sway', top: 85, left: 24, size: 24, dur: 6 },
+      { e: '🌸', m: 'sway', top: 87, left: 70, size: 22, dur: 5.2, delay: 1.8 },
+    ],
+  },
+  music: {
+    clouds: 0,
+    items: [
+      { e: '🎵', m: 'float', top: 8, left: 22, size: 30, dur: 30 },
+      { e: '🎶', m: 'float', top: 73, left: 68, size: 26, dur: 38, delay: 9 },
+      { e: '🎸', m: 'float', top: 15, left: 36, size: 34, dur: 52, delay: 18 },
+      { e: '🎺', m: 'float', top: 68, left: 84, size: 28, dur: 46, delay: 27 },
+      { e: '🥁', m: 'sway', top: 83, left: 18, size: 30, dur: 5 },
+      { e: '🎹', m: 'sway', top: 85, left: 72, size: 28, dur: 6.4, delay: 1.6 },
+    ],
+  },
 };
 
 let state = store.load();
-let config = normalizeConfig(state.config) || { ops: ['add', 'sub'], count: 10, max: 20 };
+let config = normalizeConfig(state.config) || { ops: ['add', 'sub'], kinds: ['word', 'bond'], count: 10, max: 20 };
 
 let round = [];
 let index = 0;
@@ -32,13 +101,32 @@ let attempts = [];
 let locked = false;
 let shownAt = 0;
 let advanceTimer = null;
+let clockTimer = null;
+
+/* Barevne zastavky hodin. Mezi nimi se interpoluje, takze barva prejizdi
+   plynule - v 15 s je presne zluta, ve 30 s oranzova, v 60 s cervena.
+   Po minute uz zustava cervena. */
+const CLOCK_STOPS = [
+  { t: 0, rgb: [34, 197, 94] },
+  { t: 15, rgb: [234, 179, 8] },
+  { t: 30, rgb: [249, 115, 22] },
+  { t: 45, rgb: [234, 88, 12] },
+  { t: 60, rgb: [220, 38, 38] },
+];
+const CLOCK_MAX = 60;
+const CLOCK_CIRC = 2 * Math.PI * 16; // r=16 ve viewBoxu SVG
 
 function normalizeConfig(raw) {
   if (!raw) return null;
   const ops = Array.isArray(raw.ops) ? raw.ops.filter((o) => o in OPS) : [];
   if (!ops.length) return null;
+  // starsi ulozene nastaveni druhy nezna a mivalo je oba zapnute
+  const kinds = Array.isArray(raw.kinds)
+    ? raw.kinds.filter((k) => k in EXTRA_KINDS)
+    : Object.keys(EXTRA_KINDS);
   return {
     ops,
+    kinds,
     count: clamp(Number(raw.count) || 10, 3, 60),
     max: clamp(Number(raw.max) || 20, 5, 1000),
   };
@@ -50,6 +138,7 @@ function clamp(n, min, max) {
 
 function show(name) {
   for (const [key, node] of Object.entries(screens)) node.classList.toggle('is-active', key === name);
+  document.body.classList.toggle('is-quiz', name === 'quiz');
   window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
 }
 
@@ -101,17 +190,38 @@ function currentTheme() {
   return THEMES[state.theme] ? state.theme : 'panda';
 }
 
+function renderScenery() {
+  const spec = SCENERY[currentTheme()] || { clouds: 3, items: [] };
+  const parts = [];
+  for (let i = 0; i < spec.clouds; i++) parts.push(`<div class="cloud cloud-${i + 1}"></div>`);
+  for (const it of spec.items) {
+    const style = [
+      `--top:${it.top}vh`,
+      `--left:${it.left}vw`,
+      `--size:${it.size}px`,
+      `--dur:${it.dur}s`,
+      `--delay:-${it.delay || 0}s`,
+      `--sway:${it.sway || 0}px`,
+    ].join(';');
+    parts.push(`<span class="decor decor-${it.m}" style="${style}">${it.e}</span>`);
+  }
+  el('sceneryDecor').innerHTML = parts.join('');
+}
+
 function applyTheme() {
   const key = currentTheme();
   document.body.dataset.theme = key;
   el('heroMascot').textContent = THEMES[key].mascot;
+  renderScenery();
 
   const dark = !!state.dark;
   document.body.classList.toggle('is-dark', dark);
-  const btn = el('darkBtn');
-  btn.textContent = dark ? '☀️' : '🌙';
-  btn.setAttribute('aria-pressed', String(dark));
-  btn.setAttribute('aria-label', dark ? 'Přepnout světlý režim' : 'Přepnout tmavý režim');
+  // dva prepinace: plovouci na nastaveni a vysledku, druhy v liste kvizu
+  for (const btn of [el('darkBtn'), el('darkBtnQuiz')]) {
+    btn.textContent = dark ? '☀️' : '🌙';
+    btn.setAttribute('aria-pressed', String(dark));
+    btn.setAttribute('aria-label', dark ? 'Přepnout světlý režim' : 'Přepnout tmavý režim');
+  }
 }
 
 function renderConfigScreen() {
@@ -126,6 +236,10 @@ function renderConfigScreen() {
     .map(([key, op]) => chipHTML(key, `${op.emoji} ${op.label}`, config.ops.includes(key)))
     .join('');
 
+  el('kindChips').innerHTML = Object.entries(EXTRA_KINDS)
+    .map(([key, kind]) => chipHTML(key, `${kind.emoji} ${kind.label}`, config.kinds.includes(key)))
+    .join('');
+
   el('countChips').innerHTML = COUNT_PRESETS
     .map((n) => chipHTML(n, `${n} příkladů`, config.count === n))
     .join('');
@@ -133,6 +247,8 @@ function renderConfigScreen() {
   el('maxChips').innerHTML = MAX_PRESETS
     .map((n) => chipHTML(n, `do ${n}`, config.max === n))
     .join('');
+
+  renderKindNote();
 
   el('countCustom').value = COUNT_PRESETS.includes(config.count) ? '' : config.count;
   el('maxCustom').value = MAX_PRESETS.includes(config.max) ? '' : config.max;
@@ -146,6 +262,21 @@ function renderConfigScreen() {
 
 function chipHTML(value, label, on) {
   return `<button type="button" class="chip${on ? ' is-on' : ''}" data-value="${value}" aria-pressed="${on}">${label}</button>`;
+}
+
+/* Zapnuty druh, ktery se k vybranym operacim nehodi, by tise vypadl.
+   Radeji to rekneme nahlas, ať je jasné, proč v kole není. */
+function renderKindNote() {
+  const note = el('kindNote');
+  const blocked = config.kinds.filter((k) => !config.ops.some((o) => EXTRA_KINDS[k].ops.includes(o)));
+  if (!blocked.length) {
+    note.hidden = true;
+    return;
+  }
+  note.textContent = blocked
+    .map((k) => `${EXTRA_KINDS[k].label} jdou jen u ${EXTRA_KINDS[k].ops.map((o) => OPS[o].name).join(' a ')}.`)
+    .join(' ') + ' Přidej si je nahoře, jinak se v kole neobjeví.';
+  note.hidden = false;
 }
 
 function renderLastHint() {
@@ -163,11 +294,13 @@ function renderLastHint() {
   hint.hidden = false;
 }
 
-el('darkBtn').addEventListener('click', () => {
-  state.dark = !state.dark;
-  store.save(state);
-  applyTheme();
-});
+for (const id of ['darkBtn', 'darkBtnQuiz']) {
+  el(id).addEventListener('click', () => {
+    state.dark = !state.dark;
+    store.save(state);
+    applyTheme();
+  });
+}
 
 el('themeChips').addEventListener('click', (e) => {
   const chip = e.target.closest('.chip');
@@ -190,6 +323,18 @@ el('opChips').addEventListener('click', (e) => {
     return;
   }
   config.ops = next;
+  renderConfigScreen();
+});
+
+/* Na rozdil od operaci je prazdny vyber v poradku - pak jsou v kole
+   jen obycejne priklady. */
+el('kindChips').addEventListener('click', (e) => {
+  const chip = e.target.closest('.chip');
+  if (!chip) return;
+  const value = chip.dataset.value;
+  config.kinds = config.kinds.includes(value)
+    ? config.kinds.filter((k) => k !== value)
+    : [...config.kinds, value];
   renderConfigScreen();
 });
 
@@ -259,6 +404,44 @@ function startRound() {
   renderExercise();
 }
 
+/* ---------------- hodiny ---------------- */
+function clockColor(sec) {
+  const stops = CLOCK_STOPS;
+  if (sec <= stops[0].t) return `rgb(${stops[0].rgb.join(',')})`;
+  const last = stops[stops.length - 1];
+  if (sec >= last.t) return `rgb(${last.rgb.join(',')})`;
+  const i = stops.findIndex((s) => s.t > sec);
+  const from = stops[i - 1];
+  const to = stops[i];
+  const k = (sec - from.t) / (to.t - from.t);
+  const mix = from.rgb.map((c, j) => Math.round(c + (to.rgb[j] - c) * k));
+  return `rgb(${mix.join(',')})`;
+}
+
+function paintClock(sec) {
+  const clock = el('quizClock');
+  const progress = Math.min(1, sec / CLOCK_MAX);
+  clock.style.setProperty('--clock', clockColor(sec));
+  clock.querySelector('.clock-progress').style.strokeDashoffset = String(CLOCK_CIRC * (1 - progress));
+  // rotace pres SVG atribut, ne CSS - transform-origin u SVG se chova nejednotne
+  clock.querySelector('.clock-hand').setAttribute('transform', `rotate(${progress * 360} 20 20)`);
+  clock.classList.toggle('is-over', sec >= CLOCK_MAX);
+  el('quizClockText').textContent = `${Math.floor(sec)} s`;
+}
+
+function startClock() {
+  stopClock();
+  paintClock(0);
+  clockTimer = setInterval(() => paintClock((Date.now() - shownAt) / 1000), 100);
+}
+
+/* Hodiny se zastavi, ale zustanou stat na dosazenem case - je videt,
+   jak dlouho priklad trval. */
+function stopClock() {
+  clearInterval(clockTimer);
+  clockTimer = null;
+}
+
 function renderExercise() {
   clearTimeout(advanceTimer);
   locked = false;
@@ -277,6 +460,7 @@ function renderExercise() {
   input.maxLength = String(config.max).length + 1;
   input.focus({ preventScroll: true });
   shownAt = Date.now();
+  startClock();
 }
 
 function hintFor(ex) {
@@ -393,6 +577,7 @@ function submit() {
   }
 
   locked = true;
+  stopClock();
   el('keypad').dataset.disabled = 'true';
 
   const ex = round[index];
@@ -486,12 +671,14 @@ function next() {
 el('quitBtn').addEventListener('click', () => {
   if (!confirm('Ukončit trénink? Rozpočítané kolo se nezapočítá.')) return;
   clearTimeout(advanceTimer);
+  stopClock();
   show('config');
   renderConfigScreen();
 });
 
 /* ---------------- výsledek ---------------- */
 function finish() {
+  stopClock();
   const report = store.analyze(state, config, attempts);
   store.recordRound(state, config, attempts);
   renderResult(report);

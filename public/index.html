@@ -16,10 +16,8 @@
 
 <div class="scenery" aria-hidden="true">
   <div class="sun"></div>
-  <div class="cloud cloud-1"></div>
-  <div class="cloud cloud-2"></div>
-  <div class="cloud cloud-3"></div>
   <div class="hills"></div>
+  <div id="sceneryDecor" class="decor-layer"></div>
 </div>
 
 <div id="confetti" class="confetti-layer" aria-hidden="true"></div>
@@ -48,6 +46,12 @@
       <h2 class="card-title"><span aria-hidden="true">🎯</span> Co budeme počítat?</h2>
       <div id="opChips" class="chips chips-ops"></div>
       <p id="opsError" class="field-error" hidden>Vyber aspoň jednu možnost.</p>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title"><span aria-hidden="true">🧩</span> Chceš i něco navíc?</h2>
+      <div id="kindChips" class="chips"></div>
+      <p id="kindNote" class="field-note" hidden></p>
     </div>
 
     <div class="card">
@@ -81,7 +85,17 @@
     <div class="quiz-top">
       <button id="quitBtn" class="icon-btn" aria-label="Ukončit trénink">✕</button>
       <div class="quiz-counter"><span id="quizCounter">1 / 10</span></div>
+      <div id="quizClock" class="quiz-clock" role="timer" aria-live="off" aria-label="Čas na tento příklad">
+        <svg class="clock-face" viewBox="0 0 40 40" aria-hidden="true">
+          <circle class="clock-track" cx="20" cy="20" r="16"></circle>
+          <circle class="clock-progress" cx="20" cy="20" r="16" transform="rotate(-90 20 20)"></circle>
+          <line class="clock-hand" x1="20" y1="20" x2="20" y2="6.5"></line>
+          <circle class="clock-pin" cx="20" cy="20" r="2.2"></circle>
+        </svg>
+        <span id="quizClockText" class="clock-text">0 s</span>
+      </div>
       <div class="quiz-score" aria-live="off"><span aria-hidden="true">⭐</span> <span id="quizScore">0</span></div>
+      <button id="darkBtnQuiz" class="icon-btn icon-btn-sm" type="button" aria-pressed="false" aria-label="Přepnout tmavý režim">🌙</button>
     </div>
     <div id="dots" class="dots" aria-hidden="true"></div>
 

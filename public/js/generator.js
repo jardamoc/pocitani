@@ -11,6 +11,18 @@ export const MISSING_LABEL = {
   c: 'chybí výsledek',
 };
 
+/* Druhy uloh navic k obycejnym prikladum. `ops` rika, ke kterym operacim
+   se druh hodi - slovni ulohy mame jen pro scitani a odcitani, sablony vet
+   pro nasobeni a deleni neexistuji. */
+export const EXTRA_KINDS = {
+  word: { label: 'Slovní úlohy', emoji: '📖', ops: ['add', 'sub'] },
+  bond: { label: 'Pyramidy', emoji: '🔺', ops: ['add', 'sub', 'mul', 'div'] },
+};
+
+/* Zapnuty druh ma byt videt vic nez drive (drive vychazelo ~2 z 10).
+   Kvotu proto pocitame pevne, ne pres nahodu, aby v kole opravdu byly. */
+const EXTRA_SHARE = 0.3;
+
 const rnd = (min, max) => min + Math.floor(Math.random() * (max - min + 1));
 const pick = (arr) => arr[rnd(0, arr.length - 1)];
 const chance = (p) => Math.random() < p;
@@ -189,15 +201,22 @@ function makeExercise(op, max, opts = {}) {
   return finalize({ op, kind: 'equation', missing: opts.missing || pickMissing(), ...t });
 }
 
-function randomExercise(ops, max) {
-  const op = pick(ops);
-  const wordable = op === 'add' || op === 'sub';
-  const kind = wordable && chance(0.15) ? 'word' : chance(0.18) ? 'bond' : 'equation';
-  return makeExercise(op, max, { kind });
+function randomExercise(ops, max, kind = 'equation') {
+  const pool = kind === 'equation' ? ops : ops.filter((o) => EXTRA_KINDS[kind].ops.includes(o));
+  if (!pool.length) return null;
+  return makeExercise(pick(pool), max, { kind });
 }
 
-function focusAllowed(m, ops) {
-  return ops.includes(m.op);
+/* Vrati druhy, ktere se pri danem nastaveni daji vygenerovat. Zapnuty druh
+   bez vhodne operace (napr. slovni ulohy jen s nasobenim) proste vypadne. */
+export function usableKinds(config) {
+  const enabled = Array.isArray(config.kinds) ? config.kinds : [];
+  return enabled.filter((k) => EXTRA_KINDS[k] && config.ops.some((o) => EXTRA_KINDS[k].ops.includes(o)));
+}
+
+function focusAllowed(m, ops, kinds) {
+  if (!ops.includes(m.op)) return false;
+  return m.kind === 'equation' || kinds.includes(m.kind);
 }
 
 function similarTo(m, max) {
@@ -216,7 +235,9 @@ function similarTo(m, max) {
 
 export function buildRound(config, missed = []) {
   const { ops, count, max } = config;
-  const usable = missed.filter((m) => focusAllowed(m, ops));
+  const kinds = usableKinds(config);
+
+  const usable = missed.filter((m) => focusAllowed(m, ops, kinds));
   const focusCount = Math.min(usable.length, Math.round(count * 0.4));
   const chosen = shuffle(usable.slice(0, 12)).slice(0, focusCount);
 
@@ -235,9 +256,21 @@ export function buildRound(config, missed = []) {
     for (let t = 0; t < 6; t++) if (push(similarTo(m, max))) break;
   }
 
+  // kvota pro kazdy zapnuty druh; opakovane priklady z minula se do ni pocitaji
+  const quota = Math.max(1, Math.round(count * EXTRA_SHARE));
+  for (const kind of kinds) {
+    let have = items.filter((ex) => ex.kind === kind).length;
+    let guard = 0;
+    while (have < quota && items.length < count && guard++ < quota * 40) {
+      if (push(randomExercise(ops, max, kind))) have += 1;
+    }
+  }
+
   let guard = 0;
   while (items.length < count && guard++ < count * 60) push(randomExercise(ops, max));
-  while (items.length < count) items.push(randomExercise(ops, max));
+  // uz jen dorovnani, kdyz je rozsah tak maly, ze nove kombinace nejsou
+  const anyKind = ['equation', ...kinds];
+  while (items.length < count) items.push(randomExercise(ops, max, pick(anyKind)) || randomExercise(ops, max));
 
   return shuffle(items).slice(0, count);
 }

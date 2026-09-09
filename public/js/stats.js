@@ -86,6 +86,9 @@ const KIND_LABEL = {
   'bond:c': 'pyramidy s chybějícím celkem',
   'bond:a': 'pyramidy s chybějící částí',
   'bond:b': 'pyramidy s chybějící částí',
+  'word:c': 'slovní úlohy na výsledek',
+  'word:a': 'slovní úlohy na počátek',
+  'word:b': 'slovní úlohy na změnu',
 };
 
 function starsFor(pct) {
