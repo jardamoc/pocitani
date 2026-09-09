@@ -9,7 +9,7 @@ const screens = {
 };
 
 const COUNT_PRESETS = [10, 20, 30];
-const MAX_PRESETS = [10, 20, 30, 50, 100];
+const MAX_PRESETS = [10, 15, 20, 30, 50, 100];
 
 const THEMES = {
   panda: { label: 'Panda', icon: '🐼', mascot: '🐼' },
@@ -267,7 +267,8 @@ function renderExercise() {
   el('quizCounter').textContent = `${index + 1} / ${round.length}`;
   el('dots').querySelectorAll('.dot').forEach((dot, i) => dot.classList.toggle('is-current', i === index));
   el('exerciseHint').textContent = hintFor(ex);
-  el('exerciseBody').innerHTML = ex.kind === 'bond' ? bondHTML(ex) : equationHTML(ex);
+  el('exerciseBody').innerHTML =
+    ex.kind === 'bond' ? bondHTML(ex) : ex.kind === 'word' ? wordHTML(ex) : equationHTML(ex);
   el('feedback').hidden = true;
   el('feedback').innerHTML = '';
   el('keypad').dataset.disabled = 'false';
@@ -279,11 +280,19 @@ function renderExercise() {
 }
 
 function hintFor(ex) {
+  if (ex.kind === 'word') return `Slovní úloha – ${OPS[ex.op].name}.`;
   if (ex.kind === 'bond') {
-    const op = ex.op === 'mul' ? 'Nahoře je součin obou spodních čísel' : 'Nahoře je součet obou spodních čísel';
-    return `${op}. Doplň prázdné okénko.`;
+    const relation = ex.family === 'mul' ? 'součin' : 'součet';
+    return ex.missing === 'c'
+      ? `Nahoře doplň ${relation} obou spodních čísel.`
+      : `Nahoře je celek, dole chybí jedna část. Dopočítej ${OPS[ex.op].name}m.`;
   }
   return `${OPS[ex.op].label} – ${MISSING_LABEL[ex.missing]}.`;
+}
+
+function wordHTML(ex) {
+  return `<p class="story">${ex.story}</p>
+    <div class="equation equation-single">${slotHTML()}</div>`;
 }
 
 function slotHTML() {
@@ -312,7 +321,7 @@ function bondHTML(ex) {
         <line x1="50" y1="2" x2="20" y2="42" vector-effect="non-scaling-stroke"></line>
         <line x1="50" y1="2" x2="80" y2="42" vector-effect="non-scaling-stroke"></line>
       </svg>
-      <div class="bond-row bond-row-bottom">${box('a')}<span class="bond-op" aria-hidden="true">${ex.op === 'mul' ? '×' : '+'}</span>${box('b')}</div>
+      <div class="bond-row bond-row-bottom">${box('a')}<span class="bond-op" aria-hidden="true">${ex.family === 'mul' ? '×' : '+'}</span>${box('b')}</div>
     </div>`;
 }
 
@@ -407,6 +416,42 @@ function submit() {
   if (correct) confetti();
 }
 
+/* Grafické vysvětlení pro rozsah do 20: dva řádky po deseti kroužcích.
+   Zlom řádku je přesně desítka, takže je vidět přechod přes ni. */
+function tenFrameHTML(ex) {
+  const relation = ex.kind === 'bond' ? ex.family : ex.op === 'add' || ex.op === 'sub' ? 'add' : null;
+  if (relation !== 'add') return '';
+
+  const { a, b, c } = ex;
+  const removing = ex.op === 'sub' && ex.kind !== 'bond';
+  const total = removing ? a : c;
+  if (total > 20) return '';
+
+  const cells = [];
+  for (let i = 0; i < 20; i++) {
+    let cls = 'tf-cell';
+    if (removing) {
+      if (i < c) cls += ' tf-a';
+      else if (i < a) cls += ' tf-gone';
+    } else if (i < a) cls += ' tf-a';
+    else if (i < c) cls += ' tf-b';
+    cells.push(`<span class="${cls}"></span>`);
+  }
+
+  // cestina meni tvar podstatneho jmena podle cislovky i padu
+  const circlesGen = (n) => `${n} ${n === 1 ? 'kroužku' : 'kroužků'}`;
+  const circlesAcc = (n) => `${n} ${n === 1 ? 'kroužek' : n <= 4 ? 'kroužky' : 'kroužků'}`;
+
+  const caption = removing
+    ? `Z ${circlesGen(a)} jsi ${b} odebrala (přeškrtnuté). Zbylo ${c}.`
+    : ex.cross
+      ? `Nejdřív ${circlesAcc(a)} jednou barvou, pak ${circlesAcc(b)} druhou. První řádek se zaplní do deseti a zbytek přeteče do druhého.`
+      : `Nejdřív ${circlesAcc(a)} jednou barvou, pak ${circlesAcc(b)} druhou. Dohromady ${c}.`;
+
+  return `<div class="tenframe" aria-hidden="true">${cells.join('')}</div>
+    <p class="tenframe-caption">${caption}</p>`;
+}
+
 function renderFeedback(ex, given, correct) {
   const fb = el('feedback');
   fb.dataset.state = correct ? 'correct' : 'wrong';
@@ -425,6 +470,7 @@ function renderFeedback(ex, given, correct) {
     <div class="fb-answer">Správně je <b>${ex.answer}</b>${Number.isFinite(given) ? ` <span class="retry-given">(napsala jsi ${given})</span>` : ''}</div>
     <p class="fb-steps-title">Jak na to:</p>
     <ul class="fb-steps">${steps}</ul>
+    ${tenFrameHTML(ex)}
     <button type="button" class="btn btn-primary">Rozumím, další <span aria-hidden="true">➜</span></button>`;
   fb.hidden = false;
   fb.querySelector('.btn').addEventListener('click', next);

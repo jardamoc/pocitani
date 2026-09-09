@@ -88,15 +88,23 @@ function makeBond(family, max) {
   return { a, b: c - a, c };
 }
 
-function pickMissing(kind) {
+function pickMissing() {
   const r = Math.random();
-  if (kind === 'bond') return r < 0.4 ? 'c' : r < 0.7 ? 'a' : 'b';
   return r < 0.45 ? 'c' : r < 0.75 ? 'b' : 'a';
+}
+
+/* Pyramida patri k vybrane operaci: scitani a nasobeni doplnuji celek nahore,
+   odcitani a deleni chybejici dil dole. Bez toho by pri zvolenem deleni
+   vyskocila nasobici pyramida. */
+function bondMissingFor(op) {
+  if (op === 'add' || op === 'mul') return 'c';
+  return chance(0.5) ? 'a' : 'b';
 }
 
 function finalize(ex) {
   ex.answer = ex[ex.missing];
-  ex.cross = crossesTen(ex.op, ex.a, ex.b);
+  const relation = ex.family || ex.op;
+  ex.cross = crossesTen(relation === 'mul' ? 'mul' : ex.kind === 'bond' ? 'add' : ex.op, ex.a, ex.b);
   ex.skill = `${ex.op}:${ex.kind}:${ex.missing}:${ex.cross ? 'cross' : 'plain'}`;
   return ex;
 }
@@ -109,29 +117,86 @@ function bondFamily(op) {
   return op === 'mul' || op === 'div' ? 'mul' : 'add';
 }
 
+/* Slovni ulohy - vzdy v zenskem rode, aplikace je pro jednu holku.
+   Tvary podstatnych jmen drzime v tabulce, cestina po cislovkach meni pad. */
+const STORY_ITEMS = [
+  { one: 'bonbon', few: 'bonbony', many: 'bonbonů', take: 'sníst', took: 'snědla' },
+  { one: 'korálek', few: 'korálky', many: 'korálků', take: 'schovat', took: 'schovala' },
+  { one: 'samolepku', few: 'samolepky', many: 'samolepek', take: 'rozdat', took: 'rozdala' },
+  { one: 'jablko', few: 'jablka', many: 'jablek', take: 'sníst', took: 'snědla' },
+  { one: 'kytičku', few: 'kytičky', many: 'kytiček', take: 'rozdat', took: 'rozdala' },
+  { one: 'kolečko', few: 'kolečka', many: 'koleček', take: 'odebrat', took: 'odebrala' },
+];
+
+/* Vsechny sablony pouzivaji podstatne jmeno ve 4. padu (mela jsi, dostala jsi,
+   abys mela), proto je tvar pro jednicku ulozeny rovnou v akuzativu. */
+function czPlural(n, item) {
+  if (n === 1) return item.one;
+  if (n >= 2 && n <= 4) return item.few;
+  return item.many;
+}
+
+/* Vety schvalne stavime tak, aby se prisudek neshodoval s cislovkou
+   ("abys mela 2 koralky", ne "aby ti zbylo 2"), jinak by cislo menilo tvar
+   slovesa podle rodu i poctu. */
+function storyFor(op, missing, a, b, c, item) {
+  const pl = (n) => czPlural(n, item);
+  if (op === 'sub') {
+    if (missing === 'b') return `Měla jsi ${a} ${pl(a)}. Kolik jich musíš ${item.take}, abys měla ${c} ${pl(c)}?`;
+    if (missing === 'a') return `Kolik jsi měla ${item.many} celkem, když jsi ${b} ${item.took} a teď máš ${c} ${pl(c)}?`;
+    return `Měla jsi ${a} ${pl(a)} a ${b} jsi ${item.took}. Kolik ti zbylo?`;
+  }
+  if (missing === 'b') return `Měla jsi ${a} ${pl(a)}. Kolik jich musíš dostat, abys měla ${c} ${pl(c)}?`;
+  if (missing === 'a') return `Kolik jsi měla ${item.many} na začátku, když jsi dostala ${b} ${pl(b)} a teď máš ${c} ${pl(c)}?`;
+  return `Měla jsi ${a} ${pl(a)} a dostala jsi ještě ${b} ${pl(b)}. Kolik jich máš teď?`;
+}
+
+function makeWord(op, max, missing) {
+  let t = null;
+  for (let i = 0; i < 40; i++) {
+    const candidate = makeTriple(op, max, chance(0.5));
+    if (candidate.a >= 1 && candidate.b >= 1 && candidate.c >= 1) {
+      t = candidate;
+      break;
+    }
+    if (!t) t = candidate;
+  }
+  const item = pick(STORY_ITEMS);
+  return finalize({
+    op,
+    kind: 'word',
+    missing,
+    ...t,
+    story: storyFor(op, missing, t.a, t.b, t.c, item),
+  });
+}
+
 function makeExercise(op, max, opts = {}) {
   const kind = opts.kind || 'equation';
+
   if (kind === 'bond') {
     const family = bondFamily(op);
     const t = makeBond(family, max);
-    return finalize({ op: family, kind: 'bond', missing: opts.missing || pickMissing('bond'), ...t });
+    return finalize({ op, family, kind: 'bond', missing: opts.missing || bondMissingFor(op), ...t });
   }
+
+  if (kind === 'word') {
+    return makeWord(op, max, opts.missing || pickMissing());
+  }
+
   const wantCross = op === 'add' || op === 'sub' ? chance(0.55) : null;
   const t = makeTriple(op, max, wantCross);
-  return finalize({ op, kind: 'equation', missing: opts.missing || pickMissing('equation'), ...t });
+  return finalize({ op, kind: 'equation', missing: opts.missing || pickMissing(), ...t });
 }
 
 function randomExercise(ops, max) {
   const op = pick(ops);
-  return makeExercise(op, max, { kind: chance(0.18) ? 'bond' : 'equation' });
+  const wordable = op === 'add' || op === 'sub';
+  const kind = wordable && chance(0.15) ? 'word' : chance(0.18) ? 'bond' : 'equation';
+  return makeExercise(op, max, { kind });
 }
 
 function focusAllowed(m, ops) {
-  if (m.kind === 'bond') {
-    return m.op === 'mul'
-      ? ops.includes('mul') || ops.includes('div')
-      : ops.includes('add') || ops.includes('sub');
-  }
   return ops.includes(m.op);
 }
 
@@ -180,9 +245,14 @@ export function buildRound(config, missed = []) {
 export function exToText(ex, reveal = false) {
   const shown = (key) => (ex.missing === key ? (reveal ? String(ex.answer) : '__') : String(ex[key]));
   if (ex.kind === 'bond') {
-    const sym = ex.op === 'mul' ? '×' : '+';
-    return `pyramida ${shown('c')} = ${shown('a')} ${sym} ${shown('b')}`;
+    return `pyramida ${shown('c')} = ${shown('a')} ${ex.family === 'mul' ? '×' : '+'} ${shown('b')}`;
   }
+  const eq = `${shown('a')} ${OPS[ex.op].symbol} ${shown('b')} = ${shown('c')}`;
+  return ex.kind === 'word' ? `slovní úloha (${eq})` : eq;
+}
+
+export function equationText(ex) {
+  const shown = (key) => (ex.missing === key ? '__' : String(ex[key]));
   return `${shown('a')} ${OPS[ex.op].symbol} ${shown('b')} = ${shown('c')}`;
 }
 
@@ -219,8 +289,12 @@ function repeatedAdditionStep(a, b, c) {
 export function explain(ex) {
   const { op, kind, missing, a, b, c } = ex;
 
+  if (kind === 'word') {
+    return [`Zapsáno jako příklad: ${equationText(ex)}`, ...explainEquation(ex)];
+  }
+
   if (kind === 'bond') {
-    if (op === 'add') {
+    if (ex.family === 'add') {
       if (missing === 'c') {
         return ['Spodní čísla dáme dohromady.', ...tenStrategyAdd(a, b, c), `${a} + ${b} = ${c}.`];
       }
@@ -239,6 +313,12 @@ export function explain(ex) {
       `Zkouška: ${a} × ${b} = ${c}. ✔`,
     ];
   }
+
+  return explainEquation(ex);
+}
+
+function explainEquation(ex) {
+  const { op, missing, a, b, c } = ex;
 
   if (op === 'add') {
     if (missing === 'c') return [...tenStrategyAdd(a, b, c), `${a} + ${b} = ${c}.`];

@@ -430,6 +430,11 @@ body[data-theme="space"] .scenery::after {
   display: flex; align-items: center; justify-content: center; gap: clamp(8px, 3vw, 18px);
   flex-wrap: nowrap;
 }
+.equation-single { margin-top: 4px; }
+.story {
+  margin: 0 0 18px; font-size: 1.14rem; font-weight: 700; line-height: 1.5;
+  color: var(--ink); text-align: left;
+}
 .num, .eq-op { font-size: clamp(2.1rem, 10vw, 3.4rem); font-weight: 800; line-height: 1.1; }
 .eq-op { color: var(--coral); font-weight: 700; }
 
@@ -505,6 +510,21 @@ body[data-theme="space"] .scenery::after {
 .fb-steps { margin: 0; padding: 0; list-style: none; }
 .fb-steps li { margin-bottom: 6px; font-weight: 600; line-height: 1.45; }
 .feedback .btn { margin-top: 16px; width: 100%; }
+
+/* desitkovy ramec - 10 kroužků na řádek, zlom = desítka */
+.tenframe {
+  display: grid; grid-template-columns: repeat(10, 1fr); gap: 5px;
+  max-width: 340px; margin: 16px auto 0;
+}
+.tf-cell { aspect-ratio: 1; border-radius: 50%; box-shadow: inset 0 0 0 2px var(--line); }
+.tf-a { background: var(--accent-a); box-shadow: none; }
+.tf-b { background: var(--accent-b); box-shadow: none; }
+.tf-gone { position: relative; background: var(--surface-2); box-shadow: inset 0 0 0 2px var(--bad); }
+.tf-gone::after {
+  content: '×'; position: absolute; inset: 0; display: grid; place-items: center;
+  color: var(--bad); font-weight: 800; font-size: .95rem; line-height: 1;
+}
+.tenframe-caption { margin: 10px 0 0; font-weight: 700; color: var(--ink-soft); line-height: 1.45; }
 
 /* ---------- klávesnice ---------- */
 .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
