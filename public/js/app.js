@@ -11,13 +11,15 @@ const screens = {
 const COUNT_PRESETS = [10, 20, 30];
 const MAX_PRESETS = [10, 15, 20, 30, 50, 100];
 
+/* `start` je ikona na tlacitku Zacit. Zamerne to neni maskot - ten uz kouka
+   z hlavicky, tady se hodi neco, co znamena "jdeme". */
 const THEMES = {
-  panda: { label: 'Panda', icon: '🐼', mascot: '🐼' },
-  unicorn: { label: 'Jednorožec', icon: '🦄', mascot: '🦄' },
-  ocean: { label: 'Oceán', icon: '🐬', mascot: '🐬' },
-  kawaii: { label: 'Kawaii', icon: '🌸', mascot: '🌸' },
-  aesthetic: { label: 'Aesthetic', icon: '✨', mascot: '✨' },
-  music: { label: 'Hudba', icon: '🎧', mascot: '🎧' },
+  panda: { label: 'Panda', icon: '🐼', mascot: '🐼', start: '🐾' },
+  unicorn: { label: 'Jednorožec', icon: '🦄', mascot: '🦄', start: '🌈' },
+  ocean: { label: 'Oceán', icon: '🐬', mascot: '🐬', start: '🌊' },
+  kawaii: { label: 'Kawaii', icon: '🌸', mascot: '🌸', start: '🎀' },
+  aesthetic: { label: 'Aesthetic', icon: '✨', mascot: '✨', start: '✨' },
+  music: { label: 'Hudba', icon: '🎧', mascot: '🎧', start: '🎶' },
 };
 
 /* Kulisa pro kazde tema. `m` je druh pohybu (viz .decor-* v CSS), `top`/`left`
@@ -212,6 +214,7 @@ function applyTheme() {
   const key = currentTheme();
   document.body.dataset.theme = key;
   el('heroMascot').textContent = THEMES[key].mascot;
+  el('startIcon').textContent = THEMES[key].start;
   renderScenery();
 
   const dark = !!state.dark;
