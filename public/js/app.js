@@ -735,6 +735,7 @@ function riddleNotesHTML(ex) {
 function gridHTML(ex) {
   const { size, cells, colOps, rowOps, hidden } = ex;
   const holeAt = (r, c) => hidden.findIndex((h) => h.r === r && h.c === c);
+  const digits = String(config.max).length;
   const out = [];
 
   for (let r = 0; r < size; r++) {
@@ -745,8 +746,11 @@ function gridHTML(ex) {
       } else {
         const first = idx === 0 ? ' id="answerSlot"' : '';
         const id = idx === 0 ? ' id="answerInput"' : '';
+        /* `maxlength` musí mít KAŽDÉ kolečko. `renderExercise` ho nastavuje
+           jen tomu s id="answerInput"; bez atributu vrací `input.maxLength`
+           −1 a klávesnice by do zbylých koleček nenapsala ani číslici. */
         out.push(`<span class="gcell slot"${first}><input${id} class="grid-input" type="text"
-          inputmode="none" autocomplete="off" data-idx="${idx}"
+          inputmode="none" autocomplete="off" data-idx="${idx}" maxlength="${digits}"
           aria-label="Doplň číslo, ${r + 1}. řádek, ${c + 1}. sloupec"></span>`);
       }
       if (c < size - 2) out.push(`<span class="gop">${colOps[c]}</span>`);
@@ -820,7 +824,8 @@ function handleKey(key) {
     delete input.dataset.op;
     return;
   }
-  if (input.value.length >= input.maxLength) return;
+  // maxLength je −1, když atribut chybí; brát to jako "žádný limit"
+  if (input.maxLength > 0 && input.value.length >= input.maxLength) return;
   input.value += key;
 }
 
@@ -831,7 +836,8 @@ el('exerciseBody').addEventListener('focusin', (e) => {
 // do odpovědi i do poznámek pustíme jen číslice - i při vložení ze schránky
 document.addEventListener('input', (e) => {
   if (!e.target.matches?.(FIELD_SEL)) return;
-  const digits = e.target.value.replace(/\D+/g, '').slice(0, e.target.maxLength);
+  const cap = e.target.maxLength > 0 ? e.target.maxLength : undefined;
+  const digits = e.target.value.replace(/\D+/g, '').slice(0, cap);
   if (digits !== e.target.value) e.target.value = digits;
   // jakmile dítě začne přepisovat, červená z kolečka zmizí
   e.target.closest('.gcell')?.classList.remove('is-wrong');

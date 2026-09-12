@@ -712,14 +712,21 @@ body.is-quiz .wrap { padding-top: 18px; }
 .gcell.slot {
   border-radius: 50%; width: var(--cell); height: var(--cell); min-width: 0;
 }
-.grid-input {
+/* Selektor musí mít dost specificity, aby přebil obecné `.slot input`
+   (0,1,1) - jinak si zapsané číslo vezme velikost písma z běžného políčka
+   na odpověď, přeteče z kolečka a nevypadá vycentrovaně. */
+.gcell .grid-input {
   font: inherit; font-family: 'Baloo 2', sans-serif; font-weight: 800;
   font-size: calc(var(--cell) * .42); text-align: center; color: var(--violet);
   width: 100%; height: 100%; min-width: 0; padding: 0;
   border: 0; background: transparent;
+  /* výška řádku přes celý vnitřek kolečka drží číslici svisle na středu
+     bez ohledu na to, jak si prohlížeč centruje text v <input> */
+  line-height: calc(var(--cell) - 8px);
 }
-.grid[data-digits="3"] .grid-input, .grid[data-digits="4"] .grid-input { font-size: calc(var(--cell) * .34); }
-.grid-input:focus { outline: none; }
+.grid[data-digits="3"] .gcell .grid-input,
+.grid[data-digits="4"] .gcell .grid-input { font-size: calc(var(--cell) * .34); }
+.gcell .grid-input:focus { outline: none; }
 .gcell.slot:focus-within { box-shadow: 0 0 0 4px rgba(124, 92, 255, .35); }
 
 /* po druhé chybě: správná hodnota a pod ní přeškrtnutá vlastní */
