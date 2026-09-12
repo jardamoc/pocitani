@@ -186,17 +186,16 @@ Přetečení neměř přes `scrollWidth > clientWidth`; řádek se místo rolov�
 kontrola projde. Porovnávej **součet šířek dětí** proti vnitřní šířce řádku, nebo sleduj
 `document.documentElement.scrollWidth > window.innerWidth`.
 
-## Cizí dovednosti v repozitáři
+## Pozor na `npx skills add`
 
-12. 9. 2026 sem `npx skills add JuliusBrussee/caveman` nainstaloval 20 dovedností.
-Instalátor použil **aktuální adresář**, takže neskončily globálně, ale uvnitř tohohle
-projektu: `.agents/`, `.claude/skills/` a `skills-lock.json`. Všechno tři je v
-`.gitignore` — je to cizí kód vázaný na tenhle stroj a do repozitáře s aplikací nepatří.
+Instalátor dovedností používá **aktuální adresář**, ne globální složku. Když ho pustíš
+odsud, nasype 20 cizích dovedností rovnou do repozitáře s aplikací (`.agents/`,
+`.claude/skills/`, `skills-lock.json`) — přesně to se stalo 12. 9. 2026. Dovednosti
+patří do `~/.claude/skills/`, kam byly ručně přesunuty; ty tři cesty zůstávají
+v `.gitignore` jako pojistka, kdyby se to opakovalo.
 
-**Nikdy je necommituj** a při `git add -A` si ověř, že `git status` nehlásí nic z těch
-cest. Bezpečnostní sken instalátoru označil `caveman-setup` a `caveman-compress` jako
-**High Risk** a `caveman-review` jako Med Risk; dovednosti běží s plnými právy agenta,
-takže je před použitím přečti.
+Do repozitáře s aplikací pro dceru cizí kód nepatří. Kdyby se tu znovu objevil,
+přesuň ho do `~/.claude/skills/` a smaž odsud, nebo rovnou odinstaluj.
 
 ## Komunikace s uživatelem
 
