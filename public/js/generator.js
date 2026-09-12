@@ -1,3 +1,6 @@
+import { rnd, pick, chance, shuffle } from './random.js';
+import { makeRiddle, riddleExplain, riddleText } from './riddle.js';
+
 export const OPS = {
   add: { symbol: '+', label: 'Sčítání', name: 'sčítání', emoji: '➕' },
   sub: { symbol: '−', label: 'Odčítání', name: 'odčítání', emoji: '➖' },
@@ -17,24 +20,14 @@ export const MISSING_LABEL = {
 export const EXTRA_KINDS = {
   word: { label: 'Slovní úlohy', emoji: '📖', ops: ['add', 'sub'] },
   bond: { label: 'Pyramidy', emoji: '🔺', ops: ['add', 'sub', 'mul', 'div'] },
+  /* Doplnovani znamenka potrebuje aspon dve operace - z jedne moznosti
+     by nebylo co vybirat a dite by trefilo spravne vzdycky. */
+  sign: { label: 'Doplň znaménko', emoji: '❓', ops: ['add', 'sub', 'mul', 'div'], minOps: 2 },
 };
 
 /* Zapnuty druh ma byt videt vic nez drive (drive vychazelo ~2 z 10).
    Kvotu proto pocitame pevne, ne pres nahodu, aby v kole opravdu byly. */
 const EXTRA_SHARE = 0.3;
-
-const rnd = (min, max) => min + Math.floor(Math.random() * (max - min + 1));
-const pick = (arr) => arr[rnd(0, arr.length - 1)];
-const chance = (p) => Math.random() < p;
-
-function shuffle(arr) {
-  const out = arr.slice();
-  for (let i = out.length - 1; i > 0; i--) {
-    const j = rnd(0, i);
-    [out[i], out[j]] = [out[j], out[i]];
-  }
-  return out;
-}
 
 export function crossesTen(op, a, b) {
   if (op === 'add') return a > 0 && b > 0 && (a % 10) + (b % 10) >= 10;
@@ -183,8 +176,34 @@ function makeWord(op, max, missing) {
   });
 }
 
+/* Sedi operace na trojici cisel? U deleni hlidame i beze zbytku. */
+function opFits(op, a, b, c) {
+  if (op === 'add') return a + b === c;
+  if (op === 'sub') return a - b === c;
+  if (op === 'mul') return a * b === c;
+  return b !== 0 && a % b === 0 && a / b === c;
+}
+
+/* Doplnovani znamenka: 7 __ 3 = 10. Priklad pustime dal jen tehdy, kdyz
+   z nabizenych operaci sedi PRAVE JEDNA - jinak by mela uloha vic spravnych
+   odpovedi (2 __ 2 = 4 plati pro + i ×, 4 __ 2 = 2 pro − i ÷).
+   Nabidka je presne ta sada, kterou ma dite na klavesnici, takze se
+   jednoznacnost posuzuje proti tomu, z ceho opravdu vybira. */
+function makeSign(choices, max) {
+  for (let i = 0; i < 80; i++) {
+    const op = pick(choices);
+    const t = makeTriple(op, max, null);
+    if (t.a < 1 || t.b < 1 || t.c < 1) continue;
+    if (choices.filter((o) => opFits(o, t.a, t.b, t.c)).length !== 1) continue;
+    return finalize({ op, kind: 'sign', missing: 'op', choices: choices.slice(), ...t });
+  }
+  return null;
+}
+
 function makeExercise(op, max, opts = {}) {
   const kind = opts.kind || 'equation';
+
+  if (kind === 'sign') return makeSign(opts.choices?.length ? opts.choices : [op], max);
 
   if (kind === 'bond') {
     const family = bondFamily(op);
@@ -202,16 +221,21 @@ function makeExercise(op, max, opts = {}) {
 }
 
 function randomExercise(ops, max, kind = 'equation') {
-  const pool = kind === 'equation' ? ops : ops.filter((o) => EXTRA_KINDS[kind].ops.includes(o));
+  const pool = kind === 'equation' ? ops : kindOps(kind, ops);
   if (!pool.length) return null;
-  return makeExercise(pick(pool), max, { kind });
+  return makeExercise(pick(pool), max, { kind, choices: pool });
 }
 
 /* Vrati druhy, ktere se pri danem nastaveni daji vygenerovat. Zapnuty druh
    bez vhodne operace (napr. slovni ulohy jen s nasobenim) proste vypadne. */
 export function usableKinds(config) {
   const enabled = Array.isArray(config.kinds) ? config.kinds : [];
-  return enabled.filter((k) => EXTRA_KINDS[k] && config.ops.some((o) => EXTRA_KINDS[k].ops.includes(o)));
+  return enabled.filter((k) => EXTRA_KINDS[k] && kindOps(k, config.ops).length >= (EXTRA_KINDS[k].minOps || 1));
+}
+
+/* Operace, se kterými se dany druh ulohy da postavit pri danem nastaveni. */
+export function kindOps(kind, ops) {
+  return ops.filter((o) => EXTRA_KINDS[kind].ops.includes(o));
 }
 
 function focusAllowed(m, ops, kinds) {
@@ -219,11 +243,12 @@ function focusAllowed(m, ops, kinds) {
   return m.kind === 'equation' || kinds.includes(m.kind);
 }
 
-function similarTo(m, max) {
+function similarTo(m, max, ops) {
   const original = signature(m);
   let fallback = null;
+  const choices = m.kind === 'sign' ? kindOps('sign', ops) : null;
   for (let t = 0; t < 40; t++) {
-    const ex = makeExercise(m.op, max, { kind: m.kind, missing: m.missing });
+    const ex = makeExercise(m.op, max, { kind: m.kind, missing: m.missing, choices });
     if (!fallback) fallback = ex;
     if (signature(ex) === original) continue;
     const closeResult = Math.abs(ex.c - m.c) <= 3;
@@ -253,7 +278,7 @@ export function buildRound(config, missed = []) {
   };
 
   for (const m of chosen) {
-    for (let t = 0; t < 6; t++) if (push(similarTo(m, max))) break;
+    for (let t = 0; t < 6; t++) if (push(similarTo(m, max, ops))) break;
   }
 
   // kvota pro kazdy zapnuty druh; opakovane priklady z minula se do ni pocitaji
@@ -275,7 +300,46 @@ export function buildRound(config, missed = []) {
   return shuffle(items).slice(0, count);
 }
 
+/* ---------------- obrázkové hádanky ----------------
+   Hádanku zabalíme do stejného tvaru jako ostatní úlohy (op/kind/a/b/c),
+   aby s ní kvíz, klávesnice i statistiky uměly pracovat beze změny.
+   `a` a `b` dávají smysl jen tehdy, když je poslední řádek prostý součet
+   dvou obrázků - jinde je necháme prázdné a `simpleSum` říká, že se u nich
+   nemá kreslit desítkový rámec. */
+function riddleExercise(max, level) {
+  const r = makeRiddle(max, level);
+  const simpleSum = r.question.terms.length === 2 && r.question.terms.every((t) => t.sign === 1);
+  return finalize({
+    op: 'add',
+    kind: 'riddle',
+    missing: 'c',
+    a: simpleSum ? r.values[r.question.terms[0].sym] : r.question.total,
+    b: simpleSum ? r.values[r.question.terms[1].sym] : 0,
+    c: r.question.total,
+    simpleSum,
+    ...r,
+  });
+}
+
+/* Kolo hádanek je celý režim, ne příměs k příkladům, takže si ho skládáme
+   zvlášť. Opakované chyby sem nevracíme - každá hádanka je stejně nová. */
+export function buildRiddleRound(config) {
+  const items = [];
+  const seen = new Set();
+  for (let i = 0; i < config.count; i++) {
+    let ex = riddleExercise(config.max, config.level);
+    for (let t = 0; t < 6 && seen.has(ex.key); t++) ex = riddleExercise(config.max, config.level);
+    seen.add(ex.key);
+    items.push(ex);
+  }
+  return items;
+}
+
 export function exToText(ex, reveal = false) {
+  if (ex.kind === 'riddle') return riddleText(ex, reveal);
+  if (ex.kind === 'sign') {
+    return `${ex.a} ${reveal ? OPS[ex.op].symbol : '__'} ${ex.b} = ${ex.c}`;
+  }
   const shown = (key) => (ex.missing === key ? (reveal ? String(ex.answer) : '__') : String(ex[key]));
   if (ex.kind === 'bond') {
     return `pyramida ${shown('c')} = ${shown('a')} ${ex.family === 'mul' ? '×' : '+'} ${shown('b')}`;
@@ -321,6 +385,24 @@ function repeatedAdditionStep(a, b, c) {
 
 export function explain(ex) {
   const { op, kind, missing, a, b, c } = ex;
+
+  if (kind === 'riddle') return riddleExplain(ex);
+
+  /* U znamenka je nejnazornejsi zkusit vsechny moznosti, ze kterych dite
+     vybiralo, a ukazat, ktera jedina vyjde. */
+  if (kind === 'sign') {
+    /* Moznost, ktera by vysla zaporne nebo se zbytkem, necislujeme -
+       misto "3 − 15 = -12" radeji rekneme slovy, proc to nejde. */
+    const tried = (ex.choices || [op]).map((o) => {
+      let shown;
+      if (o === 'add') shown = a + b;
+      else if (o === 'mul') shown = a * b;
+      else if (o === 'sub') shown = a >= b ? a - b : 'to nejde, odčítá se větší číslo';
+      else shown = b !== 0 && a % b === 0 ? a / b : 'to nevyjde beze zbytku';
+      return `${a} ${OPS[o].symbol} ${b} = ${shown}${o === op ? ' ✔' : ''}`;
+    });
+    return [`Vyzkoušej každé znaménko a hledej, které dá ${c}:`, ...tried];
+  }
 
   if (kind === 'word') {
     return [`Zapsáno jako příklad: ${equationText(ex)}`, ...explainEquation(ex)];
@@ -414,12 +496,19 @@ export const TAGS = {
   inverse: 'obrácený postup',
   offOne: 'chyba o jedničku',
   offTen: 'chyba o desítku',
+  riddleSymbol: 'hodnota obrázku místo součtu',
   other: 'jiná chyba',
 };
 
 export function diagnose(ex, given) {
   const { op, kind, missing, a, b, c, answer } = ex;
   if (given === answer) return null;
+
+  // typická chyba u hádanek: dítě napíše, kolik je jeden obrázek
+  if (kind === 'riddle' && ex.values.includes(given)) return 'riddleSymbol';
+
+  // u znaménka je jakákoli jiná volba prostě záměna operace
+  if (kind === 'sign') return 'swapOp';
 
   if (kind === 'equation') {
     if (op === 'add' && missing === 'c' && given === Math.abs(a - b)) return 'swapOp';

@@ -1,4 +1,5 @@
-import { OPS, EXTRA_KINDS, MISSING_LABEL, buildRound, explain, diagnose } from './generator.js';
+import { OPS, EXTRA_KINDS, MISSING_LABEL, kindOps, buildRound, buildRiddleRound, explain, diagnose } from './generator.js';
+import { RIDDLE_LEVELS, RIDDLE_LEVEL_KEYS } from './riddle.js';
 import * as store from './stats.js';
 
 const el = (id) => document.getElementById(id);
@@ -10,6 +11,18 @@ const screens = {
 
 const COUNT_PRESETS = [10, 20, 30];
 const MAX_PRESETS = [10, 15, 20, 30, 50, 100];
+
+/* Dva režimy hry. Počítání je původní trénink, hádanky jsou obrázkové
+   rovnice. Společné zůstává jen "kolik příkladů" a "do kolika" - u hádanek
+   řídí rozsah i obtížnost. */
+const MODES = {
+  calc: { label: 'Počítání', icon: '🧮', sub: 'Příklady, slovní úlohy, pyramidy' },
+  riddle: { label: 'Obrázkové hádanky', icon: '🧩', sub: 'Zjisti, kolik je který obrázek' },
+};
+
+/* Hádanka se luští déle než příklad, tak na ni dáváme jeden pokus navíc -
+   první špatná odpověď ještě neukáže řešení. */
+const RETRY_KINDS = new Set(['riddle']);
 
 /* `start` je ikona na tlacitku Zacit. Zamerne to neni maskot - ten uz kouka
    z hlavicky, tady se hodi neco, co znamena "jdeme". */
@@ -95,7 +108,8 @@ const SCENERY = {
 };
 
 let state = store.load();
-let config = normalizeConfig(state.config) || { ops: ['add', 'sub'], kinds: ['word', 'bond'], count: 10, max: 20 };
+let config = normalizeConfig(state.config)
+  || { mode: 'calc', level: 'easy', ops: ['add', 'sub'], kinds: ['word', 'bond'], count: 10, max: 20 };
 
 let round = [];
 let index = 0;
@@ -104,6 +118,9 @@ let locked = false;
 let shownAt = 0;
 let advanceTimer = null;
 let clockTimer = null;
+let retriesLeft = 0;
+let retried = false;
+let activeField = null; // políčko, do kterého píše klávesnice (odpověď / poznámka)
 
 /* Barevne zastavky hodin. Mezi nimi se interpoluje, takze barva prejizdi
    plynule - v 15 s je presne zluta, ve 30 s oranzova, v 60 s cervena.
@@ -127,12 +144,17 @@ function normalizeConfig(raw) {
     ? raw.kinds.filter((k) => k in EXTRA_KINDS)
     : Object.keys(EXTRA_KINDS);
   return {
+    // starší uložené nastavení režim nezná a bylo vždycky "počítání"
+    mode: raw.mode === 'riddle' ? 'riddle' : 'calc',
+    level: RIDDLE_LEVEL_KEYS.includes(raw.level) ? raw.level : 'easy',
     ops,
     kinds,
     count: clamp(Number(raw.count) || 10, 3, 60),
     max: clamp(Number(raw.max) || 20, 5, 1000),
   };
 }
+
+const isRiddleMode = () => config.mode === 'riddle';
 
 function clamp(n, min, max) {
   return Math.min(max, Math.max(min, Math.round(n)));
@@ -227,7 +249,48 @@ function applyTheme() {
   }
 }
 
+/* U hádanek nemá výběr operací ani "něco navíc" smysl, tak ty dvě karty
+   schováme. Nastavení v nich ale zůstane, aby se po přepnutí zpátky
+   všechno vrátilo tak, jak to bylo. */
+function renderModeCards() {
+  const riddle = isRiddleMode();
+  el('card-ops').hidden = riddle;
+  el('card-kinds').hidden = riddle;
+  el('card-level').hidden = !riddle;
+  el('countTitle').innerHTML = riddle
+    ? '<span aria-hidden="true">🔢</span> Kolik hádanek?'
+    : '<span aria-hidden="true">🔢</span> Kolik příkladů?';
+
+  const maxNote = el('maxNote');
+  maxNote.hidden = !riddle;
+  if (!riddle) return;
+
+  maxNote.textContent = 'Rozsah řídí, jak velká čísla v hádankách budou. Kolik je v nich obrázků, si vybíráš výš u obtížnosti.';
+
+  /* Obtížnost říká, jak hádanka vypadá, rozsah jak velká jsou čísla -
+     dvě nezávislé věci, tak to u obou rovnou napíšeme. */
+  const level = RIDDLE_LEVELS[config.level];
+  el('levelNote').textContent = `${level.label} – ${level.note}, třeba ${level.example}. Čísla do ${config.max}.`;
+}
+
 function renderConfigScreen() {
+  el('modeChips').innerHTML = Object.entries(MODES)
+    .map(([key, mode]) => {
+      const on = key === config.mode;
+      return `<button type="button" class="chip chip-mode${on ? ' is-on' : ''}" data-value="${key}" aria-pressed="${on}">
+          <span class="chip-icon" aria-hidden="true">${mode.icon}</span>
+          <span class="chip-main">${mode.label}</span>
+          <span class="chip-sub">${mode.sub}</span>
+        </button>`;
+    })
+    .join('');
+
+  el('levelChips').innerHTML = RIDDLE_LEVEL_KEYS
+    .map((key) => chipHTML(key, `${RIDDLE_LEVELS[key].emoji} ${RIDDLE_LEVELS[key].label}`, config.level === key))
+    .join('');
+
+  renderModeCards();
+
   el('themeChips').innerHTML = Object.entries(THEMES)
     .map(([key, theme]) => {
       const on = key === currentTheme();
@@ -271,29 +334,43 @@ function chipHTML(value, label, on) {
    Radeji to rekneme nahlas, ať je jasné, proč v kole není. */
 function renderKindNote() {
   const note = el('kindNote');
-  const blocked = config.kinds.filter((k) => !config.ops.some((o) => EXTRA_KINDS[k].ops.includes(o)));
-  if (!blocked.length) {
+  const reasons = config.kinds
+    .map((k) => {
+      const kind = EXTRA_KINDS[k];
+      const have = kindOps(k, config.ops).length;
+      if (have >= (kind.minOps || 1)) return null;
+      // druh vypadne buď kvůli nevhodné operaci, nebo protože je zapnutá jen jedna
+      return kind.minOps > 1 && have > 0
+        ? `${kind.label} potřebuje aspoň ${kind.minOps} operace, ať je z čeho vybírat.`
+        : `${kind.label} jdou jen u ${kind.ops.map((o) => OPS[o].name).join(', ')}.`;
+    })
+    .filter(Boolean);
+
+  if (!reasons.length) {
     note.hidden = true;
     return;
   }
-  note.textContent = blocked
-    .map((k) => `${EXTRA_KINDS[k].label} jdou jen u ${EXTRA_KINDS[k].ops.map((o) => OPS[o].name).join(' a ')}.`)
-    .join(' ') + ' Přidej si je nahoře, jinak se v kole neobjeví.';
+  note.textContent = `${reasons.join(' ')} Uprav si výběr nahoře, jinak se v kole neobjeví.`;
   note.hidden = false;
 }
 
+/* Připomínka posledního kola. Ukazujeme jen kolo ze stejného režimu -
+   procenta z hádanek a z příkladů se srovnávat nedají. */
 function renderLastHint() {
   const hint = el('lastRoundHint');
-  const last = state.rounds[0];
+  const last = state.rounds.find((r) => (r.mode || 'calc') === config.mode);
   if (!last) {
     hint.hidden = true;
     return;
   }
   const pct = Math.round((last.correct / last.total) * 100);
-  const focus = state.missed.length
-    ? ` Do dalšího kola zařadím ${Math.min(state.missed.length, 12)} podobných příkladů, které minule nevyšly.`
-    : ' Minule ti nic neuteklo. 🎉';
-  hint.textContent = `Naposledy: ${last.correct} z ${last.total} (${pct} %).${focus}`;
+  const what = isRiddleMode() ? 'hádanek' : 'příkladů';
+  const focus = isRiddleMode()
+    ? ' Každá hádanka je pokaždé nová.'
+    : state.missed.length
+      ? ` Do dalšího kola zařadím ${Math.min(state.missed.length, 12)} podobných příkladů, které minule nevyšly.`
+      : ' Minule ti nic neuteklo. 🎉';
+  hint.textContent = `Naposledy ${what}: ${last.correct} z ${last.total} (${pct} %).${focus}`;
   hint.hidden = false;
 }
 
@@ -304,6 +381,20 @@ for (const id of ['darkBtn', 'darkBtnQuiz']) {
     applyTheme();
   });
 }
+
+el('modeChips').addEventListener('click', (e) => {
+  const chip = e.target.closest('.chip');
+  if (!chip) return;
+  config.mode = chip.dataset.value;
+  renderConfigScreen();
+});
+
+el('levelChips').addEventListener('click', (e) => {
+  const chip = e.target.closest('.chip');
+  if (!chip) return;
+  config.level = chip.dataset.value;
+  renderConfigScreen();
+});
 
 el('themeChips').addEventListener('click', (e) => {
   const chip = e.target.closest('.chip');
@@ -366,6 +457,7 @@ function bindCustomField(inputId, chipsId, key, min, max) {
       chip.classList.toggle('is-on', on);
       chip.setAttribute('aria-pressed', String(on));
     });
+    renderModeCards(); // u hádanek se s rozsahem mění i obtížnost
   });
   input.addEventListener('blur', () => renderConfigScreen());
 }
@@ -398,7 +490,7 @@ el('startBtn').addEventListener('click', startRound);
 function startRound() {
   config.max = clamp(config.max, 5, 1000);
   config.count = clamp(config.count, 3, 60);
-  round = buildRound(config, state.missed);
+  round = isRiddleMode() ? buildRiddleRound(config) : buildRound(config, state.missed);
   index = 0;
   attempts = [];
   el('dots').innerHTML = round.map(() => '<span class="dot"></span>').join('');
@@ -453,11 +545,14 @@ function renderExercise() {
   el('quizCounter').textContent = `${index + 1} / ${round.length}`;
   el('dots').querySelectorAll('.dot').forEach((dot, i) => dot.classList.toggle('is-current', i === index));
   el('exerciseHint').textContent = hintFor(ex);
-  el('exerciseBody').innerHTML =
-    ex.kind === 'bond' ? bondHTML(ex) : ex.kind === 'word' ? wordHTML(ex) : equationHTML(ex);
+  el('exerciseBody').innerHTML = (BODY_HTML[ex.kind] || equationHTML)(ex);
   el('feedback').hidden = true;
   el('feedback').innerHTML = '';
+  renderKeypad(ex);
   el('keypad').dataset.disabled = 'false';
+  retriesLeft = RETRY_KINDS.has(ex.kind) ? 1 : 0;
+  retried = false;
+  activeField = null;
 
   const input = el('answerInput');
   input.maxLength = String(config.max).length + 1;
@@ -467,6 +562,8 @@ function renderExercise() {
 }
 
 function hintFor(ex) {
+  if (ex.kind === 'riddle') return 'Zjisti z rovnic, kolik je který obrázek, a dopočítej poslední řádek.';
+  if (ex.kind === 'sign') return 'Doplň chybějící znaménko, aby příklad vyšel.';
   if (ex.kind === 'word') return `Slovní úloha – ${OPS[ex.op].name}.`;
   if (ex.kind === 'bond') {
     const relation = ex.family === 'mul' ? 'součin' : 'součet';
@@ -484,6 +581,23 @@ function wordHTML(ex) {
 
 function slotHTML() {
   return `<span class="slot" id="answerSlot"><input id="answerInput" type="text" inputmode="none" autocomplete="off" aria-label="Doplň chybějící číslo"></span>`;
+}
+
+/* Doplň znaménko: čísla i výsledek jsou vidět, chybí operace. Políčko je
+   znovu `.slot` s `#answerInput`, jen je readonly - hodnotu do něj vkládají
+   tlačítka se znaménky, takže potvrzení i vyhodnocení běží stejnou cestou
+   jako u ostatních úloh. */
+function signHTML(ex) {
+  return `<div class="equation">
+      <span class="num">${ex.a}</span>
+      <span class="slot slot-op" id="answerSlot">
+        <input id="answerInput" type="text" inputmode="none" autocomplete="off" readonly
+               aria-label="Doplň chybějící znaménko">
+      </span>
+      <span class="num">${ex.b}</span>
+      <span class="eq-op">=</span>
+      <span class="num">${ex.c}</span>
+    </div>`;
 }
 
 function equationHTML(ex) {
@@ -512,15 +626,68 @@ function bondHTML(ex) {
     </div>`;
 }
 
-/* klávesnice */
-el('keypad').innerHTML = [...'123456789']
+/* Obrázková hádanka: pomocné rovnice pod sebou a poslední řádek s políčkem
+   na odpověď. Políčko je stejný `.slot` jako u ostatních úloh, takže
+   klávesnice, potvrzení i vyhodnocení fungují beze změny. */
+function riddleHTML(ex) {
+  const face = (t) => (t.sym !== undefined
+    ? `<span class="riddle-sym">${ex.symbols[t.sym]}</span>`
+    : `<span class="riddle-total riddle-inline">${t.num}</span>`);
+
+  const row = (r) => {
+    const parts = [`${r.terms[0].sign < 0 ? '<span class="riddle-op">−</span>' : ''}${face(r.terms[0])}`];
+    for (const t of r.terms.slice(1)) parts.push(`<span class="riddle-op">${t.sign < 0 ? '−' : '+'}</span>`, face(t));
+    parts.push('<span class="riddle-op riddle-eq">=</span>');
+    parts.push(!r.rhs ? slotHTML() : r.rhs.sym !== undefined ? face(r.rhs) : `<span class="riddle-total">${r.rhs.num}</span>`);
+    return `<div class="riddle-row${r.rhs ? '' : ' riddle-row-q'}">${parts.join('')}</div>`;
+  };
+
+  return `<div class="riddle">${ex.rows.map(row).join('')}${row(ex.question)}</div>${riddleNotesHTML(ex)}`;
+}
+
+/* Poznámkový blok pod hádankou. Dítě si sem může zapsat, co mu u kterého
+   obrázku vyšlo - je to jen tahák pro něj, na vyhodnocení odpovědi to nemá
+   žádný vliv a nic se z toho nekontroluje. */
+function riddleNotesHTML(ex) {
+  const items = ex.symbols
+    .map((s) => `<label class="riddle-note">
+        <span class="riddle-sym riddle-sym-sm" aria-hidden="true">${s}</span>
+        <span class="riddle-note-eq" aria-hidden="true">=</span>
+        <input class="riddle-note-input" type="text" inputmode="none" autocomplete="off"
+               maxlength="3" aria-label="Poznámka: kolik je tenhle obrázek">
+      </label>`)
+    .join('');
+  return `<div class="riddle-notes">
+      <p class="riddle-notes-title">Můžeš si poznamenat, co ti vyšlo:</p>
+      <div class="riddle-notes-row">${items}</div>
+    </div>`;
+}
+
+const BODY_HTML = { bond: bondHTML, word: wordHTML, riddle: riddleHTML, sign: signHTML };
+
+/* klávesnice - číselná, nebo se znaménky u úlohy "doplň znaménko" */
+const DEL_KEY = '<button type="button" class="key key-del" data-key="del" aria-label="Smazat">⌫</button>';
+const OK_KEY = '<button type="button" class="key key-ok" data-key="ok" aria-label="Potvrdit">✓</button>';
+
+const DIGIT_KEYS = [...'123456789']
   .map((d) => `<button type="button" class="key" data-key="${d}">${d}</button>`)
-  .concat([
-    '<button type="button" class="key key-del" data-key="del" aria-label="Smazat">⌫</button>',
-    '<button type="button" class="key" data-key="0">0</button>',
-    '<button type="button" class="key key-ok" data-key="ok" aria-label="Potvrdit">✓</button>',
-  ])
+  .concat([DEL_KEY, '<button type="button" class="key" data-key="0">0</button>', OK_KEY])
   .join('');
+
+/* Nabízíme právě ty operace, které má uživatel zapnuté - podle stejné sady
+   se v generátoru hlídá, že je správná odpověď jen jedna. */
+function signKeys(ex) {
+  const ops = (ex.choices || [ex.op])
+    .map((o) => `<button type="button" class="key key-op" data-key="op:${o}" aria-label="${OPS[o].label}">${OPS[o].symbol}</button>`)
+    .join('');
+  return `<div class="key-ops">${ops}</div>${DEL_KEY}${OK_KEY}`;
+}
+
+function renderKeypad(ex) {
+  const keypad = el('keypad');
+  keypad.dataset.mode = ex.kind === 'sign' ? 'sign' : 'digits';
+  keypad.innerHTML = ex.kind === 'sign' ? signKeys(ex) : DIGIT_KEYS;
+}
 
 el('keypad').addEventListener('click', (e) => {
   const key = e.target.closest('.key');
@@ -528,28 +695,60 @@ el('keypad').addEventListener('click', (e) => {
   handleKey(key.dataset.key);
 });
 
+/* Klávesnice píše do políčka, na které dítě naposledy klaplo - buď do
+   odpovědi, nebo do poznámky pod hádankou. ✓ ale potvrzuje vždycky
+   odpověď, ať je kurzor kdekoli. */
+function currentField() {
+  return activeField?.isConnected ? activeField : el('answerInput');
+}
+
 function handleKey(key) {
   if (locked) return;
-  const input = el('answerInput');
-  if (!input) return;
   if (key === 'ok') return submit();
+
+  // volba znaménka - vybraná operace se drží v datasetu, aby ji submit našel
+  if (key.startsWith('op:')) {
+    const slot = el('answerInput');
+    if (!slot) return;
+    slot.dataset.op = key.slice(3);
+    slot.value = OPS[key.slice(3)].symbol;
+    return;
+  }
+
+  const input = currentField();
+  if (!input) return;
   if (key === 'del') {
     input.value = input.value.slice(0, -1);
+    delete input.dataset.op;
     return;
   }
   if (input.value.length >= input.maxLength) return;
   input.value += key;
 }
 
-// do odpovědi pustíme jen číslice - i při vložení ze schránky
+el('exerciseBody').addEventListener('focusin', (e) => {
+  if (e.target.matches('#answerInput, .riddle-note-input')) activeField = e.target;
+});
+
+// do odpovědi i do poznámek pustíme jen číslice - i při vložení ze schránky
 document.addEventListener('input', (e) => {
-  if (e.target.id !== 'answerInput') return;
+  if (!e.target.matches?.('#answerInput, .riddle-note-input')) return;
   const digits = e.target.value.replace(/\D+/g, '').slice(0, e.target.maxLength);
   if (digits !== e.target.value) e.target.value = digits;
 });
 
+/* Znaménka jdou zadat i z fyzické klávesnice; `x` a `:` bereme taky,
+   protože × a ÷ na běžné klávesnici nejsou. */
+const SIGN_KEYS = { '+': 'add', '-': 'sub', '−': 'sub', '*': 'mul', x: 'mul', X: 'mul', '/': 'div', ':': 'div' };
+
 document.addEventListener('keydown', (e) => {
   if (!screens.quiz.classList.contains('is-active')) return;
+  if (round[index]?.kind === 'sign' && SIGN_KEYS[e.key]) {
+    const op = SIGN_KEYS[e.key];
+    if ((round[index].choices || []).includes(op)) handleKey(`op:${op}`);
+    e.preventDefault();
+    return;
+  }
   if (e.key >= '0' && e.key <= '9') {
     handleKey(e.key);
     e.preventDefault();
@@ -579,18 +778,29 @@ function submit() {
     return;
   }
 
+  const ex = round[index];
+  // u znaménka je odpovědí klíč operace, jinde číslo
+  const given = ex.kind === 'sign' ? (input.dataset.op || null) : Number(raw);
+  const correct = given === ex.answer;
+
+  /* Druhý pokus: hádanku ještě nevyhodnocujeme, jen jemně pošťouchneme.
+     Hodiny běží dál, takže čas opravu poctivě započítá. */
+  if (!correct && retriesLeft > 0) {
+    retriesLeft -= 1;
+    retried = true;
+    softRetry(given);
+    return;
+  }
+
   locked = true;
   stopClock();
   el('keypad').dataset.disabled = 'true';
-
-  const ex = round[index];
-  const given = Number(raw);
-  const correct = given === ex.answer;
 
   attempts.push({
     ex,
     given,
     correct,
+    retried,
     ms: Date.now() - shownAt,
     tag: correct ? null : diagnose(ex, given),
   });
@@ -604,9 +814,30 @@ function submit() {
   if (correct) confetti();
 }
 
+/* Špatná odpověď u hádanky ještě neznamená konec - políčko se vyprázdní
+   a dítě to zkusí znovu. Řešení se ukáže až po druhém pokusu. */
+function softRetry(given) {
+  const slot = el('answerSlot');
+  const input = el('answerInput');
+  input.value = '';
+  slot.classList.add('is-wrong');
+  setTimeout(() => el('answerSlot')?.classList.remove('is-wrong'), 500);
+  input.focus({ preventScroll: true });
+  beep('wrong');
+
+  const fb = el('feedback');
+  fb.dataset.state = 'retry';
+  fb.innerHTML = `<div class="fb-badge"><span aria-hidden="true">💪</span> Ještě ne – zkus to znovu!</div>
+    <p class="fb-retry-note">${given} to není. Jdi po řádcích odshora – v prvním je jen jeden druh obrázku
+    a v každém dalším ti pak chybí dopočítat jediný.</p>`;
+  fb.hidden = false;
+}
+
 /* Grafické vysvětlení pro rozsah do 20: dva řádky po deseti kroužcích.
    Zlom řádku je přesně desítka, takže je vidět přechod přes ni. */
 function tenFrameHTML(ex) {
+  // u hádanky jen tehdy, když je poslední řádek prostý součet dvou obrázků
+  if (ex.kind === 'riddle' && !ex.simpleSum) return '';
   const relation = ex.kind === 'bond' ? ex.family : ex.op === 'add' || ex.op === 'sub' ? 'add' : null;
   if (relation !== 'add') return '';
 
@@ -640,22 +871,35 @@ function tenFrameHTML(ex) {
     <p class="tenframe-caption">${caption}</p>`;
 }
 
+function riddleRevealHTML(ex) {
+  const items = ex.symbols
+    .map((s, i) => `<span><span class="riddle-sym riddle-sym-sm">${s}</span> = ${ex.values[i]}</span>`)
+    .join('');
+  return `<div class="riddle-reveal">${items}</div>`;
+}
+
 function renderFeedback(ex, given, correct) {
   const fb = el('feedback');
   fb.dataset.state = correct ? 'correct' : 'wrong';
 
   if (correct) {
     const praise = ['Správně!', 'Výborně!', 'Přesně tak!', 'Paráda!', 'Skvěle!'];
-    fb.innerHTML = `<div class="fb-badge"><span aria-hidden="true">🎉</span> ${praise[index % praise.length]}</div>`;
+    /* U hádanky ještě ukážeme, co který obrázek znamenal - dítě si potvrdí,
+       že to vyluštilo, a ne jen trefilo. Na přečtení je potřeba chvilku víc. */
+    const reveal = ex.kind === 'riddle' ? riddleRevealHTML(ex) : '';
+    fb.innerHTML = `<div class="fb-badge"><span aria-hidden="true">🎉</span> ${praise[index % praise.length]}</div>${reveal}`;
     fb.hidden = false;
-    advanceTimer = setTimeout(next, 1100);
+    advanceTimer = setTimeout(next, reveal ? 2000 : 1100);
     return;
   }
 
   const steps = explain(ex).map((s) => `<li>${s}</li>`).join('');
+  // u znaménka je odpovědí operace, ne číslo - ukážeme rovnou symbol
+  const shown = (v) => (ex.kind === 'sign' ? OPS[v]?.symbol : v);
+  const gave = ex.kind === 'sign' ? OPS[given]?.symbol : (Number.isFinite(given) ? given : null);
   fb.innerHTML = `
     <div class="fb-badge"><span aria-hidden="true">🤔</span> Tentokrát ne</div>
-    <div class="fb-answer">Správně je <b>${ex.answer}</b>${Number.isFinite(given) ? ` <span class="retry-given">(napsala jsi ${given})</span>` : ''}</div>
+    <div class="fb-answer">Správně je <b>${shown(ex.answer)}</b>${gave ? ` <span class="retry-given">(napsala jsi ${gave})</span>` : ''}</div>
     <p class="fb-steps-title">Jak na to:</p>
     <ul class="fb-steps">${steps}</ul>
     ${tenFrameHTML(ex)}
@@ -705,10 +949,17 @@ function renderResult(r) {
       ? ''
       : `<p class="trend">${r.trend > 0 ? `📈 O ${r.trend} % lepší než minule!` : r.trend < 0 ? `📉 O ${Math.abs(r.trend)} % méně než minule – nic se neděje.` : '➡️ Stejně jako minule.'}</p>`;
 
-  const bars = r.byOp
+  /* U hádanek nemá rozpad podle operací co říct (všechno je sčítání),
+     zajímavější je, jak šly jednotlivé obtížnosti. */
+  const riddle = isRiddleMode();
+  const groups = riddle
+    ? r.byLevel.map((g) => ({ ...g, name: `${RIDDLE_LEVELS[g.key].emoji} ${RIDDLE_LEVELS[g.key].label}` }))
+    : r.byOp.map((g) => ({ ...g, name: `${OPS[g.key].emoji} ${OPS[g.key].label}` }));
+
+  const bars = groups
     .map(
       (g) => `<div class="bar-row">
-        <span>${OPS[g.key].emoji} ${OPS[g.key].label}</span>
+        <span>${g.name}</span>
         <span class="bar-track"><span class="bar-fill" data-level="${g.pct >= 80 ? 'high' : g.pct >= 50 ? 'mid' : 'low'}" style="width:${g.pct}%"></span></span>
         <span class="bar-pct">${g.correct}/${g.seen}</span>
       </div>`,
@@ -723,6 +974,10 @@ function renderResult(r) {
         </div>`
       : '';
 
+  const retryNote = riddle
+    ? 'Příště přijdou nové hádanky s jinými obrázky.'
+    : 'Podobné příklady se objeví v dalším kole.';
+
   const retry = r.missedList.length
     ? `<div class="card">
         <h2 class="card-title"><span aria-hidden="true">🔁</span> K procvičení (${r.missedList.length})</h2>
@@ -734,12 +989,14 @@ function renderResult(r) {
             </li>`,
           )
           .join('')}</ul>
-        <p class="fb-steps-title">Podobné příklady se objeví v dalším kole.</p>
+        <p class="fb-steps-title">${retryNote}</p>
       </div>`
     : `<div class="card"><h2 class="card-title"><span aria-hidden="true">✨</span> Bez jediné chyby!</h2>
         <p style="margin:0;font-weight:700;color:var(--ink-soft)">Nic k procvičení – tohle byla čistá práce.</p></div>`;
 
-  const avg = r.avgMs ? `<p class="score-sub">Průměrně ${(r.avgMs / 1000).toFixed(1)} s na příklad</p>` : '';
+  const avg = r.avgMs
+    ? `<p class="score-sub">Průměrně ${(r.avgMs / 1000).toFixed(1)} s na ${riddle ? 'hádanku' : 'příklad'}</p>`
+    : '';
 
   el('resultBody').innerHTML = `
     <div class="result-head">
@@ -759,7 +1016,7 @@ function renderResult(r) {
     </div>
 
     <div class="card">
-      <h2 class="card-title"><span aria-hidden="true">📊</span> Podle operací</h2>
+      <h2 class="card-title"><span aria-hidden="true">📊</span> ${riddle ? 'Podle obtížnosti' : 'Podle operací'}</h2>
       <div class="bars">${bars}</div>
     </div>
 

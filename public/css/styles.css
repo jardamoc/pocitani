@@ -22,6 +22,8 @@
   --panel: rgba(255, 255, 255, .85);
   --good-tint: #d1fae5;
   --bad-tint: #ffe4e9;
+  --warn-tint: #fff3d4;
+  --warn-dark: #b45309;
   --tint-fade: #ffffff;
   --del-shadow: #f7c9d2;
 }
@@ -167,6 +169,8 @@ body.is-dark {
   --panel: rgba(27, 35, 51, .88);
   --good-tint: #0f3d31;
   --bad-tint: #45162a;
+  --warn-tint: #46330f;
+  --warn-dark: #fbbf24;
   --tint-fade: #1b2333;
   --del-shadow: #4a1022;
   --shadow: 0 14px 34px rgba(0, 0, 0, .45);
@@ -383,6 +387,24 @@ h1, h2, h3, .num, .box-value, .key, .score-big { font-family: 'Baloo 2', 'Nunito
 /* Specificita musi dorovnat pravidlo vys, jinak by obecny modry gradient vyhral. */
 .chips .chip.is-on[data-value="word"] { background: linear-gradient(135deg, #fbbf24, #f97316); }
 .chips .chip.is-on[data-value="bond"] { background: linear-gradient(135deg, #2dd4bf, #0d9488); }
+.chips .chip.is-on[data-value="sign"] { background: linear-gradient(135deg, #f87171, #b91c1c); }
+/* Volba hry - dvě velké dlaždice vedle sebe, na úzkém displeji pod sebou. */
+.chips-mode { display: grid; grid-template-columns: repeat(auto-fit, minmax(158px, 1fr)); gap: 10px; }
+.chip-mode {
+  flex-direction: column; align-items: center; text-align: center;
+  gap: 2px; padding: 15px 14px; border-radius: 22px;
+}
+.chip-icon { font-size: 1.85rem; line-height: 1.1; }
+.chip-main { font-size: 1.02rem; line-height: 1.2; }
+.chip-sub { font-weight: 700; font-size: .78rem; line-height: 1.25; opacity: .72; }
+.chips-mode .chip.is-on[data-value="calc"] { background: linear-gradient(135deg, #38bdf8, #4f46e5); }
+.chips-mode .chip.is-on[data-value="riddle"] { background: linear-gradient(135deg, #fb923c, #db2777); }
+
+/* obtížnost hádanek - barvy sedí na kolečka 🟢 🟡 🔴 na chipech */
+.chips .chip.is-on[data-value="easy"] { background: linear-gradient(135deg, #4ade80, #15803d); }
+.chips .chip.is-on[data-value="medium"] { background: linear-gradient(135deg, #fbbf24, #d97706); }
+.chips .chip.is-on[data-value="hard"] { background: linear-gradient(135deg, #fb7185, #dc2626); }
+
 .chips-theme .chip { flex-direction: column; gap: 2px; padding: 12px 18px; }
 .chips-theme .chip span:first-child { font-size: 1.5rem; }
 .chips-theme .chip.is-on[data-value="panda"] { background: linear-gradient(135deg, #38bdf8, #10b981); }
@@ -556,13 +578,99 @@ body.is-quiz .wrap { padding-top: 18px; }
 .box-value { font-size: clamp(1.9rem, 9vw, 2.9rem); font-weight: 800; }
 .box.slot { border-color: var(--slot); background: var(--slot-bg); }
 
+/* ---------- obrázková hádanka ----------
+   Každá rovnice je vlastní proužek, ať se řádky nepletou. Řádek se nesmí
+   zalomit, proto všechno škáluje přes clamp() - i se čtyřmi obrázky se
+   vejde na úzký telefon. */
+/* Nejširší možný řádek je ten poslední u těžké obtížnosti: čtyři obrázky,
+   čtyři znaménka a políčko na odpověď. Všechno proto škáluje z jedné sady
+   proměnných, nastavené tak, aby se i tenhle případ vešel na 320px. */
+.riddle {
+  --sym: clamp(1.3rem, 6.05vw, 2.5rem);
+  --op: clamp(.95rem, 3.8vw, 1.6rem);
+  --gap: clamp(2px, 1vw, 9px);
+  display: grid; gap: clamp(7px, 2vw, 10px); min-width: 0;
+}
+/* `min-width:0` a `overflow-x` jsou pojistka pro nečekaně dlouhý obsah:
+   bez nich by se řádek s nowrap místo zúžení roztáhl a odtlačil stránku. */
+.riddle-row {
+  display: flex; align-items: center; justify-content: center; flex-wrap: nowrap;
+  min-width: 0; overflow-x: auto; scrollbar-width: none;
+  gap: var(--gap);
+  padding: clamp(7px, 2vw, 11px) clamp(6px, 2.4vw, 16px);
+  border-radius: 18px; background: var(--surface-2);
+  box-shadow: inset 0 0 0 2px var(--line);
+}
+.riddle-row::-webkit-scrollbar { display: none; }
+.riddle-sym {
+  flex: none; font-size: var(--sym); line-height: 1.15;
+  filter: drop-shadow(0 3px 5px rgba(20, 49, 77, .18));
+}
+.riddle-op {
+  flex: none; font-family: 'Baloo 2', sans-serif; font-weight: 700; color: var(--coral);
+  font-size: var(--op);
+}
+.riddle-eq { color: var(--ink-soft); }
+.riddle-total {
+  flex: none; font-family: 'Baloo 2', sans-serif; font-weight: 800; color: var(--ink);
+  font-size: calc(var(--sym) * .92); line-height: 1.15;
+}
+/* číslo uvnitř rovnice (🌰 + 2 = 7) je o kus menší než výsledek vpravo */
+.riddle-inline { font-size: calc(var(--sym) * .78); color: var(--ink-soft); }
+
+/* poslední řádek - ten, na který se odpovídá */
+.riddle-row-q {
+  margin-top: clamp(2px, 1vw, 6px);
+  background: linear-gradient(160deg, var(--slot-bg), var(--card) 78%);
+  box-shadow: inset 0 0 0 3px var(--slot);
+}
+/* Poslední řádek nese navíc políčko na odpověď, takže má nejmíň místa.
+   Obrázky v něm proto nezvětšujeme - vysadí ho barevný rám.
+
+   Políčku dáváme pevnou šířku a `min-width:0` i vnitřnímu <input>: samo
+   od sebe si drží vlastní vnitřní šířku přes 300px a rozhodilo by řádek. */
+.riddle-row-q .slot {
+  flex: none;
+  width: clamp(52px, 15vw, 96px); min-width: 0;
+  height: clamp(48px, 13vw, 72px);
+}
+.riddle-row-q .slot input { min-width: 0; font-size: calc(var(--sym) * .95); }
+
+/* Tahák pod hádankou: dítě si sem píše, co mu u kterého obrázku vyšlo.
+   Vizuálně je to schválně tlumené, ať to nesoupeří s políčkem na odpověď. */
+.riddle-notes { margin-top: 16px; border-top: 2px dashed var(--line); padding-top: 12px; }
+.riddle-notes-title { margin: 0 0 8px; font-weight: 700; font-size: .9rem; color: var(--ink-soft); }
+.riddle-notes-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.riddle-note {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--surface-2); border-radius: 14px; padding: 5px 9px 5px 7px;
+  box-shadow: inset 0 0 0 2px var(--line);
+}
+.riddle-note-eq { font-family: 'Baloo 2', sans-serif; font-weight: 700; color: var(--ink-soft); }
+.riddle-note-input {
+  font: inherit; font-family: 'Baloo 2', sans-serif; font-weight: 800; font-size: 1.15rem;
+  width: 2.4em; min-width: 0; padding: 3px 0; text-align: center;
+  border: 0; border-bottom: 3px solid var(--line-strong); border-radius: 0;
+  background: transparent; color: var(--ink);
+}
+.riddle-note-input:focus { outline: none; border-bottom-color: var(--slot); background: var(--card); }
+
+/* hodnoty obrázků, které se ukážou po správné odpovědi */
+.riddle-reveal { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; font-weight: 800; font-size: 1.1rem; }
+.riddle-reveal > span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.riddle-sym-sm { font-size: 1.5rem; }
+
 /* ---------- vyhodnocení ---------- */
 .feedback { border-radius: var(--radius); padding: 18px; margin-bottom: 16px; box-shadow: var(--shadow); }
 .feedback[data-state="correct"] { background: linear-gradient(160deg, var(--good-tint), var(--tint-fade) 70%); border: 3px solid var(--good); }
 .feedback[data-state="wrong"] { background: linear-gradient(160deg, var(--bad-tint), var(--tint-fade) 70%); border: 3px solid var(--bad); }
+/* druhý pokus u hádanky - žlutá, ne červená: ještě se nic nepokazilo */
+.feedback[data-state="retry"] { background: linear-gradient(160deg, var(--warn-tint), var(--tint-fade) 70%); border: 3px solid var(--mango); }
 .fb-badge { font-family: 'Baloo 2', sans-serif; font-size: 1.5rem; font-weight: 800; display: flex; align-items: center; gap: 10px; }
 .feedback[data-state="correct"] .fb-badge { color: var(--good-dark); }
 .feedback[data-state="wrong"] .fb-badge { color: var(--bad-dark); }
+.feedback[data-state="retry"] .fb-badge { color: var(--warn-dark); }
+.fb-retry-note { margin: 8px 0 0; font-weight: 700; line-height: 1.45; }
 .fb-answer { margin-top: 8px; font-size: 1.2rem; font-weight: 800; }
 .fb-answer b { font-family: 'Baloo 2', sans-serif; font-size: 1.6rem; color: var(--good-dark); }
 .fb-steps-title { margin: 14px 0 6px; font-weight: 800; color: var(--ink-soft); }
@@ -599,6 +707,17 @@ body.is-quiz .wrap { padding-top: 18px; }
 .key-ok { background: linear-gradient(135deg, #34d399, #10b981); color: #fff; box-shadow: var(--ring), 0 6px 0 #047857, 0 10px 20px rgba(16, 185, 129, .3); }
 .key-ok:active { box-shadow: var(--ring), 0 2px 0 #047857; }
 .keypad[data-disabled="true"] { opacity: .45; pointer-events: none; }
+
+/* klávesnice pro "doplň znaménko": znaménka v jedné řadě nahoře, pod nimi
+   mazání a potvrzení - řada se přizpůsobí dvěma až čtyřem operacím */
+.keypad[data-mode="sign"] { grid-template-columns: 1fr 1fr; }
+.key-ops { grid-column: 1 / -1; display: flex; gap: 8px; }
+.key-ops .key { flex: 1; }
+.key-op { font-size: 1.9rem; line-height: 1.1; color: var(--coral); }
+
+/* políčko na znaménko je užší než na číslo - vejde se do něj jeden znak */
+.slot-op { min-width: clamp(64px, 17vw, 92px); }
+.slot-op input { color: var(--coral); cursor: pointer; }
 
 /* ---------- výsledky ---------- */
 .result-head { text-align: center; margin-bottom: 18px; }
@@ -653,6 +772,8 @@ body.is-quiz .wrap { padding-top: 18px; }
 @media (max-width: 380px) {
   .num, .eq-op { font-size: 1.85rem; }
   .bond-row { gap: 18px; }
+  /* hádanka se čtyřmi obrázky potřebuje na úzkém telefonu každý pixel */
+  .card-exercise { padding-left: 10px; padding-right: 10px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

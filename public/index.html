@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Počítání pro Alžbětu</title>
-<meta name="description" content="Hravý trénink sčítání, odčítání, násobení a dělení pro děti. Příklady s chybějícím číslem i pyramidy.">
+<meta name="description" content="Hravý trénink sčítání, odčítání, násobení a dělení pro děti. Příklady s chybějícím číslem, slovní úlohy, pyramidy a obrázkové hádanky.">
 <meta name="theme-color" content="#7dd3fc">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A7%AE%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -43,19 +43,30 @@
     </div>
 
     <div class="card">
+      <h2 class="card-title"><span aria-hidden="true">🕹️</span> Co si zahrajeme?</h2>
+      <div id="modeChips" class="chips chips-mode"></div>
+    </div>
+
+    <div id="card-level" class="card">
+      <h2 class="card-title"><span aria-hidden="true">🎚️</span> Jak těžké?</h2>
+      <div id="levelChips" class="chips chips-level"></div>
+      <p id="levelNote" class="field-note"></p>
+    </div>
+
+    <div id="card-ops" class="card">
       <h2 class="card-title"><span aria-hidden="true">🎯</span> Co budeme počítat?</h2>
       <div id="opChips" class="chips chips-ops"></div>
       <p id="opsError" class="field-error" hidden>Vyber aspoň jednu možnost.</p>
     </div>
 
-    <div class="card">
+    <div id="card-kinds" class="card">
       <h2 class="card-title"><span aria-hidden="true">🧩</span> Chceš i něco navíc?</h2>
       <div id="kindChips" class="chips"></div>
       <p id="kindNote" class="field-note" hidden></p>
     </div>
 
     <div class="card">
-      <h2 class="card-title"><span aria-hidden="true">🔢</span> Kolik příkladů?</h2>
+      <h2 id="countTitle" class="card-title"><span aria-hidden="true">🔢</span> Kolik příkladů?</h2>
       <div id="countChips" class="chips"></div>
       <label class="custom-max">
         <span>Nebo vlastní počet:</span>
@@ -70,6 +81,7 @@
         <span>Nebo vlastní číslo:</span>
         <input id="maxCustom" type="number" min="5" max="1000" step="1" inputmode="numeric" aria-label="Vlastní maximální číslo">
       </label>
+      <p id="maxNote" class="field-note" hidden></p>
     </div>
 
     <button id="startBtn" class="btn btn-primary btn-huge">Začít <span id="startIcon" aria-hidden="true">🐾</span></button>
