@@ -1,0 +1,10 @@
+{
+  "name": "pocitani",
+  "private": true,
+  "type": "module",
+  "description": "Hravý trenažér matematiky pro Alžbětu. Statický web bez závislostí — package.json je tu jen kvůli zkratkám níže.",
+  "scripts": {
+    "dev": "node server.mjs",
+    "publish": "node publish.mjs"
+  }
+}

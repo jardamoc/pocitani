@@ -17,26 +17,33 @@ vysvětlení po chybě. Když nějaká varianta vyjde záporně, popiš to slovy
 
 ## Spuštění a nasazení
 
-Není žádný build ani `package.json` — je to statický web, `public/` se servíruje tak, jak je.
-
 ```powershell
-node server.mjs                 # http://localhost:8000
-node server.mjs 8080            # jiný port
+npm run dev                     # http://localhost:8000
+npm run publish                 # git push + nasazení + ověření
+npm run publish -- --dry-run    # jen kontroly, nic se neodešle
 ```
 
-`server.mjs` v kořeni je vývojový server bez závislostí (jen `node:http`). Obsazený port
-si sám posune o jedna dál a vypíše, na které adrese nakonec běží. Nasazuje se jen
-`public/`, takže tenhle soubor na Netlify nikdy nejde.
+**Žádné sestavování ani závislosti nepřibyly.** `package.json` je tu jen kvůli těmhle
+dvěma zkratkám — `dependencies` je prázdné, `npm install` není potřeba, `public/` se
+pořád servíruje tak, jak leží. Co ale **nesmíš odstranit, je `"type": "module"`**: bez
+něj by Node považoval `public/js/*.js` za staré CommonJS moduly a každý testovací
+skript by spadl na `export`.
+
+Jméno skriptu `publish` je zároveň npm lifecycle hook. Nevadí to, protože `private: true`
+zakazuje `npm publish` — nic se nikam nepublikuje.
+
+**Vývojový server** `server.mjs` stojí jen na `node:http`. Obsazený port si sám posune
+o jedna dál a vypíše, kde nakonec běží. Odpovědi mají `Cache-Control: no-store`, aby
+byly změny vidět bez `Ctrl+F5`. Cesty mimo `public/` vrací 403 (ověřeno i na tvarech
+`%2e%2e` a `..%2f`).
 
 Dvojklik na `index.html` **nefunguje** — aplikace je z ES modulů a ty prohlížeč
 z `file:///` odmítne načíst. Musí to jít přes `localhost`.
 
-Nasazení je ruční, ve dvou krocích:
-
-```powershell
-git push                                  # commit na main
-npx --yes netlify-cli@latest deploy --prod --dir=public
-```
+**Nasazení** `publish.mjs` je ruční postup zabalený do skriptu, i s pojistkami:
+zastaví se na jiné větvi než `main` a na neuložených změnách (jinak by se nasadilo
+něco jiného, než je v gitu), pak odešle commity, spustí Netlify a **nakonec si stáhne
+živý web a zkontroluje ho** — hláška „Deploy is live" sama o sobě nestačí.
 
 `netlify` **není v PATH** — samotný příkaz `netlify` spadne na „není rozpoznán jako
 název rutiny". Přihlášení ale platí (je uložené v `%APPDATA%\netlify`), takže verze
@@ -54,6 +61,9 @@ přes `npx` projde bez ptaní na účet.
 | `public/js/stats.js` | ukládání do localStorage, rozbor kola, rady |
 | `public/js/random.js` | `rnd` / `pick` / `chance` / `shuffle` / `range` |
 | `public/css/styles.css` | vše včetně devíti barevných témat a tmavého režimu |
+| `server.mjs` | vývojový server (`npm run dev`) — mimo `public/`, nenasazuje se |
+| `publish.mjs` | nasazení i s kontrolami a ověřením (`npm run publish`) |
+| `package.json` | jen ty dvě zkratky a `"type": "module"`; žádné závislosti |
 
 Prosté ES moduly, žádný framework, žádné závislosti. Závislosti jdou jedním směrem:
 `random.js → riddle.js / grid.js → generator.js → app.js`. Kruh nezaváděj.
