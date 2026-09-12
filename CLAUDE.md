@@ -43,20 +43,24 @@ netlify deploy --prod --dir=public        # CLI je přihlášené
 | `public/css/styles.css` | vše včetně devíti barevných témat a tmavého režimu |
 
 Prosté ES moduly, žádný framework, žádné závislosti. Závislosti jdou jedním směrem:
-`random.js → riddle.js → generator.js → app.js`. Kruh nezaváděj.
+`random.js → riddle.js / grid.js → generator.js → app.js`. Kruh nezaváděj.
 
-## Dva režimy hry
+## Tři režimy hry
 
 Na úvodní obrazovce se vybírá karta **„Co si zahrajeme?"**:
 
-- **Počítání** (`config.mode === 'calc'`) — původní trénink. Vybírají se operace a k nim
-  druhy úloh navíc (`EXTRA_KINDS`): slovní úlohy, pyramidy, doplň znaménko.
-- **Obrázkové hádanky** (`config.mode === 'riddle'`) — samostatná hra s vlastní obtížností.
-  Karty s operacemi a „něco navíc" se v tomhle režimu schovají.
+| režim | `config.mode` | co se v nastavení skryje |
+|---|---|---|
+| **Počítání** | `calc` | — (vybírají se operace i druhy úloh navíc) |
+| **Obrázkové hádanky** | `riddle` | operace, „něco navíc" |
+| **Mřížka** | `grid` | „něco navíc", **počet příkladů** (jedna mřížka = jedno kolo) |
 
-Obě větve se rozcházejí až v `startRound()`: `buildRound()` versus `buildRiddleRound()`.
-Všechno ostatní — klávesnice, vyhodnocení, statistiky — je společné, protože každá úloha
-má stejný tvar: `{ op, kind, missing, a, b, c, answer, skill }`.
+Větve se rozcházejí až v `startRound()`, kde je tabulka builderů. Všechno ostatní —
+klávesnice, vyhodnocení, statistiky — je společné, protože každá úloha má stejný tvar:
+`{ op, kind, missing, a, b, c, answer, skill }`.
+
+`config.level` je **společný pro hádanky i mřížku** (klíče `easy`/`medium`/`hard`), takže
+přepnutí režimu obtížnost neztratí. Tabulku popisků vybírá `levelTable()` podle režimu.
 
 **Když přidáváš nový druh úlohy, drž se tohohle tvaru.** Ušetří ti to práci na pěti místech.
 Stačí pak: položka v `EXTRA_KINDS`, větev v `makeExercise()`, funkce v `BODY_HTML`,
@@ -181,6 +185,18 @@ roztáhne celou stránku. Proto má `.riddle-row-q .slot` pevnou `width` a `min-
 Přetečení neměř přes `scrollWidth > clientWidth`; řádek se místo rolování roztáhne a tahle
 kontrola projde. Porovnávej **součet šířek dětí** proti vnitřní šířce řádku, nebo sleduj
 `document.documentElement.scrollWidth > window.innerWidth`.
+
+## Cizí dovednosti v repozitáři
+
+12. 9. 2026 sem `npx skills add JuliusBrussee/caveman` nainstaloval 20 dovedností.
+Instalátor použil **aktuální adresář**, takže neskončily globálně, ale uvnitř tohohle
+projektu: `.agents/`, `.claude/skills/` a `skills-lock.json`. Všechno tři je v
+`.gitignore` — je to cizí kód vázaný na tenhle stroj a do repozitáře s aplikací nepatří.
+
+**Nikdy je necommituj** a při `git add -A` si ověř, že `git status` nehlásí nic z těch
+cest. Bezpečnostní sken instalátoru označil `caveman-setup` a `caveman-compress` jako
+**High Risk** a `caveman-review` jako Med Risk; dovednosti běží s plnými právy agenta,
+takže je před použitím přečti.
 
 ## Komunikace s uživatelem
 
