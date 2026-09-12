@@ -27,8 +27,12 @@ Nasazení je ruční, ve dvou krocích:
 
 ```powershell
 git push                                  # commit na main
-netlify deploy --prod --dir=public        # CLI je přihlášené
+npx --yes netlify-cli@latest deploy --prod --dir=public
 ```
+
+`netlify` **není v PATH** — samotný příkaz `netlify` spadne na „není rozpoznán jako
+název rutiny". Přihlášení ale platí (je uložené v `%APPDATA%\netlify`), takže verze
+přes `npx` projde bez ptaní na účet.
 
 ## Struktura
 
@@ -38,6 +42,7 @@ netlify deploy --prod --dir=public        # CLI je přihlášené
 | `public/js/app.js` | veškeré UI — vykreslení úloh, klávesnice, vyhodnocení, výsledková obrazovka |
 | `public/js/generator.js` | generování příkladů, vysvětlení po chybě, rozbor chyby |
 | `public/js/riddle.js` | generátor obrázkových hádanek (samostatný, generator.js si ho importuje) |
+| `public/js/grid.js` | generátor mřížek (stejně samostatný jako `riddle.js`) |
 | `public/js/stats.js` | ukládání do localStorage, rozbor kola, rady |
 | `public/js/random.js` | `rnd` / `pick` / `chance` / `shuffle` / `range` |
 | `public/css/styles.css` | vše včetně devíti barevných témat a tmavého režimu |
@@ -173,6 +178,10 @@ si napiš do scratchpadu. U čehokoli, co generuje úlohy, testuj vždycky tohle
 
 Projeď aspoň pár tisíc vygenerovaných úloh, ne deset. Většina vad se objeví jednou za sto.
 
+**Úlohy s vlastním ovládáním testuj přes klávesnici, ne zápisem do `.value`.** Test mřížky
+mi prošel zeleně, přestože psát šlo jen do jednoho z devíti koleček — hodnoty zapisoval
+přímo do `input.value` a `handleKey()` úplně obešel. Chyba byla přesně v té funkci.
+
 ## Rozvržení
 
 Musí fungovat **od 320 px** (nejužší reálný telefon) po desktop. Nejkritičtější je poslední
@@ -185,6 +194,16 @@ roztáhne celou stránku. Proto má `.riddle-row-q .slot` pevnou `width` a `min-
 Přetečení neměř přes `scrollWidth > clientWidth`; řádek se místo rolování roztáhne a tahle
 kontrola projde. Porovnávej **součet šířek dětí** proti vnitřní šířce řádku, nebo sleduj
 `document.documentElement.scrollWidth > window.innerWidth`.
+
+**Každé nové políčko na odpověď potřebuje v HTML vlastní `maxlength`.** `renderExercise()`
+ho nastavuje jen tomu s `id="answerInput"`. Bez atributu vrací `input.maxLength` hodnotu
+−1, podmínka `value.length >= maxLength` je pak vždycky splněná a klávesnice do políčka
+nenapíše ani číslici. Takhle se rozbila mřížka — psát šlo jen do prvního kolečka.
+
+**Hlídej si specificitu.** Obecné `.slot input` (0,1,1) přebije vlastní `.grid-input`
+(0,1,0), takže si kolečko vzalo velikost písma z běžného příkladu a dvojciferné číslo
+přeteklo z kroužku ven. Nový selektor musí mít aspoň dvě třídy (`.gcell .grid-input`)
+a nastavit i `line-height`, jinak číslo nesedí na střed.
 
 ## Pozor na `npx skills add`
 
