@@ -29,6 +29,9 @@ export function save(state) {
   }
 }
 
+/* Druhy úloh, které se nedají z descriptoru znovu poskládat. */
+const NO_REPEAT = new Set(['riddle', 'grid']);
+
 const descriptor = (ex) => ({
   op: ex.op,
   kind: ex.kind,
@@ -49,10 +52,11 @@ export function recordRound(state, config, attempts) {
     if (!at.correct) s.wrong += 1;
   }
 
-  /* Hádanky se do "co si zopakovat" neukládají - každá je pokaždé jiná,
-     takže by se nedaly znovu složit a jen by vytlačily skutečné příklady. */
+  /* Hádanky ani mřížky se do "co si zopakovat" neukládají - každá je pokaždé
+     jiná, takže by se nedaly znovu složit a jen by vytlačily skutečné
+     příklady. `descriptor` z nich navíc uchová jen a, b, c, což nestačí. */
   const solved = new Set(attempts.filter((a) => a.correct).map((a) => signature(a.ex)));
-  const fresh = attempts.filter((a) => !a.correct && a.ex.kind !== 'riddle').map((a) => descriptor(a.ex));
+  const fresh = attempts.filter((a) => !a.correct && !NO_REPEAT.has(a.ex.kind)).map((a) => descriptor(a.ex));
 
   state.missed = [...fresh, ...state.missed.filter((m) => !solved.has(signature(m)))]
     .filter((m, i, arr) => arr.findIndex((x) => signature(x) === signature(m)) === i)
@@ -95,6 +99,7 @@ const KIND_LABEL = {
   'word:b': { acc: 'slovní úlohy na změnu', gen: 'slovních úloh na změnu' },
   'riddle:c': { acc: 'obrázkové hádanky', gen: 'obrázkových hádanek' },
   'sign:op': { acc: 'příklady s chybějícím znaménkem', gen: 'příkladů s chybějícím znaménkem' },
+  'grid:c': { acc: 'mřížky', gen: 'mřížek' },
 };
 
 function starsFor(pct) {
@@ -127,6 +132,11 @@ const LEVEL_NAME = { easy: 'Lehké', medium: 'Střední', hard: 'Těžké' };
 
 export function analyze(state, config, attempts) {
   const riddleMode = config.mode === 'riddle';
+  const gridMode = config.mode === 'grid';
+  /* Režimy, kde se rozpad podle operací nehodí - hádanky i mřížky mají
+     `op: 'add'` jen jako zástupnou hodnotu, takže by "přechod přes desítku"
+     i rady k násobilce říkaly nesmysl. Jedeme podle obtížnosti. */
+  const levelMode = riddleMode || gridMode;
   const total = attempts.length;
   const correct = attempts.filter((a) => a.correct).length;
   const pct = total ? Math.round((correct / total) * 100) : 0;
@@ -154,11 +164,11 @@ export function analyze(state, config, attempts) {
   /* V režimu hádanek je všechno sčítání, takže rozpad podle operací i
      přechod přes desítku by říkaly nesmysl. Místo nich jedeme podle
      obtížnosti. */
-  for (const g of riddleMode ? byLevel : byOp) {
+  for (const g of levelMode ? byLevel : byOp) {
     // "Sčítání ti jde" × "Lehké hádanky ti jdou" - jiný rod i číslo
-    const name = riddleMode ? `${LEVEL_NAME[g.key]} hádanky` : OPS[g.key].label;
-    const goes = riddleMode ? 'jdou' : 'jde';
-    const hard = riddleMode ? 'dřou' : 'dře';
+    const name = levelMode ? `${LEVEL_NAME[g.key]} ${gridMode ? 'mřížky' : 'hádanky'}` : OPS[g.key].label;
+    const goes = levelMode ? 'jdou' : 'jde';
+    const hard = levelMode ? 'dřou' : 'dře';
     if (g.seen >= 3 && g.pct >= 85) strengths.push(`${name} ti ${goes} výborně – ${g.correct} z ${g.seen} správně.`);
     if (g.seen >= 2 && g.pct < 70) watchOuts.push(`${name} ještě ${hard} – ${g.correct} z ${g.seen}.`);
   }
@@ -168,7 +178,7 @@ export function analyze(state, config, attempts) {
     if (g.seen >= 3 && g.pct === 100) strengths.push(`Zvládla jsi všechny ${label.acc} bez chyby.`);
     if (g.seen >= 3 && g.pct < 60) watchOuts.push(`Nejvíc chyb máš u ${label.gen}.`);
   }
-  if (!riddleMode && cross && cross.seen >= 3) {
+  if (!levelMode && cross && cross.seen >= 3) {
     if (cross.pct >= 85) strengths.push(`Přechod přes desítku ti jde (${cross.correct} z ${cross.seen}). To je ta nejtěžší část!`);
     else if (cross.pct < 65) watchOuts.push(`Přechod přes desítku dělá potíže – ${cross.correct} z ${cross.seen}.`);
   }
@@ -176,13 +186,26 @@ export function analyze(state, config, attempts) {
 
   if (tags.get('offOne') >= 2) watchOuts.push('Několikrát ti výsledek utekl jen o jedničku – vyplatí se na konci zkontrolovat.');
   if (tags.get('riddleSymbol') >= 1) watchOuts.push('U hádanky se občas napsalo, kolik je jeden obrázek. Poslední řádek chce součet celého řádku.');
-  if (!riddleMode) {
+  if (!levelMode) {
     if (tags.get('inverse') >= 2) watchOuts.push('U příkladů s chybějícím číslem se občas počítalo opačně (sčítalo se místo odčítání).');
     if (tags.get('swapOp') >= 1) watchOuts.push('Někdy se popletlo znaménko – vždycky se podívej, jestli je tam + nebo −.');
   }
   if (tags.get('offTen') >= 2) watchOuts.push('Občas se spletla desítka (např. 24 místo 14).');
 
-  if (riddleMode) {
+  if (gridMode) {
+    if (pct < 100) {
+      tips.push('V mřížce hledej řádek nebo sloupec, kde chybí jediné kolečko – od něj se rozmotá zbytek.');
+    }
+    if (attempts.some((a) => a.retried)) {
+      tips.push('Když ti roh nesedí, přepočítej ho i druhým směrem. Musí vyjít stejně doprava i dolů.');
+    }
+    if (pct === 100) {
+      const harder = { easy: 'střední', medium: 'těžkou' }[config.level];
+      tips.push(harder
+        ? `Zvládla jsi ji – zkus příště ${harder} obtížnost, mřížka bude o řádek větší.`
+        : 'Zvládla jsi největší mřížku. Zkus zvýšit rozsah, čísla budou vyšší.');
+    }
+  } else if (riddleMode) {
     const weakLevel = byLevel.find((g) => g.seen >= 2 && g.pct < 70);
     if (weakLevel) {
       tips.push('Hádanky luští odshora dolů: první řádek prozradí jeden obrázek a v každém dalším pak zbývá dopočítat už jenom jeden.');

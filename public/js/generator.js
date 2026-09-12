@@ -1,5 +1,6 @@
 import { rnd, pick, chance, shuffle } from './random.js';
 import { makeRiddle, riddleExplain, riddleText } from './riddle.js';
+import { makeGrid, gridExplain, gridText } from './grid.js';
 
 export const OPS = {
   add: { symbol: '+', label: 'Sčítání', name: 'sčítání', emoji: '➕' },
@@ -115,6 +116,8 @@ function finalize(ex) {
 }
 
 export function signature(ex) {
+  // mřížka nemá trojici a,b,c - podpisem je otisk celé mřížky
+  if (ex.kind === 'grid') return `grid|${ex.key}`;
   return `${ex.op}|${ex.kind}|${ex.missing}|${ex.a}|${ex.b}`;
 }
 
@@ -335,7 +338,32 @@ export function buildRiddleRound(config) {
   return items;
 }
 
+/* ---------------- mřížka ----------------
+   Odpověď je ŘETĚZEC hodnot skrytých koleček spojený ', ' v pořadí
+   `ex.hidden`. `submit()` čte políčka ve stejném pořadí a spojuje stejně,
+   takže porovnání `given === ex.answer` funguje beze změny - nemusí se
+   kvůli mřížce sahat do společné cesty vyhodnocení. */
+function gridExercise(config) {
+  const g = makeGrid(config.max, config.level, config.ops);
+  return {
+    op: 'add',            // zástupná hodnota, ať OPS[ex.op] nikde nespadne
+    kind: 'grid',
+    missing: 'c',
+    a: 0, b: 0, c: 0,
+    cross: false,
+    skill: `grid:${g.family}:${g.level}`,
+    answer: g.hidden.map(({ r, c }) => g.cells[r][c]).join(', '),
+    ...g,
+  };
+}
+
+/* Jedna mřížka je celé kolo - uživatel u ní nechtěl volbu počtu příkladů. */
+export function buildGridRound(config) {
+  return [gridExercise(config)];
+}
+
 export function exToText(ex, reveal = false) {
+  if (ex.kind === 'grid') return gridText(ex, reveal);
   if (ex.kind === 'riddle') return riddleText(ex, reveal);
   if (ex.kind === 'sign') {
     return `${ex.a} ${reveal ? OPS[ex.op].symbol : '__'} ${ex.b} = ${ex.c}`;
@@ -386,6 +414,7 @@ function repeatedAdditionStep(a, b, c) {
 export function explain(ex) {
   const { op, kind, missing, a, b, c } = ex;
 
+  if (kind === 'grid') return gridExplain(ex);
   if (kind === 'riddle') return riddleExplain(ex);
 
   /* U znamenka je nejnazornejsi zkusit vsechny moznosti, ze kterych dite
@@ -497,12 +526,17 @@ export const TAGS = {
   offOne: 'chyba o jedničku',
   offTen: 'chyba o desítku',
   riddleSymbol: 'hodnota obrázku místo součtu',
+  gridPartial: 'část mřížky správně',
   other: 'jiná chyba',
 };
 
 export function diagnose(ex, given) {
   const { op, kind, missing, a, b, c, answer } = ex;
   if (given === answer) return null;
+
+  /* Mřížka musí ven dřív, než se sáhne na aritmetiku - odpovědí je řetězec
+     a `Math.abs(given - answer)` by dal NaN. */
+  if (kind === 'grid') return 'gridPartial';
 
   // typická chyba u hádanek: dítě napíše, kolik je jeden obrázek
   if (kind === 'riddle' && ex.values.includes(given)) return 'riddleSymbol';

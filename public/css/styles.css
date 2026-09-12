@@ -399,6 +399,7 @@ h1, h2, h3, .num, .box-value, .key, .score-big { font-family: 'Baloo 2', 'Nunito
 .chip-sub { font-weight: 700; font-size: .78rem; line-height: 1.25; opacity: .72; }
 .chips-mode .chip.is-on[data-value="calc"] { background: linear-gradient(135deg, #38bdf8, #4f46e5); }
 .chips-mode .chip.is-on[data-value="riddle"] { background: linear-gradient(135deg, #fb923c, #db2777); }
+.chips-mode .chip.is-on[data-value="grid"] { background: linear-gradient(135deg, #34d399, #0891b2); }
 
 /* obtížnost hádanek - barvy sedí na kolečka 🟢 🟡 🔴 na chipech */
 .chips .chip.is-on[data-value="easy"] { background: linear-gradient(135deg, #4ade80, #15803d); }
@@ -660,6 +661,83 @@ body.is-quiz .wrap { padding-top: 18px; }
 .riddle-reveal > span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 .riddle-sym-sm { font-size: 1.5rem; }
 
+/* ---------- mřížka ----------
+   Kolečka a mezi nimi operátory, vodorovně i svisle. Nejtěsnější případ je
+   5×5 na 320px: pět koleček a čtyři operátory v řadě. Rozměry proto drží
+   proměnné, které se mění podle `data-size`.
+
+   `min-width: 0` na kolečku je povinné - bez něj si <input> prosadí vlastní
+   vnitřní šířku přes 300px a roztáhne celou stránku. */
+.grid {
+  --cell: clamp(58px, 17vw, 84px);
+  --op: clamp(20px, 6.5vw, 32px);
+  --gap: clamp(2px, 1vw, 8px);
+  display: grid; justify-content: center; align-items: center;
+  gap: var(--gap); min-width: 0;
+  grid-template-columns: var(--cell) var(--op) var(--cell) var(--op) var(--cell);
+}
+.grid[data-size="4"] {
+  --cell: clamp(46px, 13.5vw, 72px);
+  --op: clamp(15px, 4.6vw, 26px);
+  --gap: clamp(1px, .5vw, 6px);
+  grid-template-columns: var(--cell) var(--op) var(--cell) var(--op) var(--cell) var(--op) var(--cell);
+}
+.grid[data-size="5"] {
+  --cell: clamp(42px, 12.4vw, 64px);
+  --op: clamp(12px, 3.6vw, 22px);
+  --gap: 0px;
+  grid-template-columns: var(--cell) var(--op) var(--cell) var(--op) var(--cell) var(--op) var(--cell) var(--op) var(--cell);
+}
+
+.gcell {
+  width: var(--cell); height: var(--cell); min-width: 0;
+  display: grid; place-items: center; position: relative;
+  border-radius: 50%; box-sizing: border-box;
+}
+.gnum {
+  background: var(--card); border: 4px solid var(--ink);
+  font-family: 'Baloo 2', sans-serif; font-weight: 800; color: var(--ink);
+  font-size: calc(var(--cell) * .42);
+  box-shadow: 0 4px 0 rgba(20, 49, 77, .14);
+}
+/* trojciferná čísla se do kolečka vejdou jen menším písmem */
+.grid[data-digits="3"] .gnum, .grid[data-digits="4"] .gnum { font-size: calc(var(--cell) * .34); }
+
+.gop {
+  font-family: 'Baloo 2', sans-serif; font-weight: 700; color: var(--coral);
+  font-size: calc(var(--op) * .86); line-height: 1; text-align: center;
+}
+.gop-eq { color: var(--ink-soft); }
+
+.gcell.slot {
+  border-radius: 50%; width: var(--cell); height: var(--cell); min-width: 0;
+}
+.grid-input {
+  font: inherit; font-family: 'Baloo 2', sans-serif; font-weight: 800;
+  font-size: calc(var(--cell) * .42); text-align: center; color: var(--violet);
+  width: 100%; height: 100%; min-width: 0; padding: 0;
+  border: 0; background: transparent;
+}
+.grid[data-digits="3"] .grid-input, .grid[data-digits="4"] .grid-input { font-size: calc(var(--cell) * .34); }
+.grid-input:focus { outline: none; }
+.gcell.slot:focus-within { box-shadow: 0 0 0 4px rgba(124, 92, 255, .35); }
+
+/* po druhé chybě: správná hodnota a pod ní přeškrtnutá vlastní */
+.gval { font-family: 'Baloo 2', sans-serif; font-weight: 800; line-height: 1; }
+.gwas {
+  position: absolute; bottom: 2px; font-size: calc(var(--cell) * .22);
+  color: var(--bad-dark); text-decoration: line-through; font-weight: 700;
+}
+
+/* velký odznak místo prstence s procenty na výsledkové obrazovce */
+.grid-verdict {
+  width: 96px; height: 96px; margin: 4px auto 10px; border-radius: 50%;
+  display: grid; place-items: center; font-size: 3rem; font-weight: 800;
+  background: var(--card); box-shadow: var(--shadow);
+}
+.grid-verdict[data-ok="true"] { color: var(--good-dark); border: 5px solid var(--good); }
+.grid-verdict[data-ok="false"] { color: var(--bad-dark); border: 5px solid var(--bad); }
+
 /* ---------- vyhodnocení ---------- */
 .feedback { border-radius: var(--radius); padding: 18px; margin-bottom: 16px; box-shadow: var(--shadow); }
 .feedback[data-state="correct"] { background: linear-gradient(160deg, var(--good-tint), var(--tint-fade) 70%); border: 3px solid var(--good); }
@@ -774,6 +852,9 @@ body.is-quiz .wrap { padding-top: 18px; }
   .bond-row { gap: 18px; }
   /* hádanka se čtyřmi obrázky potřebuje na úzkém telefonu každý pixel */
   .card-exercise { padding-left: 10px; padding-right: 10px; }
+  /* mřížka 5×5 ještě víc - jinak by kolečka musela pod dotykový cíl */
+  body.is-wide-grid .wrap { padding-left: 8px; padding-right: 8px; }
+  body.is-wide-grid .card-exercise { padding-left: 4px; padding-right: 4px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -112,6 +112,43 @@ Další pravidla, která hlídají testy:
 - Průběžný součet zleva nesmí klesnout pod 1 a v poslední rovnici je nejvýš jeden minus.
 - Hádanka dá dítěti **jeden pokus navíc** (`RETRY_KINDS`); řešení se ukáže až po druhé chybě.
 
+## Mřížka
+
+Kolečka s čísly, kde platí rovnice vodorovně i svisle. Tři věci, bez kterých to nefunguje:
+
+**Operátor patří mezeře, ne rovnici.** Znaménko mezi prvním a druhým sloupcem platí ve
+všech řádcích, znaménko mezi prvním a druhým řádkem ve všech sloupcích.
+
+**Mřížka se staví, ne hádá.** Vylosuje se blok volných čísel vlevo nahoře a poslední
+sloupec s řádkem se dopočítají. Roh pak vyjde stejně oběma směry, protože obě cesty
+vedou na tutéž dvojnou sumu.
+
+**Rodiny se nesmí míchat.** Násobení se nedá prohodit se sčítáním. Mřížka 5×5
+s operátory `+ × +` v obou směrech (samé jedničky a jedna dvojka) dá v rohu **22 po
+řádku, ale 24 po sloupci** — dvě různé hodnoty pro totéž kolečko. Mřížka je proto buď
+celá sčítací (`+ −`), nebo celá násobící (`× ÷`), nikdy obojí.
+
+Z toho plyne omezení: **násobící mřížka jde jen 3×3**, protože roh je součinem *všech*
+volných buněk. U 3×3 jsou čtyři (`3·4·2·4 = 96`), u 4×4 devět — i samé dvojky dají 512,
+tedy mimo jakýkoli rozsah, který jde zvolit.
+
+Další pravidla:
+
+- **Obtížnost = velikost** (3×3 / 4×4 / 5×5). Jak velká jsou čísla, řídí výhradně rozsah.
+- Volný blok se **nelosuje celý naslepo** (`buildFreeBlock`) — odčítané buňky drží čísla
+  dole, takže mřížka se samými minusy by se náhodou skoro nikdy netrefila. Vnitřek se
+  vylosuje malý a první řádek se sloupcem se dopočítají tak, aby nic nespadlo pod nulu.
+- Strop na jedno číslo se zkouší **odshora dolů** (`SCALES`). Bez toho by „do 100"
+  u velké mřížky dávalo jednociferná čísla, protože odhad musí počítat s nejhorším.
+- Losuje se **od jedničky**; nula se povolí až když se jinak velká mřížka do těsného
+  rozsahu nevejde (5×5 má 16 volných buněk, takže roh nemůže být menší než 16).
+- **Jedna mřížka = jedno kolo.** Karta „Kolik příkladů?" se v tomhle režimu schová
+  a výsledková obrazovka má vlastní, zkrácenou podobu (`renderGridResult`).
+- Odpověď je **řetězec** hodnot skrytých koleček spojený `', '` v pořadí `ex.hidden`.
+  Díky tomu funguje `given === ex.answer` v `submit()` beze změny. `ex.op` je `'add'`
+  jen jako zástupná hodnota, aby `OPS[ex.op]` nikde nespadlo — proto `tenFrameHTML`
+  musí mřížku hned na začátku vyloučit, jinak nakreslí prázdný desítkový rámec.
+
 ## Doplň znaménko
 
 `7 __ 3 = 10`. Nabídka tlačítek je přesně ta sada operací, kterou má uživatel zapnutou,
