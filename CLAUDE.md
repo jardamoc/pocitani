@@ -20,8 +20,16 @@ vysvětlení po chybě. Když nějaká varianta vyjde záporně, popiš to slovy
 Není žádný build ani `package.json` — je to statický web, `public/` se servíruje tak, jak je.
 
 ```powershell
-npx --yes serve public          # nebo jakýkoli statický server
+node server.mjs                 # http://localhost:8000
+node server.mjs 8080            # jiný port
 ```
+
+`server.mjs` v kořeni je vývojový server bez závislostí (jen `node:http`). Obsazený port
+si sám posune o jedna dál a vypíše, na které adrese nakonec běží. Nasazuje se jen
+`public/`, takže tenhle soubor na Netlify nikdy nejde.
+
+Dvojklik na `index.html` **nefunguje** — aplikace je z ES modulů a ty prohlížeč
+z `file:///` odmítne načíst. Musí to jít přes `localhost`.
 
 Nasazení je ruční, ve dvou krocích:
 
