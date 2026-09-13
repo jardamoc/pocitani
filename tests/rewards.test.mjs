@@ -410,6 +410,33 @@ test('duvody odmen jsou cesky a bez zapornych nebo desetinnych cisel', () => {
   }
 });
 
+test('navod v popupu je cesky a odpovida pravidlum', () => {
+  for (const category of data.CATEGORY_ORDER) {
+    const navod = rewards.howToGet(category);
+    const text = [navod.lead, ...navod.bullets, navod.tail].join(' ');
+    assert.equal(navod.bullets.length > 0, true, category);
+    assert.equal(/undefined|NaN|\[object/.test(text), false, `${category}: ${text}`);
+    assert.equal(/-\d|\d+[.,]\d/.test(text), false, `zaporne nebo desetinne cislo: ${text}`);
+  }
+  // cisla v navodu se musi brat z konfigurace, ne byt prepsana v textu
+  const zakladni = rewards.howToGet('basic');
+  assert.equal(zakladni.bullets.some((b) => b.includes(`do ${REWARD_RULES.rangeTiers[0].minRange} a výš`)), true);
+  assert.equal(zakladni.bullets.some((b) => b.includes(`pod ${REWARD_RULES.speedThresholdsSeconds[0].under} s`)), true);
+  assert.equal(zakladni.bullets.some((b) => b.includes(String(REWARD_RULES.dailyVolumeSteps[0].atLeast))), true);
+
+  const legendarni = rewards.howToGet('legendary');
+  assert.equal(legendarni.bullets.some((b) => b.includes(`${REWARD_RULES.legendaryActiveDaysRequired} různých dnech`)), true);
+});
+
+test('cesky plural sklonuje i nulu spravne', () => {
+  const p = (n) => rewards.plural(n, 'bod', 'body', 'bodů');
+  assert.equal(p(0), 'bodů');
+  assert.equal(p(1), 'bod');
+  assert.equal(p(2), 'body');
+  assert.equal(p(4), 'body');
+  assert.equal(p(5), 'bodů');
+});
+
 test('souhrn sbirky sedi s inventarem', () => {
   const d = rewards.emptyData();
   d.rewardInventory.basic_01 = 3;

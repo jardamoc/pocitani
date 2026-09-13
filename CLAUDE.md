@@ -249,7 +249,15 @@ Pár věcí, které se snadno rozbijí:
   neobjevených v dané kategorii, teprve když má dítě všech osm, může padnout duplikát.
   Generátor náhody je parametr `applyRound(data, summary, rng)`, aby šly testy zopakovat.
 - **U neobjevené postavičky se skutečné jméno nesmí objevit nikde** — ani v popisku, ani
-  v `title` nebo `aria-label`. Je tam `Neobjevený dumpling`.
+  v `title` nebo `aria-label`, ani v popupu. Je tam `Neobjevený dumpling`.
+- **Návod v popupu se generuje z `REWARD_RULES`** (`howToGet()`), nikdy se nepíše ručně.
+  Jinak by text po změně hranice tiše lhal proti skutečnému chování.
+
+Na stránce sbírky je místo tlačítka „Odměny" plovoucí šipka zpět (`.rewards-back`,
+`position: fixed`, přepíná se třídou `body.is-rewards`). Tlačítko do sbírky by tam vedlo
+samo na sebe, tak se skrývá. Kliknutí na kolečko otevře popup s návodem, najetí myší jen
+napíše podrobnost do řádku pod mřížkou — ten je v normálním toku, takže nemůže roztáhnout
+stránku do šířky. **Plovoucí bublinu tam nevracej**, na 320 px přetékala.
 
 ### Sprite sheet
 
