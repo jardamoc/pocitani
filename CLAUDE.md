@@ -63,6 +63,9 @@ přes `npx` projde bez ptaní na účet.
 | `public/js/rewards-data.js` | souřadnice sprite sheetu a česká jména 40 dumplingů — čistá data |
 | `public/js/rewards.js` | pravidla odměn, vyhodnocení kola, výběr postavičky, ukládání — **bez DOM** |
 | `public/js/rewards-ui.js` | vykreslení odměn: sprite, sbírka, závěrečné okno, animace |
+| `public/js/qr.js` | generátor QR kódu podle normy — bez knihovny |
+| `public/js/transfer.js` | přenos postupu mezi zařízeními: zabalení, adresa, slučování |
+| `public/js/export-ui.js` | dialog „Export" — heslo, QR kód, tři mazací tlačítka |
 | `public/img/dumplings.png` | jeden sprite sheet 1254×1254 se všemi 40 postavičkami i 5 nadpisy |
 | `public/css/styles.css` | vše včetně devíti barevných témat, tmavého režimu a odměn |
 | `server.mjs` | vývojový server (`npm run dev`) — mimo `public/`, nenasazuje se |
@@ -71,8 +74,9 @@ přes `npx` projde bez ptaní na účet.
 | `package.json` | jen ty tři zkratky a `"type": "module"`; žádné závislosti |
 
 Prosté ES moduly, žádný framework, žádné závislosti. Závislosti jdou jedním směrem:
-`random.js → riddle.js / grid.js → generator.js → app.js` a
-`rewards-data.js → rewards.js → rewards-ui.js → app.js`. Kruh nezaváděj.
+`random.js → riddle.js / grid.js → generator.js → app.js`,
+`rewards-data.js → rewards.js → rewards-ui.js → app.js` a
+`qr.js / transfer.js → export-ui.js → app.js`. Kruh nezaváděj.
 
 ## Tři režimy hry
 
@@ -274,6 +278,66 @@ Dva výřezy mají na levém okraji plný sloupec a `tests/sprite.test.mjs` je v
 posouzené odchylky (`ZNAME_ODCHYLKY`): `rare_07` přichází asi o 8 px vlastního levého okraje,
 `epic_03` má v sobě asi 6 px sousední postavičky. Je to pod 6 % šířky výřezu a na zobrazené
 velikosti to není poznat. Pokud to někdy budeš ladit, **posuň souřadnice, nezměkčuj test.**
+
+## Nastavení, export a přenos na druhé zařízení
+
+Ve spodní liště úvodní obrazovky je vedle „Zvuk" tlačítko **„🔒 Nastavení"**. Otevře dialog
+za statickým heslem `190417` — je to zámek na dvířka od spíže, ne trezor: má zabránit tomu,
+aby si Alžběta omylem smazala sbírku. Kdo otevře zdrojový kód, dostane se dál, a to je
+v pořádku.
+
+**Tlačítko „Smazat historii" na úvodní obrazovce už není** a nevracej ho tam. Mazání patří
+do tohohle dialogu za heslo, aby se k němu dítě nedostalo omylem.
+
+Potvrzovací tlačítko u hesla **není** — dialog se odemkne sám, jakmile zadané znaky sedí.
+Chyba se hlásí až po Enteru, ne během psaní. Vlevo nahoře je šipka **„‹"**, stejné gesto
+jako na stránce sbírky.
+
+Za heslem jsou dvě věci:
+
+**QR kód s přenosem.** Celý postup se zabalí do jednoho řetězce, ten se vloží do adresy
+jako parametr `p` a z adresy se udělá QR kód. Na druhém zařízení se kód vyfotí **běžnou
+aplikací Fotoaparát** — telefon nabídne otevřít odkaz a aplikace si při načtení parametr
+přečte. Čtečka QR v aplikaci tedy není potřeba a nepiš ji.
+
+**Tři mazací tlačítka**, každé se ještě jednou potvrzuje:
+jen sbírka odměn → sbírka i historie počítání (nastavení zůstane) → úplně všechno.
+
+### Co se přenáší a jak se to slučuje
+
+Sbírka dumplingů celá, úspěšnost podle dovedností (`skills`), seznam chyb k procvičení
+(`missed`), výsledky kol **za posledních 5 dnů** (`ROUNDS_DAYS`) a nastavení.
+
+**Slučování je schválně idempotentní** — u počtů se bere vyšší hodnota, u seznamů
+sjednocení. Naskenování téhož kódu podruhé nic nezdvojí; ověřeno. Nikdy se nic nepřepisuje
+směrem dolů, takže o už získané dumplingy se nedá přijít.
+
+Jedna výjimka: **nastavení (téma, rozsah, operace) se přenese jen na zařízení, které ještě
+nic neodehrálo.** Jinak by příchozí kód přepsal vzhled někomu, kdo si ho právě nastavil.
+Jestli je zařízení čerstvé, se musí zjistit **ještě před** slučováním — po sloučení kol už
+je seznam plný z příchozích dat a podmínka by nikdy neplatila. Na tomhle jsem se spálil.
+
+Data se komprimují vestavěným `CompressionStream('deflate-raw')` a kódují do base64url bez
+výplňových `=`. Žádná knihovna. Realistický stav (5 dumplingů, 3 dovednosti, 2 chyby,
+2 kola, nastavení) dá adresu dlouhou **492 znaků** — kapacita QR na úrovni L je 2953, takže
+je velká rezerva. Když by se přenos přesto nevešel, dialog to napíše místo kódu.
+
+### `qr.js`
+
+Vlastní generátor QR podle ISO/IEC 18004: režim byte, verze 1–40, všechny čtyři úrovně
+opravy, Reed-Solomon nad GF(256), všech osm masek s penalizací podle normy.
+
+**Tabulky `EC_CODEWORDS_PER_BLOCK` a `EC_BLOCKS` jsou z normy a neopravuj je od oka.**
+Jsou správně, když `qrCapacity()` vrátí přesně 2953 / 2331 / 1663 / 1273 pro L / M / Q / H.
+
+Ověřoval jsem to jednorázovým skriptem ve scratchpadu, který matici čte zpátky a kontroluje
+**Reed-Solomonovy syndromy** — u nepoškozených dat musí vyjít všechny nulové. Když budeš
+něco podobného psát znovu, pozor na past, do které jsem spadl: do mapy funkčních modulů
+patří i **tmavý modul** na `[size - 8][8]`. Bez něj se bitový proud posune o jeden modul,
+text se ještě přečte správně, ale poslední kódová slova nesedí a syndromy vyjdou nenulové.
+
+QR se kreslí **vždy černý na bílém**, i v tmavém režimu — čtečky potřebují kontrast
+a invertovaný kód spousta telefonů nepřečte.
 
 ## Testy
 

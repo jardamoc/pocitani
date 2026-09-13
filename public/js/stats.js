@@ -1,6 +1,6 @@
 import { OPS, signature, exToText, TAGS } from './generator.js';
 
-const KEY = 'pocitani.v1';
+export const KEY = 'pocitani.v1';
 
 const emptyState = () => ({
   config: null,

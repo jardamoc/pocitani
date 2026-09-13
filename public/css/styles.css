@@ -418,11 +418,12 @@ h1, h2, h3, .num, .box-value, .key, .score-big { font-family: 'Baloo 2', 'Nunito
    border-radius ve všech prohlížečích a u pilulkových tlačítek pak trčí do hran. */
 :root { --ring-off: 0 0 0 0 rgba(0, 0, 0, 0); --ring-on: 0 0 0 4px rgba(124, 92, 255, .55); }
 .btn, .chip, .key, .icon-btn, .custom-max input, .dark-toggle, .rewards-toggle, .rew-slot,
-.rewards-back, .popup-close { --ring: var(--ring-off); }
+.rewards-back, .popup-close, .export-pass { --ring: var(--ring-off); }
 .btn:focus-visible, .chip:focus-visible, .key:focus-visible, .icon-btn:focus-visible,
 .custom-max input:focus-visible, .dark-toggle:focus-visible,
 .rewards-toggle:focus-visible, .rew-slot:focus-visible,
-.rewards-back:focus-visible, .popup-close:focus-visible { --ring: var(--ring-on); outline: none; }
+.rewards-back:focus-visible, .popup-close:focus-visible,
+.export-pass:focus-visible, .export-pass:focus { --ring: var(--ring-on); outline: none; }
 
 .field-error { margin: 12px 0 0; color: var(--bad-dark); font-weight: 800; }
 .field-note { margin: 12px 0 0; color: var(--ink-soft); font-weight: 700; font-size: .95rem; }
@@ -1172,6 +1173,17 @@ body.is-rewards .rewards-toggle { display: none; }
 }
 .popup-close:hover { color: var(--ink); }
 
+/* Sipka zpet v dialogu - stejne gesto jako na strance sbirky, jen mensi
+   a ukotvena vlevo nahore. Nadpis proto potrebuje volne misto po stranach. */
+.popup-back {
+  left: 10px; right: auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0 3px 3px 0;
+  font-family: 'Baloo 2', 'Nunito', system-ui, sans-serif;
+  font-size: 1.6rem; line-height: 1;
+}
+.export-dialog .reward-title { padding: 0 44px; }
+
 .popup-head { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 2px; }
 .popup-name { margin: 8px 0 0; font-family: 'Baloo 2', 'Nunito', sans-serif; font-size: 1.35rem; font-weight: 800; }
 .popup-cat { margin: 0; font-weight: 800; font-size: .9rem; }
@@ -1193,3 +1205,34 @@ body.is-rewards .rewards-toggle { display: none; }
   .rewards-back { top: 10px; left: 10px; width: 40px; height: 40px; font-size: 1.7rem; }
   .popup-name { font-size: 1.18rem; }
 }
+/* ---------- dialog Export ---------- */
+/* Roluje jen vnitrek dialogu, ne cely dialog - krizek je pozicovany vuci
+   dialogu, takze jinak po odrolovani zmizel z dohledu. */
+.export-dialog { position: relative; }
+.export-dialog .export-panel { overflow-y: auto; min-height: 0; }
+/* `display: flex` prebije atribut hidden, takze ho musime vratit - jinak
+   zustane pole na heslo videt i po jeho zadani. */
+.export-gate[hidden] { display: none; }
+.export-gate { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+.export-pass {
+  font: inherit; font-family: 'Baloo 2', 'Nunito', sans-serif;
+  font-size: 1.4rem; font-weight: 800; text-align: center; letter-spacing: .3em;
+  padding: 12px; border: 0; border-radius: 16px;
+  background: var(--surface-2); color: var(--ink);
+  box-shadow: var(--ring), inset 0 0 0 2px var(--line);
+}
+
+.export-qr { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 16px; }
+/* QR ma vlastni bile pozadi bez ohledu na tmavy rezim - ctecky potrebuji
+   kontrast a inverzni kod spousta telefonu neprecte. */
+.export-qr > div { background: #fff; padding: 8px; border-radius: 14px; line-height: 0; }
+.export-qr svg { display: block; width: 100%; height: auto; max-width: 260px; }
+.export-qr .field-note { margin: 0; text-align: center; }
+
+.export-danger { margin-top: 18px; padding-top: 14px; border-top: 2px dashed var(--line); }
+.export-danger .btn { margin-top: 10px; }
+.btn-danger {
+  background: linear-gradient(135deg, #fb7185, #be123c);
+  box-shadow: var(--ring), inset 0 0 0 3px rgba(255, 255, 255, .3), 0 7px 0 #7f1d3a, 0 14px 26px rgba(20, 49, 77, .28);
+}
+.btn-danger:active { box-shadow: var(--ring), 0 3px 0 #7f1d3a, 0 8px 16px rgba(20, 49, 77, .25); }

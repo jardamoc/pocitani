@@ -4,6 +4,8 @@ import { GRID_LEVELS, GRID_LEVEL_KEYS, gridOpsNote, gridRangeNote } from './grid
 import * as store from './stats.js';
 import * as rewards from './rewards.js';
 import { bindCollectionTaps, dismissGranted, dismissPopup, renderCollection, showGranted, updateBadge } from './rewards-ui.js';
+import { dismissExport, openExport } from './export-ui.js';
+import { mergePayload, readIncoming } from './transfer.js';
 
 const el = (id) => document.getElementById(id);
 const screens = {
@@ -187,6 +189,7 @@ function clamp(n, min, max) {
 function show(name) {
   if (name !== 'result') dismissGranted();
   if (name !== 'rewards') dismissPopup();
+  if (name !== 'config') dismissExport();
   for (const [key, node] of Object.entries(screens)) node.classList.toggle('is-active', key === name);
   document.body.classList.toggle('is-quiz', name === 'quiz');
   /* Na sbirce se misto tlacitka "Odmeny" ukaze plovouci sipka zpet -
@@ -533,17 +536,8 @@ el('soundBtn').addEventListener('click', () => {
   if (state.sound) beep('correct');
 });
 
-el('resetBtn').addEventListener('click', () => {
-  if (!confirm('Smazat uložené výsledky a chyby z tohoto prohlížeče?')) return;
-  const { sound, theme, dark } = state;
-  state = store.load();
-  state.skills = {};
-  state.missed = [];
-  state.rounds = [];
-  Object.assign(state, { sound, theme, dark });
-  store.save(state);
-  renderConfigScreen();
-});
+/* Mazani historie uz na uvodni obrazovce neni - patri do dialogu "Nastaveni"
+   za heslem, aby se k nemu dite nedostalo omylem. Viz wipe() nize. */
 
 el('startBtn').addEventListener('click', startRound);
 
@@ -565,6 +559,71 @@ el('rewardsBackBtn').addEventListener('click', () => {
 /* Tlacitko "Pokracovat" obsluhuje primo vrstva s odmenami (rewards-ui.js),
    tady se uz nic vazat nemusi. */
 bindCollectionTaps();
+
+/* ---------------- export a prenos ---------------- */
+
+el('exportBtn').addEventListener('click', () => {
+  openExport({ state, rewardData, onWipe: wipe });
+});
+
+/* Tri rozsahy mazani. Vsechny jsou nevratne, proto se kazdy jeste potvrzuje
+   v dialogu (export-ui.js) - sem uz prijde jen rozhodnuti. */
+function wipe(scope) {
+  if (scope === 'all') {
+    try {
+      localStorage.removeItem(store.KEY);
+      localStorage.removeItem(rewards.STORAGE_KEY);
+    } catch { /* zakazane uloziste - stav aspon vycistime v pameti */ }
+    state = store.load();
+    rewardData = rewards.load();
+    config = { mode: 'calc', level: 'easy', ops: ['add', 'sub'], kinds: ['word', 'bond'], count: 10, max: 20 };
+  } else {
+    if (scope === 'progress') {
+      state.skills = {};
+      state.missed = [];
+      state.rounds = [];
+      store.save(state);
+    }
+    try {
+      localStorage.removeItem(rewards.STORAGE_KEY);
+    } catch { /* viz vyse */ }
+    rewardData = rewards.load();
+  }
+  applyTheme();
+  renderScenery();
+  show('config');
+  renderConfigScreen();
+}
+
+/* Prenos z druheho zarizeni: parametr v adrese se slouci s tim, co uz tady
+   je. Slucovani je idempotentni, takze tyz odkaz podruhe nic nezdvoji. */
+async function acceptIncoming() {
+  const payload = await readIncoming();
+  if (!payload) return;
+  const zmeny = mergePayload(state, rewardData, payload);
+  if (!zmeny) return;
+
+  config = normalizeConfig(state.config) || config;
+  applyTheme();
+  renderScenery();
+  renderConfigScreen();
+
+  const casti = [];
+  if (zmeny.dumplingu) {
+    casti.push(`${zmeny.dumplingu} ${rewards.plural(zmeny.dumplingu, 'dumpling', 'dumplingy', 'dumplingů')}`
+      + (zmeny.novych ? ` (z toho ${zmeny.novych} ${rewards.plural(zmeny.novych, 'nový', 'nové', 'nových')})` : ''));
+  }
+  if (zmeny.chyb) casti.push(`${zmeny.chyb} ${rewards.plural(zmeny.chyb, 'příklad', 'příklady', 'příkladů')} k procvičení`);
+  if (zmeny.kol) casti.push(`${zmeny.kol} ${rewards.plural(zmeny.kol, 'výsledek', 'výsledky', 'výsledků')}`);
+
+  const hint = el('lastRoundHint');
+  hint.hidden = false;
+  hint.textContent = casti.length
+    ? `📥 Přenos z druhého zařízení: přibylo ${casti.join(', ')}.`
+    : '📥 Přenos z druhého zařízení: všechno už jsi tady měla.';
+}
+
+acceptIncoming();
 
 /* ---------------- kvíz ---------------- */
 function startRound() {

@@ -98,7 +98,7 @@
 
     <div class="toolbar">
       <button id="soundBtn" class="btn btn-ghost btn-small" aria-pressed="true">🔊 Zvuk</button>
-      <button id="resetBtn" class="btn btn-ghost btn-small">🧹 Smazat historii</button>
+      <button id="exportBtn" class="btn btn-ghost btn-small">🔒 Nastavení</button>
     </div>
   </section>
 
@@ -168,6 +168,35 @@
   <div id="dumplingDialog" class="reward-dialog dumpling-dialog" role="dialog" aria-modal="true" aria-labelledby="popupName" tabindex="-1">
     <button id="popupCloseBtn" class="popup-close" type="button" aria-label="Zavřít">✕</button>
     <div id="popupBody"></div>
+  </div>
+</div>
+
+<!-- Export: přenos postupu na druhé zařízení a mazání. Za heslem, je to pro rodiče. -->
+<div id="exportOverlay" class="reward-overlay" hidden>
+  <div id="exportDialog" class="reward-dialog export-dialog" role="dialog" aria-modal="true" aria-labelledby="exportTitle" tabindex="-1">
+    <button id="exportCloseBtn" class="popup-close popup-back" type="button" aria-label="Zpět">
+      <span aria-hidden="true">‹</span>
+    </button>
+    <h2 id="exportTitle" class="reward-title">Nastavení</h2>
+
+    <form id="exportGate" class="export-gate" autocomplete="off">
+      <p class="field-note">Tahle část je pro rodiče. Zadej heslo.</p>
+      <input id="exportPass" class="export-pass" type="password" inputmode="numeric" autocomplete="off" aria-label="Heslo">
+      <p id="exportError" class="field-error" hidden>Špatné heslo.</p>
+    </form>
+
+    <div id="exportPanel" class="export-panel" hidden>
+      <div class="export-qr">
+        <div id="exportQr"></div>
+        <p id="exportQrNote" class="field-note"></p>
+      </div>
+      <div class="export-danger">
+        <h3 class="popup-how-title">Mazání</h3>
+        <button id="wipeRewardsBtn" class="btn btn-ghost btn-huge" type="button">Smazat jen sbírku odměn</button>
+        <button id="wipeProgressBtn" class="btn btn-ghost btn-huge" type="button">Smazat sbírku i historii</button>
+        <button id="wipeAllBtn" class="btn btn-danger btn-huge" type="button">Smazat vše včetně nastavení</button>
+      </div>
+    </div>
   </div>
 </div>
 
