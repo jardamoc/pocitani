@@ -2,12 +2,15 @@ import { OPS, EXTRA_KINDS, MISSING_LABEL, kindOps, buildRound, buildRiddleRound,
 import { RIDDLE_LEVELS, RIDDLE_LEVEL_KEYS } from './riddle.js';
 import { GRID_LEVELS, GRID_LEVEL_KEYS, gridOpsNote, gridRangeNote } from './grid.js';
 import * as store from './stats.js';
+import * as rewards from './rewards.js';
+import { bindCollectionTaps, dismissGranted, dismissPopup, renderCollection, showGranted, updateBadge } from './rewards-ui.js';
 
 const el = (id) => document.getElementById(id);
 const screens = {
   config: el('screen-config'),
   quiz: el('screen-quiz'),
   result: el('screen-result'),
+  rewards: el('screen-rewards'),
 };
 
 const COUNT_PRESETS = [10, 20, 30];
@@ -133,6 +136,12 @@ let retriesLeft = 0;
 let retried = false;
 let activeField = null; // políčko, do kterého píše klávesnice (odpověď / poznámka)
 
+/* Sbirka odmen a identifikator rozehraneho kola. `gameId` vznika pri startu
+   kola a zajistuje, ze se tataz dokoncena sada nezapocita dvakrat - ani po
+   obnoveni stranky, ani pri navratu na vysledek. */
+let rewardData = rewards.load();
+let gameId = null;
+
 /* Barevne zastavky hodin. Mezi nimi se interpoluje, takze barva prejizdi
    plynule - v 15 s je presne zluta, ve 30 s oranzova, v 60 s cervena.
    Po minute uz zustava cervena. */
@@ -176,8 +185,13 @@ function clamp(n, min, max) {
 }
 
 function show(name) {
+  if (name !== 'result') dismissGranted();
+  if (name !== 'rewards') dismissPopup();
   for (const [key, node] of Object.entries(screens)) node.classList.toggle('is-active', key === name);
   document.body.classList.toggle('is-quiz', name === 'quiz');
+  /* Na sbirce se misto tlacitka "Odmeny" ukaze plovouci sipka zpet -
+     tlacitko do sbirky by tam vedlo samo na sebe. */
+  document.body.classList.toggle('is-rewards', name === 'rewards');
   if (name !== 'quiz') document.body.classList.remove('is-wide-grid');
   window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
 }
@@ -308,6 +322,7 @@ function renderModeCards() {
 }
 
 function renderConfigScreen() {
+  updateBadge(rewardData);
   el('modeChips').innerHTML = Object.entries(MODES)
     .map(([key, mode]) => {
       const on = key === config.mode;
@@ -532,8 +547,28 @@ el('resetBtn').addEventListener('click', () => {
 
 el('startBtn').addEventListener('click', startRound);
 
+/* ---------------- odměny ---------------- */
+/* Prepnuti obrazovky je jen trida v CSS, takze rozehrana hra ani nic
+   ulozeneho se otevrenim sbirky neztrati. */
+el('rewardsBtn').addEventListener('click', () => {
+  rewards.markCollectionSeen(rewardData);
+  renderCollection(rewardData);
+  updateBadge(rewardData);
+  show('rewards');
+});
+
+el('rewardsBackBtn').addEventListener('click', () => {
+  show('config');
+  renderConfigScreen();
+});
+
+/* Tlacitko "Pokracovat" obsluhuje primo vrstva s odmenami (rewards-ui.js),
+   tady se uz nic vazat nemusi. */
+bindCollectionTaps();
+
 /* ---------------- kvíz ---------------- */
 function startRound() {
+  gameId = rewards.makeGameId();
   config.max = clamp(config.max, 5, 1000);
   config.count = clamp(config.count, 3, 60);
   const build = {
@@ -1120,6 +1155,32 @@ function finish() {
   renderResult(report);
   show('result');
   if (report.pct >= 70) confetti(46);
+  grantRewards(report);
+}
+
+/* Odmeny se zapisou do sbirky hned tady, jeste pred spustenim animace. Okno
+   je pak uz jen oslava - zavreni, obnoveni stranky ani navrat zpet o odmenu
+   nepripravi a `gameId` hlida, aby se tataz sada nezapocitala podruhe. */
+function grantRewards(report) {
+  if (!gameId) return;
+  const solveMs = attempts.reduce((sum, at) => sum + (at.ms > 0 ? at.ms : 0), 0);
+  const granted = rewards.applyRound(rewardData, {
+    gameId,
+    mode: config.mode,
+    level: rewards.difficultyOf(config),
+    max: config.max,
+    total: report.total,
+    correct: report.correct,
+    solveMs,
+    nowMs: Date.now(),
+  });
+  gameId = null; // totez kolo uz se znovu vyhodnotit nemuze
+  updateBadge(rewardData);
+  if (!granted?.length) return;
+  showGranted(granted, () => {
+    updateBadge(rewardData);
+    if (screens.rewards.classList.contains('is-active')) renderCollection(rewardData);
+  });
 }
 
 function verdictFor(pct) {

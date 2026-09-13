@@ -53,20 +53,26 @@ přes `npx` projde bez ptaní na účet.
 
 | Soubor | Co v něm je |
 |---|---|
-| `public/index.html` | tři obrazovky (nastavení / kvíz / výsledek), přepínají se třídou `is-active` |
+| `public/index.html` | čtyři obrazovky (nastavení / kvíz / výsledek / odměny), přepínají se třídou `is-active`, plus vrstva `#rewardOverlay` |
 | `public/js/app.js` | veškeré UI — vykreslení úloh, klávesnice, vyhodnocení, výsledková obrazovka |
 | `public/js/generator.js` | generování příkladů, vysvětlení po chybě, rozbor chyby |
 | `public/js/riddle.js` | generátor obrázkových hádanek (samostatný, generator.js si ho importuje) |
 | `public/js/grid.js` | generátor mřížek (stejně samostatný jako `riddle.js`) |
 | `public/js/stats.js` | ukládání do localStorage, rozbor kola, rady |
 | `public/js/random.js` | `rnd` / `pick` / `chance` / `shuffle` / `range` |
-| `public/css/styles.css` | vše včetně devíti barevných témat a tmavého režimu |
+| `public/js/rewards-data.js` | souřadnice sprite sheetu a česká jména 40 dumplingů — čistá data |
+| `public/js/rewards.js` | pravidla odměn, vyhodnocení kola, výběr postavičky, ukládání — **bez DOM** |
+| `public/js/rewards-ui.js` | vykreslení odměn: sprite, sbírka, závěrečné okno, animace |
+| `public/img/dumplings.png` | jeden sprite sheet 1254×1254 se všemi 40 postavičkami i 5 nadpisy |
+| `public/css/styles.css` | vše včetně devíti barevných témat, tmavého režimu a odměn |
 | `server.mjs` | vývojový server (`npm run dev`) — mimo `public/`, nenasazuje se |
 | `publish.mjs` | nasazení i s kontrolami a ověřením (`npm run publish`) |
-| `package.json` | jen ty dvě zkratky a `"type": "module"`; žádné závislosti |
+| `tests/*.test.mjs` | testy pro `node --test`, bez frameworku i bez závislostí |
+| `package.json` | jen ty tři zkratky a `"type": "module"`; žádné závislosti |
 
 Prosté ES moduly, žádný framework, žádné závislosti. Závislosti jdou jedním směrem:
-`random.js → riddle.js / grid.js → generator.js → app.js`. Kruh nezaváděj.
+`random.js → riddle.js / grid.js → generator.js → app.js` a
+`rewards-data.js → rewards.js → rewards-ui.js → app.js`. Kruh nezaváděj.
 
 ## Tři režimy hry
 
@@ -183,9 +189,98 @@ a **proti téhle sadě se hlídá jednoznačnost** — `2 __ 2 = 4` sedí na `+`
 takový příklad se zahodí. Druh proto potřebuje aspoň dvě operace (`minOps: 2`).
 Odpovědí je klíč operace (`'add'`), ne číslo; `submit()` na to má větev.
 
+## Odměny — sbírka dumplingů
+
+Za dokončené kolo může Alžběta získat sběratelskou postavičku. Je jich 40 v pěti
+kategoriích (Základní / Neobvyklé / Raritní / Epické / Legendární) a všechny se kreslí
+z **jednoho** sprite sheetu `public/img/dumplings.png`.
+
+**Za jedno kolo padne nejvýš JEDEN dumpling.** Nerozhoduje se o počtu kusů, ale o tom,
+jak vzácný ten jeden bude. Uživatel to takhle výslovně chtěl — šest dumplingů za kolo
+bylo příliš. Vzácnost se skládá ze čtyř nezávislých příspěvků:
+
+```
+základ podle rozsahu   do 20 → +0,  20–49 → +1,  50 a víc → +2
++ bonus za rychlost    pod 20 s na příklad → +1,  pod 10 s → +2
++ bonus za objem       30 správných za den → +1,  60 → +2
++ bonus za obtížnost   těžká úroveň → +1
+= stupeň 0–3           Základní / Neobvyklý / Raritní / Epický  (strop je epický)
+```
+
+Objem je tam schválně jako **druhá cesta nahoru**: do 100 se rychle počítat nenaučíš,
+ale vytrvalost se má ocenit stejně. Bez toho by velký rozsah nikdy nedosáhl na epického.
+
+**Bezchybná sada je podmínkou všeho.** Kolo s chybou dumplinga nepřinese. Chyba ale nic
+neodebírá — už získané postavičky se **nikdy** neztrácejí a „Smazat historii" se jich
+nedotkne.
+
+Legendárního nelze získat výkonem. Je jen za milníky a **nepřidává se navíc** — povýší
+ten jediný dumpling za kolo na nejvyšší stupeň. Milníky v pořadí: nejtěžší sada bez chyby
+v rekordním čase → pět aktivních dnů v posledních sedmi → každých deset bezchybných sad →
+dumpling z každé ze čtyř nižších kategorií. Splněný milník se nikdy neuděluje dvakrát;
+u pravidelnosti se použitých pět dnů „spotřebuje" (`legendaryDaysUsed`), takže postup
+běží dál, ale stejné dny se nedají proměnit podruhé.
+
+**Všechny hranice jsou v `REWARD_RULES` v `rewards.js`** — jedno místo, žádné číslo
+z té tabulky nesmí být zapsané ještě někde jinde.
+
+Pár věcí, které se snadno rozbijí:
+
+- **Rychlostní hranice platí na jeden příklad, ne na celou sadu.** Sada má 10–30 příkladů,
+  takže „pod 20 s za sadu" by bylo nesplnitelné. Porovnává se **průměr**, aby kratší sada
+  nebyla zvýhodněná. Násobky `speedModeMultiplier` a `speedLevelMultiplier` limit roztáhnou
+  tam, kde jedna úloha trvá déle (hádanka ×3, mřížka ×4) nebo je těžší.
+- **Režim „Počítání" nemá `config.level`**, obtížnost se odvozuje z operací a úloh navíc
+  (`difficultyOf()`): dělení nebo násobení s úlohami navíc = těžká, násobení nebo samotné
+  úlohy navíc = střední, jinak lehká.
+- **Čas se bere jako součet `attempts[].ms`**, ne jako doba na obrazovce. Pauza na přečtení
+  vysvětlení po chybě se nezapočítává — dítě se nesmí trestat za to, že si přečte, kde
+  chybovalo. (Kolo s chybou stejně nic nedostane, ale u hádanek a mřížek s opravou to hraje.)
+- **`gameId`** vzniká v `startRound()` a hlídá, aby se táž sada nezapočítala dvakrát —
+  po obnovení stránky, návratu zpět ani opakovaném otevření výsledku. Odměna se zapisuje
+  do úložiště hned ve `finish()`, ještě **před** animací; okno je jen oslava.
+- **Vlastní klíč v localStorage** `pocitani.rewards.v1`, oddělený od `pocitani.v1`. Poškození
+  jednoho nesmí vzít druhé. `sanitize()` validuje každé pole zvlášť — vadná položka spadne
+  na výchozí, ostatní platná data zůstanou.
+- **Den se bere z místního kalendářního data**, ne z rozdílu 24 hodin. Nový aktivní den se
+  zapíše až po dvou skutečných hodinách od poslední aktualizace a datum starší než poslední
+  zapsané se ignoruje — přetočení systémových hodin tak neumí vyrobit pět dnů za minutu.
+- **Náhodný je jedině výběr konkrétní postavičky.** Nejdřív se losuje ze seznamu dosud
+  neobjevených v dané kategorii, teprve když má dítě všech osm, může padnout duplikát.
+  Generátor náhody je parametr `applyRound(data, summary, rng)`, aby šly testy zopakovat.
+- **U neobjevené postavičky se skutečné jméno nesmí objevit nikde** — ani v popisku, ani
+  v `title` nebo `aria-label`. Je tam `Neobjevený dumpling`.
+
+### Sprite sheet
+
+Souřadnice v `rewards-data.js` jsou převzaté doslova ze zadání a **neodhaduj je znovu**.
+Postavičky se na plátně dotýkají, takže se výřez při vykreslení ořezává o pixel z každé
+strany (`TRIM` v `rewards-ui.js`) — bez toho prohlížeč při zmenšení natáhl i první sloupec
+souseda a u kolečka byl vidět barevný proužek. Ořez je **zobrazovací pojistka**, souřadnice
+se kvůli němu nemění.
+
+Při změně velikosti se musí přepočítat **najednou** rozměr prvku, `background-position`
+i `background-size`, jinak se výřez rozjede. Poměr stran 1254×1254 zůstává 1:1.
+
+Dva výřezy mají na levém okraji plný sloupec a `tests/sprite.test.mjs` je vede jako známé,
+posouzené odchylky (`ZNAME_ODCHYLKY`): `rare_07` přichází asi o 8 px vlastního levého okraje,
+`epic_03` má v sobě asi 6 px sousední postavičky. Je to pod 6 % šířky výřezu a na zobrazené
+velikosti to není poznat. Pokud to někdy budeš ladit, **posuň souřadnice, nezměkčuj test.**
+
 ## Testy
 
-Testovací framework tu není. Generátory se ověřují **jednorázovými skripty v Node**, které
+Externí testovací framework tu není a nepřibude. Logika odměn má testy ve vestavěném
+běhu Node (žádná závislost):
+
+```powershell
+npm test          # node --test "tests/*.test.mjs"
+```
+
+Pozor: holé `node --test tests/` na tomhle stroji spadne na `Cannot find module`.
+Runner bere pozicní argument jako cestu ke spuštění, ne jako adresář ke skenu —
+proto je ve skriptu glob `"tests/*.test.mjs"`.
+
+Generátory úloh testy nemají a ověřují se dál **jednorázovými skripty v Node**, které
 si napiš do scratchpadu. U čehokoli, co generuje úlohy, testuj vždycky tohle:
 
 - **jednoznačnost řešení** — u hádanek nezávisle dvakrát (hodnost soustavy i hrubou silou

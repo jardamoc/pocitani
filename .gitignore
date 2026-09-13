@@ -6,6 +6,11 @@ node_modules/
 *.jpg
 *.png
 
+# obrazky, ktere aplikace opravdu potrebuje - sprite sheet s dumplingy.
+# Bez teto vyjimky by ho pravidlo *.png vyradilo a nasazeni by prislo o
+# vsech 40 postavicek odmen.
+!public/img/*.png
+
 # dovednosti nainstalovane pres `npx skills add` - cizi kod, patri jen
 # na tenhle stroj, ne do repozitare s aplikaci
 .agents/

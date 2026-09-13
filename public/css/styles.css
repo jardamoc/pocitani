@@ -417,9 +417,12 @@ h1, h2, h3, .num, .box-value, .key, .score-big { font-family: 'Baloo 2', 'Nunito
 /* Focus prstenec kreslíme box-shadow, ne outline - outline nerespektuje
    border-radius ve všech prohlížečích a u pilulkových tlačítek pak trčí do hran. */
 :root { --ring-off: 0 0 0 0 rgba(0, 0, 0, 0); --ring-on: 0 0 0 4px rgba(124, 92, 255, .55); }
-.btn, .chip, .key, .icon-btn, .custom-max input, .dark-toggle { --ring: var(--ring-off); }
+.btn, .chip, .key, .icon-btn, .custom-max input, .dark-toggle, .rewards-toggle, .rew-slot,
+.rewards-back, .popup-close { --ring: var(--ring-off); }
 .btn:focus-visible, .chip:focus-visible, .key:focus-visible, .icon-btn:focus-visible,
-.custom-max input:focus-visible, .dark-toggle:focus-visible { --ring: var(--ring-on); outline: none; }
+.custom-max input:focus-visible, .dark-toggle:focus-visible,
+.rewards-toggle:focus-visible, .rew-slot:focus-visible,
+.rewards-back:focus-visible, .popup-close:focus-visible { --ring: var(--ring-on); outline: none; }
 
 .field-error { margin: 12px 0 0; color: var(--bad-dark); font-weight: 800; }
 .field-note { margin: 12px 0 0; color: var(--ink-soft); font-weight: 700; font-size: .95rem; }
@@ -862,9 +865,331 @@ body.is-quiz .wrap { padding-top: 18px; }
   /* mřížka 5×5 ještě víc - jinak by kolečka musela pod dotykový cíl */
   body.is-wide-grid .wrap { padding-left: 8px; padding-right: 8px; }
   body.is-wide-grid .card-exercise { padding-left: 4px; padding-right: 4px; }
+  /* na uzkem telefonu zustane jen ikona s odznakem, text pilulky nema misto */
+  .rewards-toggle-text { display: none; }
+  .rewards-toggle { padding: 0; width: 42px; justify-content: center; }
+  .rew-grid { gap: 7px; }
+  .rew-slot { padding: 8px 4px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
   .confetti-layer { display: none; }
+}
+
+/* ==================== odmeny (dumplingove) ====================
+   Sberatelsky system - plovouci tlacitko v hlavicce, sprity postavicek,
+   stranka sbirky a zaverecne okno po dokonceni sady. */
+
+/* ---------- plovouci tlacitko v hlavicce ---------- */
+/* Stoji vlevo od .dark-toggle (ten je top:12px right:16px, prumer 42px),
+   proto stejna vyska a top, jen posunuta o sirku + mezeru doleva. */
+.rewards-toggle {
+  position: absolute; top: 12px; right: 66px; z-index: 5;
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 42px; padding: 0 16px 0 12px; border: 0; border-radius: 999px; cursor: pointer;
+  font: inherit; font-weight: 800; font-size: .92rem; white-space: nowrap;
+  background: var(--panel); color: var(--ink);
+  box-shadow: var(--ring), var(--shadow);
+  transition: transform .12s ease;
+}
+.rewards-toggle:hover { transform: scale(1.05); }
+.rewards-toggle:active { transform: scale(.94); }
+.rewards-toggle-icon { font-size: 1.2rem; line-height: 1; }
+/* behem kvizu schovana stejne jako .dark-toggle */
+body.is-quiz .rewards-toggle { display: none; }
+
+/* stejna past jako u okna - inline-flex by prebil atribut hidden */
+.rewards-badge[hidden] { display: none; }
+.rewards-badge {
+  position: absolute; top: -5px; right: -5px; min-width: 20px; height: 20px;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0 5px; border-radius: 999px;
+  background: var(--bad); color: #fff; font-size: .72rem; font-weight: 800; line-height: 1;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .28);
+}
+
+/* ---------- sprite dumplingu ---------- */
+/* JS predava rozmery pres custom properties, CSS je jen pouzije. */
+.dumpling-box { display: grid; place-items: center; width: var(--box); height: var(--box); flex-shrink: 0; }
+.dumpling {
+  display: block; flex-shrink: 0;
+  width: var(--sw); height: var(--sh);
+  background-image: url('../img/dumplings.png');
+  background-repeat: no-repeat;
+  background-position: var(--bx) var(--by);
+  background-size: var(--bs) var(--bs);
+}
+/* neziskana postavicka - tmava silueta */
+.dumpling[data-locked="true"] { filter: brightness(0) opacity(.32); }
+/* v tmavem rezimu by tmava silueta na tmavem podkladu zmizela, proto invert */
+body.is-dark .dumpling[data-locked="true"] { filter: brightness(0) invert(1) opacity(.22); }
+
+.dumpling-header {
+  display: block; flex-shrink: 0;
+  width: var(--sw); height: var(--sh);
+  background-image: url('../img/dumplings.png');
+  background-repeat: no-repeat;
+  background-position: var(--bx) var(--by);
+  background-size: var(--bs) var(--bs);
+}
+
+/* ---------- stranka sbirky ---------- */
+.rew-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }
+.rew-stat { display: flex; flex-direction: column; gap: 2px; }
+.rew-stat-num { font-family: 'Baloo 2', 'Nunito', sans-serif; font-size: 1.7rem; font-weight: 800; line-height: 1.1; }
+.rew-stat-label { font-weight: 700; font-size: .85rem; color: var(--ink-soft); line-height: 1.3; }
+
+.rew-progress { margin-top: 16px; padding-top: 14px; border-top: 2px dashed var(--line); }
+.rew-progress-label { margin: 0 0 8px; font-weight: 800; }
+.rew-progress .field-note { margin-top: 8px; }
+
+/* karta kategorie - jemny barevny nadech podle vzacnosti, jen okrajove */
+.rew-cat-head { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-bottom: 12px; text-align: center; }
+.rew-cat-sub { margin: 0; font-weight: 800; font-size: .92rem; color: var(--ink-soft); }
+.card.rew-cat[data-cat="basic"] { box-shadow: var(--shadow), inset 0 0 0 2px rgba(100, 116, 139, .3); }
+.card.rew-cat[data-cat="uncommon"] { box-shadow: var(--shadow), inset 0 0 0 2px rgba(16, 185, 129, .3); }
+.card.rew-cat[data-cat="rare"] { box-shadow: var(--shadow), inset 0 0 0 2px rgba(59, 130, 246, .3); }
+.card.rew-cat[data-cat="epic"] { box-shadow: var(--shadow), inset 0 0 0 2px rgba(139, 92, 246, .32); }
+.card.rew-cat[data-cat="legendary"] { box-shadow: var(--shadow), inset 0 0 0 2px rgba(255, 183, 3, .4); }
+.rew-cat[data-cat="basic"] .rew-cat-sub { color: #64748b; }
+.rew-cat[data-cat="uncommon"] .rew-cat-sub { color: #059669; }
+.rew-cat[data-cat="rare"] .rew-cat-sub { color: #2563eb; }
+.rew-cat[data-cat="epic"] .rew-cat-sub { color: #7c3aed; }
+.rew-cat[data-cat="legendary"] .rew-cat-sub { color: #b45309; }
+
+.rew-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+.rew-slot {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  border: 0; border-radius: 18px; padding: 10px 6px; cursor: pointer;
+  background: var(--surface-2); box-shadow: var(--ring);
+  transition: transform .12s ease, background .18s ease;
+}
+.rew-slot:hover { transform: translateY(-2px); }
+.rew-slot:active { transform: scale(.97); }
+.rew-slot[data-locked="true"] { background: var(--surface-2); opacity: .78; }
+.rew-slot[data-locked="true"] .rew-name { font-style: italic; color: var(--ink-soft); font-size: .72rem; overflow-wrap: anywhere; }
+
+.rew-count {
+  position: absolute; top: 4px; right: 4px; z-index: 2;
+  padding: 2px 7px; border-radius: 999px;
+  background: rgba(15, 23, 42, .82); color: #fff; font-weight: 800; font-size: .72rem; line-height: 1.3;
+}
+.rew-name { font-size: .78rem; font-weight: 800; line-height: 1.15; text-align: center; }
+
+/* Podrobnost o postavicce je radek v normalnim toku pod mrizkou. Driv tu byla
+   plovouci bublina, jenze i skryta zabirala misto a u krajniho kolecka
+   roztahovala stranku do sirky - na 320 px to bylo poznat. */
+.rew-detail {
+  margin: 12px 0 0; min-height: 1.2em;
+  font-weight: 700; font-size: .85rem; color: var(--ink-soft); text-align: center;
+  overflow-wrap: anywhere;
+}
+.rew-detail[data-active="true"] { color: var(--ink); }
+.rew-slot.is-open { background: var(--slot-bg); }
+/* ---------- zaverecne okno po dokonceni sady ---------- */
+/* `display: flex` prebije atribut hidden z prohlizece, proto ho musime vratit
+   vlastnim pravidlem - jinak okno sviti hned po nacteni stranky. */
+.reward-overlay[hidden] { display: none; }
+.reward-overlay {
+  position: fixed; inset: 0; z-index: 60; overflow-y: auto; padding: 18px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(10, 20, 35, .62);
+  backdrop-filter: blur(3px);
+}
+/* Sloupec s pevnym nadpisem i tlacitkem - pri peti odmenach by se jinak
+   "Pokracovat" vytlacilo pod okraj obrazovky a dite by ho nenaslo.
+   Roluje jen seznam karet uprostred. */
+.reward-dialog {
+  width: min(460px, 100%); padding: 20px; border-radius: var(--radius);
+  background: var(--card); box-shadow: var(--shadow);
+  display: flex; flex-direction: column; max-height: calc(100vh - 36px);
+}
+/* Vnitrni odsazeni musi byt aspon tak velke jako presah stitku "NOVA"
+   (-6 px), jinak by ho rolovani odriznulo. */
+.reward-dialog .reward-list { overflow-y: auto; min-height: 0; padding: 10px; margin: 6px -10px; }
+.reward-dialog .reward-title, .reward-dialog .btn { flex-shrink: 0; }
+.reward-title { margin: 0; font-family: 'Baloo 2', sans-serif; font-size: 1.4rem; font-weight: 800; text-align: center; }
+.reward-list { display: flex; flex-direction: column; gap: 12px; margin: 16px 0; }
+
+.reward-card {
+  position: relative; overflow: visible;
+  display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 12px;
+  padding: 12px; border-radius: 20px; background: var(--surface-2);
+  opacity: 0; transform: scale(.4);
+  animation: rewardPop .5s cubic-bezier(.34, 1.56, .64, 1) both;
+  animation-delay: calc(var(--i, 0) * .28s);
+}
+.reward-card .dumpling-box { position: relative; z-index: 1; }
+.reward-info { min-width: 0; }
+.reward-name { margin: 0; font-size: 1.05rem; font-weight: 800; }
+.reward-cat { margin: 2px 0 0; font-size: .82rem; font-weight: 700; color: var(--ink-soft); }
+.reward-why { margin: 4px 0 0; font-size: .85rem; font-weight: 600; color: var(--ink-soft); }
+.reward-count { margin: 4px 0 0; font-size: .85rem; font-weight: 700; }
+.reward-num { display: inline-block; font-weight: 800; }
+.reward-num.is-bumped { animation: rewardBump .45s ease; }
+
+/* stitek "NOVA" - jen kdyz je karta oznacena data-new */
+.reward-new {
+  display: none; position: absolute; top: -6px; left: -6px; z-index: 3;
+  padding: 3px 9px; border-radius: 8px; transform: rotate(-8deg);
+  background: linear-gradient(135deg, #fbbf24, #f43f5e); color: #fff;
+  font-size: .68rem; font-weight: 800; letter-spacing: .03em; text-transform: uppercase;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, .28);
+}
+.reward-card[data-new="true"] .reward-new { display: inline-block; }
+
+/* svetelny kruh za postavickou - jen u vzacnejsich kategorii */
+.reward-halo {
+  position: absolute; left: 12px; top: 50%; z-index: 0;
+  width: 120px; height: 120px; border-radius: 50%;
+  transform: translate(0, -50%); pointer-events: none; opacity: 0;
+}
+.reward-sparks { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: visible; }
+.spark {
+  position: absolute; top: 50%; left: 52px; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--mango);
+  opacity: 0;
+  animation: sparkFly .8s ease-out var(--d, 0s) both;
+  animation-iteration-count: 1;
+}
+
+/* basic - jen odhaleni a kratke poskoceni, nic navic */
+.reward-card[data-cat="basic"] .reward-sparks { display: none; }
+
+/* uncommon - jemna zelena zare kolem postavicky + par jiskrivych castic */
+.reward-card[data-cat="uncommon"] .dumpling-box { filter: drop-shadow(0 0 10px rgba(16, 185, 129, .55)); }
+.reward-card[data-cat="uncommon"] .spark { background: #34d399; }
+
+/* rare - modrostribrna zare, vic castic, kratke zhoupnuti postavicky */
+.reward-card[data-cat="rare"] .reward-halo {
+  background: radial-gradient(circle, rgba(59, 130, 246, .5), rgba(148, 163, 184, .22) 55%, transparent 72%);
+  animation: haloReveal .7s ease calc(var(--i, 0) * .28s + .1s) both;
+}
+.reward-card[data-cat="rare"] .spark { background: #60a5fa; }
+.reward-card[data-cat="rare"] .dumpling {
+  animation: rewardWobble .6s ease calc(var(--i, 0) * .28s + .5s) both;
+}
+
+/* epic - fialova svetelna zare, hvezdicky, vyraznejsi odhaleni */
+.reward-card[data-cat="epic"] .reward-halo {
+  background: radial-gradient(circle, rgba(139, 92, 246, .55), rgba(192, 132, 252, .22) 55%, transparent 72%);
+  animation: haloReveal .7s ease calc(var(--i, 0) * .28s + .1s) both;
+}
+.reward-card[data-cat="epic"] .spark { background: #c084fc; }
+.reward-card[data-cat="epic"] .dumpling {
+  animation: rewardWobble .6s ease calc(var(--i, 0) * .28s + .5s) both;
+}
+
+/* legendary - zlata zare, hvezdicky a trpyt, slavnostni odhaleni;
+   jedina animace, ktera bezi dal - pomaly klidny pulz (3.6s na cyklus) */
+.reward-card[data-cat="legendary"] .reward-halo {
+  background: radial-gradient(circle, rgba(255, 214, 10, .55), rgba(255, 183, 3, .18) 60%, transparent 72%);
+  animation: haloPulse 3.6s ease-in-out calc(var(--i, 0) * .28s) infinite;
+}
+.reward-card[data-cat="legendary"] .spark { background: #ffd60a; }
+.reward-card[data-cat="legendary"] .dumpling {
+  animation: rewardWobble .7s ease calc(var(--i, 0) * .28s + .5s) both;
+}
+
+@keyframes rewardPop {
+  0% { opacity: 0; transform: scale(.4); }
+  60% { opacity: 1; transform: scale(1.08); }
+  80% { transform: scale(.96); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes rewardWobble {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-12deg); }
+  50% { transform: rotate(10deg); }
+  75% { transform: rotate(-6deg); }
+}
+@keyframes rewardBump {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+@keyframes sparkFly {
+  0% { opacity: 1; transform: translate(0, 0) scale(1); }
+  100% { opacity: 0; transform: translate(var(--dx, 0), var(--dy, 0)) scale(.4); }
+}
+@keyframes haloReveal {
+  0% { opacity: 0; transform: translate(0, -50%) scale(.6); }
+  60% { opacity: .8; transform: translate(0, -50%) scale(1.15); }
+  100% { opacity: .55; transform: translate(0, -50%) scale(1); }
+}
+@keyframes haloPulse {
+  0%, 100% { opacity: .55; transform: translate(0, -50%) scale(1) rotate(0deg); }
+  50% { opacity: .85; transform: translate(0, -50%) scale(1.12) rotate(15deg); }
+}
+
+/* ---------- 320px - dialog i karty odmeny musi zustat bez vodorovneho rolovani ---------- */
+@media (max-width: 380px) {
+  .reward-dialog { padding: 16px; }
+  .reward-card { grid-template-columns: auto 1fr; padding: 10px; gap: 8px; }
+  .reward-info { min-width: 0; }
+  .reward-halo { width: 90px; height: 90px; left: 8px; }
+}
+
+/* ---------- preskoceni animace ----------
+   Kliknuti, Enter nebo Escape animaci rovnou dosadi na konec. Specificita
+   musi prebit pravidla podle kategorie (.reward-card[data-cat] .dumpling),
+   proto ctyri tridy. */
+.reward-list.is-instant .reward-card { animation: none; opacity: 1; transform: none; }
+.reward-list.is-instant .reward-card .dumpling { animation: none; }
+.reward-list.is-instant .reward-card .reward-halo { animation: none; opacity: .55; transform: translate(0, -50%); }
+.reward-list.is-instant .reward-card .spark { display: none; }
+.reward-dialog:focus { outline: none; }
+/* ---------- plovouci sipka zpet na strance sbirky ----------
+   Musi byt videt porad, i kdyz je sbirka odrolovana dolu - proto fixed,
+   ne absolute. Stoji vlevo nahore, naproti prepinaci tmaveho rezimu. */
+.rewards-back {
+  position: fixed; top: 12px; left: 16px; z-index: 40;
+  display: none; align-items: center; justify-content: center;
+  width: 44px; height: 44px; padding: 0 3px 3px 0;
+  border: 0; border-radius: 50%; cursor: pointer;
+  font: inherit; font-size: 1.9rem; font-weight: 800; line-height: 1;
+  font-family: 'Baloo 2', 'Nunito', system-ui, sans-serif;
+  background: var(--panel); color: var(--ink);
+  box-shadow: var(--ring), var(--shadow);
+  transition: transform .12s ease;
+}
+.rewards-back:hover { transform: scale(1.08); }
+.rewards-back:active { transform: scale(.92); }
+/* Sipka jen na sbirce, a tlacitko "Odmeny" tam naopak nema co delat -
+   vedlo by samo na sebe. */
+body.is-rewards .rewards-back { display: inline-flex; }
+body.is-rewards .rewards-toggle { display: none; }
+
+/* ---------- popup nad jednou postavickou ---------- */
+.dumpling-dialog { position: relative; text-align: left; }
+.popup-close {
+  position: absolute; top: 10px; right: 10px; z-index: 2;
+  width: 34px; height: 34px; border: 0; border-radius: 50%; cursor: pointer;
+  font: inherit; font-size: 1rem; font-weight: 800;
+  background: var(--surface-2); color: var(--ink-soft);
+  box-shadow: var(--ring);
+}
+.popup-close:hover { color: var(--ink); }
+
+.popup-head { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 2px; }
+.popup-name { margin: 8px 0 0; font-family: 'Baloo 2', 'Nunito', sans-serif; font-size: 1.35rem; font-weight: 800; }
+.popup-cat { margin: 0; font-weight: 800; font-size: .9rem; }
+.popup-count { margin: 4px 0 0; font-weight: 700; font-size: .9rem; color: var(--ink-soft); }
+/* barva kategorie jen na podnadpisu, karta zustava klidna */
+.popup-head[data-cat="basic"] .popup-cat { color: #64748b; }
+.popup-head[data-cat="uncommon"] .popup-cat { color: #059669; }
+.popup-head[data-cat="rare"] .popup-cat { color: #2563eb; }
+.popup-head[data-cat="epic"] .popup-cat { color: #7c3aed; }
+.popup-head[data-cat="legendary"] .popup-cat { color: #b45309; }
+
+.popup-how { margin-top: 16px; padding-top: 14px; border-top: 2px dashed var(--line); }
+.popup-how-title { margin: 0 0 8px; font-size: 1.05rem; }
+.popup-lead { margin: 0 0 6px; font-weight: 700; font-size: .9rem; color: var(--ink-soft); }
+.popup-how .list li { font-size: .88rem; }
+.popup-tail { margin: 10px 0 0; font-weight: 800; font-size: .9rem; }
+
+@media (max-width: 380px) {
+  .rewards-back { top: 10px; left: 10px; width: 40px; height: 40px; font-size: 1.7rem; }
+  .popup-name { font-size: 1.18rem; }
 }

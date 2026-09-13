@@ -24,6 +24,15 @@
 
 <main class="wrap">
 
+  <button id="rewardsBackBtn" class="rewards-back" type="button" aria-label="Zpět na nastavení">
+    <span aria-hidden="true">‹</span>
+  </button>
+
+  <button id="rewardsBtn" class="rewards-toggle" type="button" aria-label="Otevřít sbírku odměn">
+    <span class="rewards-toggle-icon" aria-hidden="true">🥟</span>
+    <span class="rewards-toggle-text">Odměny</span>
+    <span id="rewardsBadge" class="rewards-badge" hidden>0</span>
+  </button>
   <button id="darkBtn" class="dark-toggle" type="button" aria-pressed="false" aria-label="Přepnout tmavý režim">🌙</button>
 
 
@@ -131,7 +140,36 @@
     </div>
   </section>
 
+  <!-- ============ 4. ODMĚNY ============ -->
+  <section id="screen-rewards" class="screen">
+    <header class="hero">
+      <div class="hero-mascot" aria-hidden="true">🥟</div>
+      <h1 class="hero-title">Moje sbírka</h1>
+      <p class="hero-sub">Dumplingové, které sis vypočítala!</p>
+    </header>
+
+    <div id="rewardsSummary"></div>
+    <div id="rewardsCollection"></div>
+  </section>
+
 </main>
+
+<!-- Okno se získanými odměnami. Leží nad výsledkovou obrazovkou i nad konfetami. -->
+<div id="rewardOverlay" class="reward-overlay" hidden>
+  <div id="rewardDialog" class="reward-dialog" role="dialog" aria-modal="true" aria-labelledby="rewardTitle" tabindex="-1">
+    <h2 id="rewardTitle" class="reward-title">Skvělá práce! Získáváš:</h2>
+    <div id="rewardList" class="reward-list"></div>
+    <button id="rewardCloseBtn" class="btn btn-primary btn-huge">Pokračovat <span aria-hidden="true">👍</span></button>
+  </div>
+</div>
+
+<!-- Popup nad jedním dumplingem ze sbírky: kdo to je a jak se dá získat. -->
+<div id="dumplingPopup" class="reward-overlay" hidden>
+  <div id="dumplingDialog" class="reward-dialog dumpling-dialog" role="dialog" aria-modal="true" aria-labelledby="popupName" tabindex="-1">
+    <button id="popupCloseBtn" class="popup-close" type="button" aria-label="Zavřít">✕</button>
+    <div id="popupBody"></div>
+  </div>
+</div>
 
 <script type="module" src="js/app.js"></script>
 </body>
