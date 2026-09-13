@@ -958,11 +958,27 @@ body.is-dark .dumpling[data-locked="true"] { filter: brightness(0) invert(1) opa
 .rew-cat[data-cat="rare"] .rew-cat-sub { color: #2563eb; }
 .rew-cat[data-cat="epic"] .rew-cat-sub { color: #7c3aed; }
 .rew-cat[data-cat="legendary"] .rew-cat-sub { color: #b45309; }
+/* Syte odstiny jsou na tmavem podkladu mdle, tak se v tmavem rezimu
+   zesvetli. Plati pro podnadpis kategorie i pro popup. */
+body.is-dark .rew-cat[data-cat="basic"] .rew-cat-sub,
+body.is-dark .popup-head[data-cat="basic"] .popup-cat { color: #94a3b8; }
+body.is-dark .rew-cat[data-cat="uncommon"] .rew-cat-sub,
+body.is-dark .popup-head[data-cat="uncommon"] .popup-cat { color: #34d399; }
+body.is-dark .rew-cat[data-cat="rare"] .rew-cat-sub,
+body.is-dark .popup-head[data-cat="rare"] .popup-cat { color: #60a5fa; }
+body.is-dark .rew-cat[data-cat="epic"] .rew-cat-sub,
+body.is-dark .popup-head[data-cat="epic"] .popup-cat { color: #c084fc; }
+body.is-dark .rew-cat[data-cat="legendary"] .rew-cat-sub,
+body.is-dark .popup-head[data-cat="legendary"] .popup-cat { color: #fbbf24; }
 
 .rew-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+/* `color: var(--ink)` tu musi byt vyslovne: <button> barvu textu nededi,
+   bere si vychozi cernou z prohlizece. Ve svetlem rezimu to nebylo poznat,
+   v tmavem byla jmena dumplingu cerna na tmavem podkladu. */
 .rew-slot {
   position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px;
   border: 0; border-radius: 18px; padding: 10px 6px; cursor: pointer;
+  font: inherit; color: var(--ink);
   background: var(--surface-2); box-shadow: var(--ring);
   transition: transform .12s ease, background .18s ease;
 }
@@ -1001,9 +1017,13 @@ body.is-dark .dumpling[data-locked="true"] { filter: brightness(0) invert(1) opa
 /* Sloupec s pevnym nadpisem i tlacitkem - pri peti odmenach by se jinak
    "Pokracovat" vytlacilo pod okraj obrazovky a dite by ho nenaslo.
    Roluje jen seznam karet uprostred. */
+/* `color: var(--ink)` je povinne: pozadi je var(--card), ale bez teto radky
+   by se text zdedil z body, kde plati var(--on-bg) - barva textu na kulise.
+   U tematu Hudba je kulisa tmava a --on-bg skoro bily, takze ve svetlem
+   rezimu vysel bily text na bilem dialogu. */
 .reward-dialog {
   width: min(460px, 100%); padding: 20px; border-radius: var(--radius);
-  background: var(--card); box-shadow: var(--shadow);
+  background: var(--card); color: var(--ink); box-shadow: var(--shadow);
   display: flex; flex-direction: column; max-height: calc(100vh - 36px);
 }
 /* Vnitrni odsazeni musi byt aspon tak velke jako presah stitku "NOVA"

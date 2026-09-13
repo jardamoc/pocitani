@@ -390,6 +390,24 @@ nenapíše ani číslici. Takhle se rozbila mřížka — psát šlo jen do prvn
 přeteklo z kroužku ven. Nový selektor musí mít aspoň dvě třídy (`.gcell .grid-input`)
 a nastavit i `line-height`, jinak číslo nesedí na střed.
 
+### Barva textu — dvě pasti, na které jsem se spálil
+
+**`<button>` nedědí barvu textu.** Bere si výchozí černou z prohlížeče, takže každé nové
+tlačítko potřebuje vlastní `color`. Ve světlém režimu si toho nikdo nevšimne; v tmavém je
+z toho černý text na tmavém podkladu. Přesně takhle se rozbila jména dumplingů ve sbírce
+(`.rew-slot`). `.chip` i `.btn` si proto barvu nastavují samy — drž se toho.
+
+**`--on-bg` není `--ink`.** `--on-bg` je barva textu na kulise, `--ink` barva textu na
+kartě. Cokoli s `background: var(--card)` musí mít i `color: var(--ink)`, jinak si to
+zdědí `--on-bg` z `body`. U většiny témat to projde náhodou, ale téma **Hudba** má tmavou
+kulisu a `--on-bg: #fdf4ff` — ve světlém režimu z toho byl bílý text na bílém dialogu.
+Takhle byly neviditelné všechny tři dialogy (odměny, popup, Nastavení), než dostaly
+`color: var(--ink)` na `.reward-dialog`.
+
+Po zásahu do barev projeď **všech šest témat × oba režimy** a změř kontrast, ne jen mrkni
+na jedno téma. Po opravě vycházelo: dialog 13,3–13,5, jméno ve slotu 5,3–6,8, podnadpis
+kategorie 4,8–6,1 (hranice čitelnosti je 4,5).
+
 ## Pozor na `npx skills add`
 
 Instalátor dovedností používá **aktuální adresář**, ne globální složku. Když ho pustíš
