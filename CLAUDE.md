@@ -4,7 +4,8 @@ Hravý trenažér matematiky pro **konkrétní dítě** — dceru majitele repoz
 **1. až 3. třídy**. Není to obecný produkt; když se rozhoduješ mezi „správně obecně" a
 „srozumitelně pro sedmiletou holku", vyhrává druhé.
 
-GitHub `jardamoc/pocitani`, Netlify site `7de6843d-e093-4d19-8d9e-66fa8c1c4cf7`.
+GitHub `jardamoc/pocitani`, běží na Cloudflare Workers jako `pocitani`
+(https://pocitani.jarda-moc.workers.dev), účet `Jarda.moc@gmail.com`.
 
 ## Dvě nepřekročitelná pravidla
 
@@ -43,12 +44,17 @@ z `file:///` odmítne načíst. Musí to jít přes `localhost`.
 
 **Nasazení** `publish.mjs` je ruční postup zabalený do skriptu, i s pojistkami:
 zastaví se na jiné větvi než `main` a na neuložených změnách (jinak by se nasadilo
-něco jiného, než je v gitu), pak odešle commity, spustí Netlify a **nakonec si stáhne
-živý web a zkontroluje ho** — hláška „Deploy is live" sama o sobě nestačí.
+něco jiného, než je v gitu), pak odešle commity, spustí nasazení a **nakonec si stáhne
+živý web a zkontroluje ho** — hláška o úspěšném nasazení sama o sobě nestačí.
 
-`netlify` **není v PATH** — samotný příkaz `netlify` spadne na „není rozpoznán jako
-název rutiny". Přihlášení ale platí (je uložené v `%APPDATA%\netlify`), takže verze
-přes `npx` projde bez ptaní na účet.
+**Hostuje to Cloudflare Workers**, ne Pages: `public/` se nahraje jako statická aktiva
+a žádný kód na serveru neběží (`wrangler.jsonc` proto schválně nemá `main`). Bezpečnostní
+hlavičky jsou v `public/_headers` — wrangler ten soubor přečte a samotný ho neservíruje.
+
+`wrangler` **není v PATH**, jede se přes `npx`. Přihlášení je jednorázové
+(`npx wrangler login`, otevře prohlížeč) a ukládá se do `%APPDATA%\xdg.config\.wrangler`.
+`publish.mjs` si ho ověřuje **předem** přes `wrangler whoami`, aby nasazení nespadlo
+uprostřed na nesrozumitelné hlášce.
 
 ## Struktura
 
@@ -71,6 +77,8 @@ přes `npx` projde bez ptaní na účet.
 | `public/css/styles.css` | vše včetně devíti barevných témat, tmavého režimu a odměn |
 | `server.mjs` | vývojový server (`npm run dev`) — mimo `public/`, nenasazuje se |
 | `publish.mjs` | nasazení i s kontrolami a ověřením (`npm run publish`) |
+| `wrangler.jsonc` | nastavení Cloudflare Workers — jméno služby a složka s aktivy |
+| `public/_headers` | bezpečnostní hlavičky pro živý web; wrangler ho sám neservíruje |
 | `tests/*.test.mjs` | testy pro `node --test`, bez frameworku i bez závislostí |
 | `package.json` | jen ty tři zkratky a `"type": "module"`; žádné závislosti |
 

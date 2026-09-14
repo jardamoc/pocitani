@@ -8,7 +8,7 @@
   z `file:///` načíst odmítne. Přes localhost to projde.
 
   Žádné závislosti - jen to, co Node umí sám. Do `public/` tenhle soubor
-  nepatří, na Netlify se nenasazuje.
+  nepatří, na Cloudflare se nenasazuje.
 */
 
 import { createServer } from 'node:http';

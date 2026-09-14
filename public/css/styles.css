@@ -313,8 +313,8 @@ h1, h2, h3, .num, .box-value, .key, .score-big { font-family: 'Baloo 2', 'Nunito
 .wrap {
   position: relative; z-index: 1;
   max-width: 620px; margin: 0 auto;
-  /* Dole je vic mista zamerne: Netlify si vpravo dole vykresluje svuj odznak
-     a bez rezervy prekryval klavesu ✓. */
+  /* Dole je vic mista zamerne - rezerva pod klavesou ✓, at ji nic neprekryva
+     (puvodne kvuli odznaku Netlify, ted uz jen kvuli bezpecne zone telefonu). */
   padding: 66px 16px calc(84px + env(safe-area-inset-bottom, 0px));
 }
 

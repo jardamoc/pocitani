@@ -1,4 +1,4 @@
-.netlify/
+.wrangler/
 node_modules/
 
 # fotky zadani - jen lokalni podklady, nepatri do repozitare

@@ -1,0 +1,12 @@
+{
+  // Nasazeni na Cloudflare Workers - staticky web, zadny kod na serveru.
+  // Slozka `public/` se nahraje tak, jak lezi; `main` tu schvalne neni.
+  "name": "pocitani",
+  "compatibility_date": "2026-09-11",
+  "assets": {
+    "directory": "./public"
+  },
+  "observability": {
+    "enabled": true
+  }
+}

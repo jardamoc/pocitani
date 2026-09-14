@@ -4,7 +4,7 @@
   Dělá to, co se dosud psalo ručně ve dvou krocích, a navíc si po sobě
   přečte skutečný stav - hláška "Deploy is live" sama o sobě nestačí.
 
-  Kroky:  kontroly -> git push -> netlify deploy -> ověření živého webu
+  Kroky:  kontroly -> git push -> wrangler deploy -> ověření živého webu
 
   Nacvičit nanečisto (vše kromě samotného nasazení):
       npm run publish -- --dry-run
@@ -13,7 +13,7 @@
 import { spawnSync } from 'node:child_process';
 
 const NANECISTO = process.argv.includes('--dry-run');
-const WEB = 'https://pocitani-alzbeta.netlify.app';
+const WEB = 'https://pocitani.jarda-moc.workers.dev';
 const VETEV = 'main';
 
 const ok = (t) => console.log('  [ok]   ' + t);
@@ -74,18 +74,27 @@ if (napred !== '0') {
   ok('GitHub uz je aktualni');
 }
 
-/* ---- 3. Netlify ---- */
+/* ---- 3. Cloudflare ---- */
+
+/* Radsi se zeptat dopredu nez nechat spadnout nasazeni na nesrozumitelne hlasce. */
+const kdojsem = spawnSync('npx', ['--yes', 'wrangler@latest', 'whoami'],
+  { encoding: 'utf8', shell: true });
+if (kdojsem.status !== 0) {
+  konec('Wrangler neni prihlaseny ke Cloudflare.',
+    'Spust jednou rucne:  npx wrangler login   (otevre prohlizec, pak uz to plati)');
+}
+ok('Cloudflare je prihlaseny');
 
 if (NANECISTO) {
-  info('nanecisto: preskakuji netlify deploy i overeni webu');
+  info('nanecisto: preskakuji wrangler deploy i overeni webu');
   console.log('\n  Kontroly proslo. Ostre nasazeni: npm run publish\n');
   process.exit(0);
 }
 
-info('nasazuji na Netlify (napoprve chvili trva, stahuje se CLI)');
-// `netlify` neni v PATH, ale prihlaseni v %APPDATA%\netlify plati.
-const kod = nahlas('npx', ['--yes', 'netlify-cli@latest', 'deploy', '--prod', '--dir=public']);
-if (kod !== 0) konec('Nasazeni na Netlify selhalo (navratovy kod ' + kod + ').');
+info('nasazuji na Cloudflare Workers (napoprve chvili trva, stahuje se CLI)');
+// `wrangler` neni v PATH, jede se pres npx; nastaveni je ve wrangler.jsonc.
+const kod = nahlas('npx', ['--yes', 'wrangler@latest', 'deploy']);
+if (kod !== 0) konec('Nasazeni na Cloudflare selhalo (navratovy kod ' + kod + ').');
 
 /* ---- 4. Overit skutecny stav, ne hlasku ---- */
 
@@ -109,7 +118,7 @@ for (let pokus = 1; pokus <= 5 && !hotovo; pokus++) {
 }
 
 if (!hotovo) {
-  konec('Netlify hlasi uspech, ale web se neozval podle ocekavani.',
+  konec('Cloudflare hlasi uspech, ale web se neozval podle ocekavani.',
     'Zkontroluj rucne: ' + WEB);
 }
 
