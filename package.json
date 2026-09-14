@@ -6,6 +6,6 @@
   "scripts": {
     "dev": "node server.mjs",
     "test": "node --test \"tests/*.test.mjs\"",
-    "publish": "node publish.mjs"
+    "publish": "node --use-system-ca publish.mjs"
   }
 }

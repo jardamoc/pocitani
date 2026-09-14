@@ -56,6 +56,12 @@ hlavičky jsou v `public/_headers` — wrangler ten soubor přečte a samotný h
 `publish.mjs` si ho ověřuje **předem** přes `wrangler whoami`, aby nasazení nespadlo
 uprostřed na nesrozumitelné hlášce.
 
+Skript se pouští jako `node --use-system-ca publish.mjs` a ten přepínač **nesmíš
+odstranit**. Firemní síť rozbaluje HTTPS vlastním certifikátem; Node na rozdíl od
+PowerShellu úložiště certifikátů Windows sám nečte, takže závěrečné ověření webu
+padalo na `fetch failed` / „unable to get local issuer certificate", přestože web
+běžel. Vypadalo to jako chyba nasazení, a nebyla.
+
 ## Struktura
 
 | Soubor | Co v něm je |
