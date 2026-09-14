@@ -20,11 +20,12 @@ vysvětlení po chybě. Když nějaká varianta vyjde záporně, popiš to slovy
 ```powershell
 npm run dev                     # http://localhost:8000
 npm run publish                 # git push + nasazení + ověření
+npm test                        # testy odměn a sprite sheetu
 npm run publish -- --dry-run    # jen kontroly, nic se neodešle
 ```
 
 **Žádné sestavování ani závislosti nepřibyly.** `package.json` je tu jen kvůli těmhle
-dvěma zkratkám — `dependencies` je prázdné, `npm install` není potřeba, `public/` se
+zkratkám — `dependencies` je prázdné, `npm install` není potřeba, `public/` se
 pořád servíruje tak, jak leží. Co ale **nesmíš odstranit, je `"type": "module"`**: bez
 něj by Node považoval `public/js/*.js` za staré CommonJS moduly a každý testovací
 skript by spadl na `export`.
