@@ -1229,7 +1229,11 @@ body.is-rewards .rewards-toggle { display: none; }
 /* Roluje jen vnitrek dialogu, ne cely dialog - krizek je pozicovany vuci
    dialogu, takze jinak po odrolovani zmizel z dohledu. */
 .export-dialog { position: relative; }
-.export-dialog .export-panel { overflow-y: auto; min-height: 0; }
+/* Rolovaci blok orezava i do stran, takze poslednimu tlacitku se jinak
+   ustrihne 3D stin (`0 7px 0` dole, `var(--ring)` po stranach) a vypada, ze
+   lezi mimo okno. Odsazeni uvnitr vyvazime zapornym marginem - stejne jako
+   u `.reward-dialog .reward-list`. */
+.export-dialog .export-panel { overflow-y: auto; min-height: 0; padding: 0 10px 16px; margin: 0 -10px; }
 /* `display: flex` prebije atribut hidden, takze ho musime vratit - jinak
    zustane pole na heslo videt i po jeho zadani. */
 .export-gate[hidden] { display: none; }

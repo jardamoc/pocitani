@@ -57,9 +57,13 @@ const firstPick = () => 0;
 /* Kategorie jedineho dumplinga, ktery kolo prineslo (nebo null). */
 const kategorie = (granted) => (granted.length ? granted[0].category : null);
 
-/* Kolo trvajici zadany pocet sekund na jeden priklad. */
-const secondsPerExercise = (seconds, over = {}) =>
-  round({ total: 10, correct: 10, solveMs: 10 * seconds * 1000, ...over });
+/* Bezchybne kolo trvajici zadany pocet sekund na jednu ulohu. Cas i pocet
+   spravnych se dopocitavaji az z vysledneho `total`, aby je uprava v `over`
+   nerozhodila. */
+const secondsPerExercise = (seconds, over = {}) => {
+  const r = round({ total: 10, ...over });
+  return { ...r, correct: r.total, solveMs: r.total * seconds * 1000 };
+};
 
 /* ---------------- jeden dumpling za kolo ---------------- */
 
@@ -94,52 +98,61 @@ test('ani rychla sada s chybou dumplinga nedostane', () => {
 
 /* ---------------- zebricek vzacnosti ---------------- */
 
-test('bezchybna sada do 10 v klidnem tempu da zakladniho dumplinga', () => {
+test('bezchybna sada nad patnact sekund na priklad da zakladniho dumplinga', () => {
   const d = rewards.emptyData();
-  assert.equal(kategorie(rewards.applyRound(d, round({ max: 10 }), firstPick)), 'basic');
+  assert.equal(kategorie(rewards.applyRound(d, secondsPerExercise(20), firstPick)), 'basic');
 });
 
-test('rychlost posune stejnou sadu o stupen vys', () => {
+test('tataz sada pod patnact sekund da neobvykleho', () => {
   const d = rewards.emptyData();
-  assert.equal(kategorie(rewards.applyRound(d, secondsPerExercise(19, { max: 10 }), firstPick)), 'uncommon');
+  assert.equal(kategorie(rewards.applyRound(d, secondsPerExercise(14), firstPick)), 'uncommon');
 });
 
-test('rekordni cas posune o dva stupne', () => {
+test('rychlost a k tomu ulohy navic daji raritniho', () => {
   const d = rewards.emptyData();
-  assert.equal(kategorie(rewards.applyRound(d, secondsPerExercise(9, { max: 10 }), firstPick)), 'rare');
+  const s = secondsPerExercise(14, { extras: 1 });
+  assert.equal(kategorie(rewards.applyRound(d, s, firstPick)), 'rare');
 });
 
-test('vetsi rozsah zvedne zaklad i bez rychlosti', () => {
-  const doDvaceti = rewards.emptyData();
-  assert.equal(kategorie(rewards.applyRound(doDvaceti, round({ max: 20 }), firstPick)), 'uncommon');
-  const doStovky = rewards.emptyData();
-  assert.equal(kategorie(rewards.applyRound(doStovky, round({ max: 100 }), firstPick)), 'rare');
+test('v hadankach a mrizkach zastoupi ulohy navic tezka uroven', () => {
+  const d = rewards.emptyData();
+  // mrizka ma nasobek 4 a tezka uroven jeste 1,7 - limit je tedy pres sto sekund
+  const s = secondsPerExercise(60, { mode: 'grid', level: 'hard', total: 1, max: 10 });
+  assert.equal(kategorie(rewards.applyRound(d, s, firstPick)), 'rare');
 });
 
-test('vetsi rozsah a k tomu rychlost da epickeho', () => {
+test('rychlost pri poctech do tricet a vys da epickeho', () => {
   const d = rewards.emptyData();
-  assert.equal(kategorie(rewards.applyRound(d, secondsPerExercise(19, { max: 20 }), firstPick)), 'rare');
+  assert.equal(kategorie(rewards.applyRound(d, secondsPerExercise(14, { max: 30 }), firstPick)), 'epic');
+  // o jeden preset niz uz na epickeho nedosahne
   const e = rewards.emptyData();
-  assert.equal(kategorie(rewards.applyRound(e, secondsPerExercise(19, { max: 100 }), firstPick)), 'epic');
+  assert.equal(kategorie(rewards.applyRound(e, secondsPerExercise(14, { max: 20 }), firstPick)), 'uncommon');
 });
 
-test('tezka uroven posune o stupen vys', () => {
+test('vytrvalost je druha cesta k epickemu i bez rychlosti', () => {
   const d = rewards.emptyData();
-  // tezka uroven ma roztazeny i rychlostni limit, takze musime pocitat opravdu
-  // pomalu, aby se do vysledku nepromitl jeste bonus za rychlost
-  const pomalu = secondsPerExercise(60, { max: 10, level: 'hard' });
-  assert.equal(kategorie(rewards.applyRound(d, pomalu, firstPick)), 'uncommon');
-});
-
-test('vytrvalost je druha cesta nahoru - do 100 se rychle pocitat nenauci', () => {
-  const d = rewards.emptyData();
-  // tri pomala bezchybna kola do 100 v jednom dni, po deseti prikladech
-  assert.equal(kategorie(rewards.applyRound(d, round({ max: 100 }), firstPick)), 'rare');
-  assert.equal(kategorie(rewards.applyRound(d, round({ max: 100 }), firstPick)), 'rare');
-  assert.equal(d.dailyCorrect, 20, 'po dvou kolech je za dnesek dvacet prikladu');
-  // tretim kolem se prekroci tricet spravnych za den a pribyde stupen za objem
-  assert.equal(kategorie(rewards.applyRound(d, round({ max: 100 }), firstPick)), 'epic');
+  const pomala = (over) => secondsPerExercise(30, { total: 30, correct: 30, ...over });
+  // prvni sada: tricet spravnych za den, na hranici padesati to jeste nestaci
+  assert.equal(kategorie(rewards.applyRound(d, pomala(), firstPick)), 'basic');
   assert.equal(d.dailyCorrect, 30);
+  // druha sada prekroci padesat spravnych za dnesek
+  assert.equal(kategorie(rewards.applyRound(d, pomala(), firstPick)), 'epic');
+  assert.equal(d.dailyCorrect, 60);
+});
+
+test('hranice se berou ostre - presnych patnact sekund ani padesat prikladu nestaci', () => {
+  const naCas = rewards.performanceTier(
+    { mode: 'calc', level: 'easy', max: 10, total: 10, correct: 10, solveMs: 10 * REWARD_RULES.fastSeconds * 1000 },
+    0,
+  );
+  assert.equal(naCas.fast, false, 'presne patnact sekund uz rychle neni');
+
+  const naObjem = rewards.performanceTier(
+    { mode: 'calc', level: 'easy', max: 10, total: 10, correct: 10, solveMs: 10 * 30000 },
+    REWARD_RULES.epicDailyCorrect,
+  );
+  assert.equal(naObjem.bigVolume, false, 'padesat prikladu je "az", ne "vic nez"');
+  assert.equal(naObjem.tier, 0);
 });
 
 test('denni objem se pri zmene kalendarniho dne zacina znovu', () => {
@@ -152,26 +165,60 @@ test('denni objem se pri zmene kalendarniho dne zacina znovu', () => {
 });
 
 test('vykonem se nelze dostat vys nez na epickeho', () => {
-  const d = rewards.emptyData();
-  // rozsah 2 + rychlost 2 + tezka uroven 1 = 5, ale strop je 3
-  const parts = rewards.performanceTier({ max: 100, level: 'hard', mode: 'calc', total: 10, correct: 10, solveMs: 10 * 4000 }, 90);
-  assert.equal(parts.base.tier + parts.speed + parts.volume + parts.hard > REWARD_RULES.maxPerformanceTier, true);
+  // vsechny podminky naraz: rychle, velky rozsah, ulohy navic i velky objem
+  const parts = rewards.performanceTier(
+    { max: 100, level: 'hard', mode: 'calc', extras: 3, total: 10, correct: 10, solveMs: 10 * 4000 },
+    90,
+  );
+  assert.equal(parts.fast && parts.bigRange && parts.extras && parts.bigVolume, true);
   assert.equal(parts.tier, REWARD_RULES.maxPerformanceTier);
-  // lehka uroven, aby nesahl na milnik za nejtezsi sadu v rekordnim case
-  const granted = rewards.applyRound(d, round({ max: 100, solveMs: 10 * 4000 }), firstPick);
-  assert.equal(kategorie(granted), 'epic');
+  assert.equal(rewards.TIERS[parts.tier], 'epic');
 });
 
-test('hranice pro hadanky a mrizku jsou roztazene nasobkem podle rezimu', () => {
-  // mrizka ma nasobek 4, takze hranice 20/10 s plati jako 80/40 s
-  const at = (ms, mode) => rewards.speedStep({ total: 1, solveMs: ms, mode, level: 'easy' });
-  assert.equal(at(60000, 'calc'), 0, 'minutu na jeden priklad uz odmena nebere');
-  assert.equal(at(60000, 'grid'), 1);
-  assert.equal(at(30000, 'grid'), 2);
-  assert.equal(at(90000, 'grid'), 0);
-  // hadanka ma nasobek 3 - hranice 60/30 s
-  assert.equal(at(50000, 'riddle'), 1);
-  assert.equal(at(25000, 'riddle'), 2);
+test('hranice pro hadanky a mrizku jsou roztazene nasobkem podle druhu ulohy', () => {
+  // zaklad je patnact sekund na bezny priklad; mrizka ma nasobek 4, hadanka 3
+  const fast = (ms, mode) => rewards.isFast({ total: 1, solveMs: ms, mode, level: 'easy' });
+  assert.equal(fast(20000, 'calc'), false, 'dvacet sekund na jeden priklad uz rychle neni');
+  assert.equal(fast(14000, 'calc'), true);
+  assert.equal(fast(50000, 'grid'), true, 'mrizka ma sedesat sekund');
+  assert.equal(fast(70000, 'grid'), false);
+  assert.equal(fast(40000, 'riddle'), true, 'hadanka ma ctyricet pet sekund');
+  assert.equal(fast(50000, 'riddle'), false);
+});
+
+test('slovni uloha prida cas cele sade, prumer ji nerozredi', () => {
+  const s = REWARD_RULES.fastSeconds;
+  // deset uloh: osm beznych prikladu a dve slovni (kazda za tri priklady)
+  const sada = (solveSeconds) => ({
+    mode: 'calc',
+    level: 'easy',
+    max: 10,
+    total: 10,
+    correct: 10,
+    kindCounts: { equation: 8, word: 2 },
+    solveMs: solveSeconds * 1000,
+  });
+
+  // rozpocet je 8 + 2*3 = 14 beznych prikladu, tedy 14 * 15 s
+  assert.equal(rewards.speedBudget(sada(0)), 14 * s);
+  assert.equal(rewards.isFast(sada(14 * s - 1)), true);
+  assert.equal(rewards.isFast(sada(14 * s + 1)), false);
+
+  // bez rozpisu druhu by tataz sada mela jen 10 * 15 s a neprosla by
+  const bezRozpisu = { ...sada(12 * s), kindCounts: undefined };
+  assert.equal(rewards.isFast(bezRozpisu), false);
+  assert.equal(rewards.isFast(sada(12 * s)), true);
+});
+
+test('casovy rozpocet roste s obtiznosti a snese i chybejici rozpis', () => {
+  const s = REWARD_RULES.fastSeconds;
+  const zaklad = { mode: 'calc', level: 'easy', total: 4, kindCounts: { equation: 4 } };
+  assert.equal(rewards.speedBudget(zaklad), 4 * s);
+  // tezka uroven ma nasobek 1,7
+  assert.equal(rewards.speedBudget({ ...zaklad, level: 'hard' }), 4 * s * REWARD_RULES.speedLevelMultiplier.hard);
+  // rozpis, ktery nesedi s poctem uloh, se doplni podle rezimu a nepretece
+  assert.equal(rewards.speedBudget({ ...zaklad, kindCounts: { word: 99 } }), 4 * s * REWARD_RULES.speedKindMultiplier.word);
+  assert.equal(rewards.speedBudget({ ...zaklad, kindCounts: { neznamy: 4 } }), 4 * s);
 });
 
 test('odvozena obtiznost rezimu pocitani odpovida zapnutym operacim', () => {
@@ -299,16 +346,30 @@ test('vyber se drzi uvnitr sve kategorie i pri neplatnem losu', () => {
 
 /* ---------------- 14-15. legendarni milniky ---------------- */
 
-test('jedna sada nevytvori vice nez jednu legendarni odmenu', () => {
+test('legendarni neprida dumplinga navic, jen povysi ten jediny', () => {
   const d = rewards.emptyData();
-  d.perfectSets = 9; // desata sada bez chyby prijde prave ted
   d.activePracticeDates = ['2026-09-09', '2026-09-10', '2026-09-11', '2026-09-12'];
   d.lastUpdatedMs = Date.parse('2026-09-12T10:00:00Z');
 
-  // splnene jsou naraz dva milniky, presto padne jediny dumpling
-  const granted = playOn(d, '2026-09-13');
+  // paty den dopln pravidelnost a kolo je zaroven epicke - presto padne jeden
+  const granted = rewards.applyRound(
+    d,
+    round({ dateKey: '2026-09-13', nowMs: Date.parse('2026-09-13T10:00:00Z'), max: 100, solveMs: 10 * 4000 }),
+    firstPick,
+  );
   assert.equal(granted.length, 1);
   assert.equal(kategorie(granted), 'legendary');
+});
+
+test('vykon uz legendarniho nikdy neda - jedina cesta je pravidelnost', () => {
+  const d = rewards.emptyData();
+  // deset bezchybnych sad v jednom dni: drive to byl milnik, uz neni
+  for (let i = 0; i < 10; i += 1) {
+    const granted = rewards.applyRound(d, round({ max: 100, level: 'hard', solveMs: 10 * 3000, extras: 3 }), firstPick);
+    assert.notEqual(kategorie(granted), 'legendary');
+  }
+  assert.equal(d.perfectSets, 10);
+  assert.equal(d.completedMilestones.length, 0);
 });
 
 test('stejny jednorazovy milnik nelze ziskat opakovane', () => {
@@ -419,13 +480,18 @@ test('navod v popupu je cesky a odpovida pravidlum', () => {
     assert.equal(/-\d|\d+[.,]\d/.test(text), false, `zaporne nebo desetinne cislo: ${text}`);
   }
   // cisla v navodu se musi brat z konfigurace, ne byt prepsana v textu
-  const zakladni = rewards.howToGet('basic');
-  assert.equal(zakladni.bullets.some((b) => b.includes(`do ${REWARD_RULES.rangeTiers[0].minRange} a výš`)), true);
-  assert.equal(zakladni.bullets.some((b) => b.includes(`pod ${REWARD_RULES.speedThresholdsSeconds[0].under} s`)), true);
-  assert.equal(zakladni.bullets.some((b) => b.includes(String(REWARD_RULES.dailyVolumeSteps[0].atLeast))), true);
+  const obsahuje = (navod, text) => [navod.lead, ...navod.bullets, navod.tail].join(' ').includes(text);
+
+  assert.equal(obsahuje(rewards.howToGet('basic'), `${REWARD_RULES.fastSeconds} s`), true);
+  assert.equal(obsahuje(rewards.howToGet('uncommon'), `do ${REWARD_RULES.fastSeconds} s`), true);
+  assert.equal(obsahuje(rewards.howToGet('rare'), `do ${REWARD_RULES.fastSeconds} s`), true);
+
+  const epicky = rewards.howToGet('epic');
+  assert.equal(obsahuje(epicky, `víc než ${REWARD_RULES.epicDailyCorrect} příkladů`), true);
+  assert.equal(obsahuje(epicky, `do ${REWARD_RULES.epicMinRange} a výš`), true);
 
   const legendarni = rewards.howToGet('legendary');
-  assert.equal(legendarni.bullets.some((b) => b.includes(`${REWARD_RULES.legendaryActiveDaysRequired} různých dnech`)), true);
+  assert.equal(obsahuje(legendarni, `v ${REWARD_RULES.legendaryActiveDaysRequired} z posledních ${REWARD_RULES.legendaryWindowDays} dnů`), true);
 });
 
 test('cesky plural sklonuje i nulu spravne', () => {

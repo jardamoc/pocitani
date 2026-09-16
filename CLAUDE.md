@@ -216,39 +216,59 @@ z **jednoho** sprite sheetu `public/img/dumplings.png`.
 
 **Za jedno kolo padne nejvýš JEDEN dumpling.** Nerozhoduje se o počtu kusů, ale o tom,
 jak vzácný ten jeden bude. Uživatel to takhle výslovně chtěl — šest dumplingů za kolo
-bylo příliš. Vzácnost se skládá ze čtyř nezávislých příspěvků:
+bylo příliš. Vzácnost se **nesčítá z bodů** — bere se nejvyšší splněná podmínka žebříčku:
 
-```
-základ podle rozsahu   do 20 → +0,  20–49 → +1,  50 a víc → +2
-+ bonus za rychlost    pod 20 s na příklad → +1,  pod 10 s → +2
-+ bonus za objem       30 správných za den → +1,  60 → +2
-+ bonus za obtížnost   těžká úroveň → +1
-= stupeň 0–3           Základní / Neobvyklý / Raritní / Epický  (strop je epický)
-```
+| kategorie | podmínka |
+|---|---|
+| Základní | bezchybná sada, čas nad limitem |
+| Neobvyklý | bezchybná sada pod limitem |
+| Raritní | pod limitem a k tomu úlohy navíc (slovní úlohy, pyramidy, doplň znaménko; u hádanek a mřížek zastoupí těžká úroveň) |
+| Epický | víc než 50 správných příkladů za dnešek, **nebo** pod limitem při rozsahu 30 a výš |
+| Legendární | bezchybná sada aspoň v 5 z posledních 7 dnů |
 
-Objem je tam schválně jako **druhá cesta nahoru**: do 100 se rychle počítat nenaučíš,
-ale vytrvalost se má ocenit stejně. Bez toho by velký rozsah nikdy nedosáhl na epického.
+Dřív se stupně sčítaly ze čtyř nezávislých příspěvků (základ podle rozsahu + bonus za
+rychlost + objem + obtížnost) a kvůli tomu se na Základního dumplinga nedalo dostat —
+rozsah „do 20" přidával stupeň sám o sobě. **Ke sčítání bodů se už nevracej.**
+
+Objem je tam schválně jako **druhá cesta k Epickému**: do 100 se rychle počítat
+nenaučíš, ale vytrvalost se má ocenit stejně. Bez toho by velký rozsah nikdy nedosáhl
+na epického.
 
 **Bezchybná sada je podmínkou všeho.** Kolo s chybou dumplinga nepřinese. Chyba ale nic
 neodebírá — už získané postavičky se **nikdy** neztrácejí a „Smazat historii" se jich
 nedotkne.
 
-Legendárního nelze získat výkonem. Je jen za milníky a **nepřidává se navíc** — povýší
-ten jediný dumpling za kolo na nejvyšší stupeň. Milníky v pořadí: nejtěžší sada bez chyby
-v rekordním čase → pět aktivních dnů v posledních sedmi → každých deset bezchybných sad →
-dumpling z každé ze čtyř nižších kategorií. Splněný milník se nikdy neuděluje dvakrát;
-u pravidelnosti se použitých pět dnů „spotřebuje" (`legendaryDaysUsed`), takže postup
-běží dál, ale stejné dny se nedají proměnit podruhé.
+Legendárního nelze získat výkonem. Má **jedinou cestu — pravidelnost**: bezchybná sada
+aspoň v pěti z posledních sedmi kalendářních dnů. Dřív tu byly ještě tři další milníky
+(nejtěžší sada v rekordním čase, každých deset bezchybných sad, dumpling ze všech čtyř
+nižších kategorií) — uživatel je zrušil, protože legendárních padalo příliš mnoho.
+**Nevracej je zpátky.** Legendární se **nepřidává navíc** — povýší ten jediný dumpling
+za kolo na nejvyšší stupeň. Splněný milník se nikdy neuděluje dvakrát; použitých pět dnů
+se zapisuje do `legendaryDaysUsed` a „spotřebuje", takže stejnou pětici dnů nejde proměnit
+v milník podruhé.
 
 **Všechny hranice jsou v `REWARD_RULES` v `rewards.js`** — jedno místo, žádné číslo
 z té tabulky nesmí být zapsané ještě někde jinde.
 
 Pár věcí, které se snadno rozbijí:
 
-- **Rychlostní hranice platí na jeden příklad, ne na celou sadu.** Sada má 10–30 příkladů,
-  takže „pod 20 s za sadu" by bylo nesplnitelné. Porovnává se **průměr**, aby kratší sada
-  nebyla zvýhodněná. Násobky `speedModeMultiplier` a `speedLevelMultiplier` limit roztáhnou
-  tam, kde jedna úloha trvá déle (hádanka ×3, mřížka ×4) nebo je těžší.
+- **Rychlost se měří časovým rozpočtem celé sady, ne průměrem na jeden příklad.** Základ
+  je 15 s na jeden běžný příklad (`REWARD_RULES.fastSeconds`). Každá úloha si do rozpočtu
+  přispěje vlastním přídělem podle druhu (`speedKindMultiplier`): běžný příklad 1×, slovní
+  úloha 3×, pyramida 2×, doplňování znaménka 2×, hádanka 3×, mřížka 4×. Rozpočet ještě
+  násobí obtížnost (`speedLevelMultiplier`: lehká 1, střední 1,3, těžká 1,7). Porovnává se
+  součet skutečného času celé sady proti součtu těchhle přídělů (`speedBudget()`).
+  Dřív se počítal jeden průměr na celou sadu a roztahoval se jen podle režimu (hádanka ×3,
+  mřížka ×4). V režimu „Počítání" je ale slovní úloha jen pár kusů mezi běžnými příklady —
+  její delší čas se v průměru rozředil a dítě na tom prodělalo. Příklad: sada 8 běžných
+  příkladů a 2 slovních má rozpočet 8 + 2×3 = 14 příkladů, tedy 14 × 15 s = 210 s; dřív by
+  měla jen 150 s. **Násobky v `speedKindMultiplier` musí zůstat celá čísla** — zobrazují se
+  v návodu v popupu a desetinné číslo do textu pro dítě nepatří.
+- **Rozpis druhů úloh posílá `app.js` v poli `kindCounts`** (spočítané z `attempts[].ex.kind`).
+  Když `kindCounts` chybí (stará uložená data), doplní se podle režimu — sada se tím
+  nerozbije.
+- **`extras`** v souhrnu kola je počet zapnutých druhů úloh navíc (`config.kinds.length`) —
+  je to podmínka Raritního.
 - **Režim „Počítání" nemá `config.level`**, obtížnost se odvozuje z operací a úloh navíc
   (`difficultyOf()`): dělení nebo násobení s úlohami navíc = těžká, násobení nebo samotné
   úlohy navíc = střední, jinak lehká.

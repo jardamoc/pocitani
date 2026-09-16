@@ -16,57 +16,52 @@ export const DATA_VERSION = 1;
  * tabulky nesmi byt zapsane jeste nekde jinde v kodu.
  *
  * ZAKLADNI PRINCIP: za jedno kolo padne nejvys JEDEN dumpling. Nerozhoduje
- * se o poctu kusu, ale o tom, jak vzacny dumpling to bude. Vzacnost se sklada
- * ze ctyr nezavislych prispevku:
+ * se o poctu kusu, ale o tom, jak vzacny dumpling to bude. Vzacnost se
+ * NESCITA z bodu - bere se nejvyssi splnena podminka zebricku:
  *
- *   zaklad podle rozsahu  (do kolika se pocita)
- * + bonus za rychlost     (prumerny cas na jeden priklad)
- * + bonus za objem        (kolik prikladu uz dite ten den spocitalo)
- * + bonus za obtiznost    (tezka uroven)
+ *   Zakladni   bezchybna sada, prumer nad 15 s na ulohu
+ *   Neobvykly  bezchybna sada, prumer pod 15 s
+ *   Raritni    pod 15 s a k tomu vyssi slozitost (ulohy navic, tezka uroven)
+ *   Epicky     vic nez 50 prikladu za dnesek, NEBO pod 15 s pri rozsahu 30 a vys
+ *   Legendarni bezchybna sada aspon v peti ze sedmi poslednich dnu
  *
- * Objem je tam schvalne jako druha cesta nahoru: do 100 se rychle pocitat
+ * Drive se stupne scitaly a zakladem byl rozsah - "do 20" tim pridavalo stupen
+ * samo o sobe a na Zakladniho se nedalo dostat. Scitani uz nevracej.
+ *
+ * Objem je tam schvalne jako druha cesta k epickemu: do 100 se rychle pocitat
  * nenaucis, ale vytrvalost se ma ocenit stejne.
  *
- * POZOR na rychlost: hranice plati na JEDEN priklad (prumer), ne na celou
- * sadu - sada ma 10 az 30 prikladu. Kratsi sada tim neni zvyhodnena. Nasobky
- * nize limit jeste roztahnou tam, kde jedna uloha trva dele (hadanka, mrizka)
- * nebo je tezsi. */
+ * POZOR na rychlost: porovnava se cas cele sady proti jejimu casovemu
+ * ROZPOCTU. Kazda uloha si do nej prispeje vlastnim pridelem podle druhu -
+ * slovni uloha se musi nejdriv precist, mrizka je devet kolecek naraz.
+ * Pocitat jeden prumer na celou sadu a roztahovat ho jen podle rezimu
+ * nestaci: v rezimu Pocitani je v sade nekolik slovnich uloh mezi beznymi
+ * priklady, takze delsi cas jedne ulohy se v prumeru zase rozredi a dite
+ * na tom prodela. */
 export const REWARD_RULES = {
   /* Kolo s chybou neprinese nic - bezchybnost je podminkou vseho. */
   requirePerfectSet: true,
   maxRewardsPerGame: 1,
 
-  /* Zaklad: cim vetsi cisla, tim vzacnejsi dumpling. Zkousi se odshora. */
-  rangeTiers: [
-    { minRange: 50, tier: 2, label: 'Raritní' },
-    { minRange: 20, tier: 1, label: 'Neobvyklý' },
-    { minRange: 0, tier: 0, label: 'Základní' },
-  ],
-
-  /* Bonus za rychlost - sekundy na jeden priklad, zkousi se od nejnizsiho. */
-  speedThresholdsSeconds: [
-    { under: 10, step: 2 },
-    { under: 20, step: 1 },
-  ],
-  speedModeMultiplier: { calc: 1, riddle: 3, grid: 4 },
+  /* Hranice rychlosti - sekundy na jeden bezny priklad. */
+  fastSeconds: 15,
+  /* Kolik beznych prikladu jedna uloha vydá. Nasobek se pricita za KAZDOU
+     ulohu zvlast, ne az na hotovy prumer - jedna slovni uloha v sade tak
+     opravdu prida cas na tri priklady. Drz cela cisla, nasobek se zobrazuje
+     v navodu a desetinne cislo do textu pro dite nepatri. */
+  speedKindMultiplier: { equation: 1, word: 3, bond: 2, sign: 2, riddle: 3, grid: 4 },
   speedLevelMultiplier: { easy: 1, medium: 1.3, hard: 1.7 },
 
-  /* Bonus za objem - kolik spravnych prikladu uz dite ten den spocitalo
-     (vcetne prave dokonceneho kola). Zkousi se odshora. */
-  dailyVolumeSteps: [
-    { atLeast: 60, step: 2 },
-    { atLeast: 30, step: 1 },
-  ],
+  /* Epicky: bud hodne spocitanych prikladu za dnesek (podminka je "vic nez"),
+     nebo rychle a k tomu velka cisla. */
+  epicDailyCorrect: 50,
+  epicMinRange: 30,
 
-  /* Bonus za obtiznost - nasobeni a deleni, nebo tezka hadanka ci mrizka. */
-  hardLevelStep: 1,
-
-  /* Vykonem se da dojit nejvys k epickemu. Legendarni je jen za milniky. */
+  /* Vykonem se da dojit nejvys k epickemu. Legendarni je jen za pravidelnost. */
   maxPerformanceTier: 3,
 
   legendaryActiveDaysRequired: 5,
   legendaryWindowDays: 7,
-  perfectSetsMilestoneStep: 10,
   /* Ochrana proti posunuti systemovych hodin: novy procvicovaci den se zapise
      az po dvou skutecnych hodinach od posledni aktualizace. Pretoceni data
      dopredu tak neumi vyrobit pet "aktivnich dnu" za minutu. */
@@ -203,71 +198,89 @@ export const TOP_LEVEL = 'hard';
 
 /* ---------------- jednotlive kategorie ---------------- */
 
-function speedLimits(mode, level) {
-  const byMode = REWARD_RULES.speedModeMultiplier[mode] ?? 1;
-  const byLevel = REWARD_RULES.speedLevelMultiplier[level] ?? 1;
-  return REWARD_RULES.speedThresholdsSeconds
-    .map((t) => ({ under: t.under * byMode * byLevel, step: t.step }))
-    .sort((a, b) => a.under - b.under);
+/* Kolik beznych prikladu vyda jedna uloha daneho druhu. */
+const kindWeight = (kind) => REWARD_RULES.speedKindMultiplier[kind] ?? 1;
+
+/* Druh, kterym nahradime ulohy bez rozpisu - stara ulozena data i souhrn,
+   ktery `kindCounts` neposlal. */
+const defaultKind = (mode) => (mode === 'riddle' ? 'riddle' : mode === 'grid' ? 'grid' : 'equation');
+
+/* Casovy rozpocet cele sady v sekundach. Kazda uloha si prispeje vlastnim
+   pridelem podle druhu, takze slovni uloha mezi beznymi priklady rozpocet
+   opravdu zvedne - kdybychom roztahovali az hotovy prumer, delsi cas te jedne
+   ulohy by se mezi ostatni rozredil. */
+export function speedBudget(summary) {
+  const total = Math.max(0, Math.floor(summary.total || 0));
+  const byLevel = REWARD_RULES.speedLevelMultiplier[summary.level] ?? 1;
+  const counts = summary.kindCounts && typeof summary.kindCounts === 'object' ? summary.kindCounts : {};
+
+  let zbyva = total;
+  let jednotek = 0;
+  for (const [kind, pocet] of Object.entries(counts)) {
+    const n = Math.min(zbyva, Math.max(0, Math.floor(Number(pocet) || 0)));
+    jednotek += n * kindWeight(kind);
+    zbyva -= n;
+  }
+  jednotek += zbyva * kindWeight(defaultKind(summary.mode));
+
+  return REWARD_RULES.fastSeconds * byLevel * jednotek;
 }
 
-/* Kolik stupnu prida rychlost. Hranice se zkousi od nejnizsiho casu a bere se
-   jen ta nejlepsi - devet sekund je dva stupne, ne 1 + 2. */
-export function speedStep(summary) {
+/* Prumerny pridel na jednu ulohu - jen do textu, aby dite vedelo, o jaky cas
+   slo. U sady ze samych beznych prikladu vyjde presne `fastSeconds`. */
+export const speedLimitPerExercise = (summary) => {
+  const total = Math.max(0, Math.floor(summary.total || 0));
+  return total ? speedBudget(summary) / total : REWARD_RULES.fastSeconds;
+};
+
+/* Vesla se cela sada do sveho rozpoctu? Bez zmereneho casu vracime false -
+   chybejici udaj nesmi vyrobit bonus. */
+export function isFast(summary) {
   const total = Math.max(0, Math.floor(summary.total || 0));
   const solveMs = Number(summary.solveMs);
-  if (!total || !Number.isFinite(solveMs) || solveMs <= 0) return 0;
+  if (!total || !Number.isFinite(solveMs) || solveMs <= 0) return false;
 
-  const perExercise = solveMs / total / 1000;
-  for (const limit of speedLimits(summary.mode, summary.level)) {
-    if (perExercise < limit.under) return limit.step;
-  }
-  return 0;
-}
-
-/* Kolik stupnu prida objem odpocitany za dnesek. Druha cesta nahoru pro
-   toho, kdo pocita velka cisla - do 100 se rychle pocitat nenauci. */
-export function volumeStep(dailyCorrect) {
-  for (const rule of REWARD_RULES.dailyVolumeSteps) {
-    if (dailyCorrect >= rule.atLeast) return rule.step;
-  }
-  return 0;
-}
-
-function rangeTier(max) {
-  for (const rule of REWARD_RULES.rangeTiers) {
-    if (max >= rule.minRange) return rule;
-  }
-  return REWARD_RULES.rangeTiers[REWARD_RULES.rangeTiers.length - 1];
+  return solveMs / 1000 < speedBudget(summary);
 }
 
 /* Vzacnost dumplinga za jedno kolo. Vraci stupen 0-3 (zakladni az epicky)
-   a rozpis, z ceho se poskladal - z nej se pak sklada cesky duvod. */
+   a rozpis, z ceho vysel - z nej se pak sklada cesky duvod.
+
+   `extras` je pocet zapnutych druhu navic (slovni ulohy, pyramidy, znamenka).
+   Tezka uroven se pocita jako totez, aby Raritni sel ziskat i v hadankach
+   a mrizkach, kde zadne "neco navic" neni. */
 export function performanceTier(summary, dailyCorrect) {
-  const base = rangeTier(Math.max(0, Math.floor(Number(summary.max) || 0)));
-  const speed = speedStep(summary);
-  const volume = volumeStep(dailyCorrect);
-  const hard = summary.level === TOP_LEVEL ? REWARD_RULES.hardLevelStep : 0;
-  const tier = Math.min(REWARD_RULES.maxPerformanceTier, base.tier + speed + volume + hard);
-  return { tier, base, speed, volume, hard };
+  const fast = isFast(summary);
+  const extras = Number(summary.extras) > 0 || summary.level === TOP_LEVEL;
+  const bigRange = Math.max(0, Math.floor(Number(summary.max) || 0)) >= REWARD_RULES.epicMinRange;
+  const bigVolume = dailyCorrect > REWARD_RULES.epicDailyCorrect;
+
+  let tier = 0;
+  if (bigVolume || (fast && bigRange)) tier = 3;
+  else if (fast && extras) tier = 2;
+  else if (fast) tier = 1;
+
+  return {
+    tier: Math.min(REWARD_RULES.maxPerformanceTier, tier),
+    fast,
+    extras,
+    bigRange,
+    bigVolume,
+  };
 }
 
-/* Cesky duvod. Zaklad rika, za co dumpling je; pripocteny bonus vysvetli,
-   proc je vzacnejsi, nez by cekala. */
-function reasonFor(parts, summary, dailyCorrect) {
-  const bonusy = [];
-  if (parts.speed) {
-    const limit = speedLimits(summary.mode, summary.level).find((l) => l.step === parts.speed);
-    const unit = summary.mode === 'riddle' ? 'hádanku' : summary.mode === 'grid' ? 'mřížku' : 'příklad';
-    bonusy.push(`rychlost pod ${Math.round(limit.under)} s na ${unit}`);
-  }
-  if (parts.volume) bonusy.push(`${dailyCorrect} spočítaných příkladů za dnešek`);
-  if (parts.hard) bonusy.push('těžkou úroveň');
+/* Nazev jedne ulohy podle rezimu - do vety o rychlosti. */
+const unitName = (mode) => (mode === 'riddle' ? 'hádanku' : mode === 'grid' ? 'mřížku' : 'příklad');
 
-  const zaklad = `Za počítání do ${summary.max} bez chyby`;
-  if (!bonusy.length) return zaklad;
-  const vypis = bonusy.length === 1 ? bonusy[0] : `${bonusy.slice(0, -1).join(', ')} a ${bonusy[bonusy.length - 1]}`;
-  return `${zaklad} – a k tomu za ${vypis}`;
+/* Cesky duvod: rekne presne tu podminku, ktera dumplinga vynesla nejvys. */
+function reasonFor(parts, summary, dailyCorrect) {
+  const rychle = `rychleji než ${Math.round(speedLimitPerExercise(summary))} s na ${unitName(summary.mode)}`;
+
+  if (parts.bigVolume) return `Za sadu bez chyby a ${dailyCorrect} spočítaných příkladů za dnešek`;
+  if (parts.fast && parts.bigRange) return `Za sadu bez chyby ${rychle}, a k tomu do ${summary.max}`;
+  if (parts.fast && parts.extras) return `Za sadu bez chyby ${rychle}, a k tomu z těžších úloh`;
+  if (parts.fast) return `Za sadu bez chyby ${rychle}`;
+  return `Za počítání do ${summary.max} bez jediné chyby`;
 }
 
 /* ---------------- ferovy vyber postavicky ---------------- */
@@ -313,60 +326,31 @@ export function readyPracticeDays(data, todayKey = localDateKey()) {
 
 /* ---------------- legendarni milniky ---------------- */
 
-const ownedInCategory = (data, category) =>
-  CATEGORIES[category].items.some((item) => data.rewardInventory[item.id] > 0);
-
 const countMilestones = (data, prefix) =>
   data.completedMilestones.filter((m) => m.startsWith(prefix)).length;
 
 /* Legendarni se neprida navic - povysi ten jediny dumpling za kolo na
-   nejvyssi stupen. Bere se prvni nesplneny milnik v poradi; ostatni splnene
-   se neztraci, prijdou na radu v dalsim kole. */
+   nejvyssi stupen. Cesta je jedina: pravidelnost, tedy pet aktivnich dnu
+   v poslednich sedmi. Vykonem se legendarni ziskat neda.
+
+   Drive tu byly jeste tri dalsi milniky (rekordni cas, kazdych deset
+   bezchybnych sad, dumpling ze vsech ctyr kategorii) - legendarnich tim
+   padalo moc a uzivatel je zrusil. Nevracej je. */
 function takeLegendary(data, ctx) {
-  const has = (id) => data.completedMilestones.includes(id);
-  const claim = (id, why) => {
-    data.completedMilestones.push(id);
-    return { why, milestone: id };
-  };
-
-  // a) nejtezsi uroven bez chyby a zaroven v nejvyssim rychlostnim limitu
-  const topSpeed = Math.max(...REWARD_RULES.speedThresholdsSeconds.map((t) => t.step));
-  if (ctx.level === TOP_LEVEL && ctx.perfect && ctx.speedStep >= topSpeed) {
-    const id = `ultimate:${data.ultimateRuns + 1}`;
-    if (!has(id)) {
-      data.ultimateRuns += 1;
-      return claim(id, 'Za nejtěžší sadu bez chyby a v rekordním čase');
-    }
-  }
-
-  // b) pet aktivnich dnu v poslednich sedmi kalendarnich dnech
   const ready = readyPracticeDays(data, ctx.dateKey);
   const needed = REWARD_RULES.legendaryActiveDaysRequired;
-  if (ready.length >= needed) {
-    const id = `days:${countMilestones(data, 'days:') + 1}`;
-    if (!has(id)) {
-      // spotrebovane dny uz nesmi udelat legendarniho podruhe
-      data.legendaryDaysUsed = [...new Set([...data.legendaryDaysUsed, ...ready.slice(0, needed)])]
-        .sort()
-        .slice(-120);
-      return claim(id, `Za procvičování v ${needed} různých dnech`);
-    }
-  }
+  if (ready.length < needed) return null;
 
-  // c) kazdych deset sad bez jedine chyby
-  const step = REWARD_RULES.perfectSetsMilestoneStep;
-  const reached = Math.floor(data.perfectSets / step) * step;
-  if (reached >= step && !has(`perfect:${reached}`)) {
-    return claim(`perfect:${reached}`, `Za ${reached} sad bez jediné chyby`);
-  }
+  const id = `days:${countMilestones(data, 'days:') + 1}`;
+  if (data.completedMilestones.includes(id)) return null;
 
-  // d) aspon jeden dumpling ze vsech ctyr nizsich kategorii, jednou za zivot
-  const lower = CATEGORY_ORDER.filter((key) => key !== 'legendary');
-  if (!has('allfour') && lower.every((key) => ownedInCategory(data, key))) {
-    return claim('allfour', 'Za dumplinga z každé ze čtyř kategorií');
-  }
+  // spotrebovane dny uz nesmi udelat legendarniho podruhe
+  data.legendaryDaysUsed = [...new Set([...data.legendaryDaysUsed, ...ready.slice(0, needed)])]
+    .sort()
+    .slice(-120);
+  data.completedMilestones.push(id);
 
-  return null;
+  return { why: `Za procvičování v ${needed} různých dnech`, milestone: id };
 }
 
 /* ---------------- vyhodnoceni kola ---------------- */
@@ -391,7 +375,9 @@ export function applyRound(data, summary, rng = Math.random) {
   const perfect = total > 0 && correct === total;
   const nowMs = Number.isFinite(Number(summary.nowMs)) ? Number(summary.nowMs) : Date.now();
   const dateKey = DATE_RE.test(summary.dateKey || '') ? summary.dateKey : localDateKey(nowMs);
-  const shaped = { mode, level, max, total, correct, solveMs: Number(summary.solveMs) || 0 };
+  const extras = Math.max(0, Math.floor(Number(summary.extras) || 0));
+  const kindCounts = summary.kindCounts && typeof summary.kindCounts === 'object' ? summary.kindCounts : {};
+  const shaped = { mode, level, max, total, correct, extras, kindCounts, solveMs: Number(summary.solveMs) || 0 };
 
   data.totalCorrectAnswers += correct;
   data.completedSets += 1;
@@ -419,7 +405,7 @@ export function applyRound(data, summary, rng = Math.random) {
     return [];
   }
 
-  // vzacnost se sklada z rozsahu, rychlosti, denniho objemu a obtiznosti
+  // vzacnost urcuje nejvyssi splnena podminka zebricku, nescitaji se body
   const parts = performanceTier(shaped, data.dailyCorrect);
   let tier = parts.tier;
   let why = reasonFor(parts, { ...shaped, max }, data.dailyCorrect);
@@ -427,9 +413,9 @@ export function applyRound(data, summary, rng = Math.random) {
   // aktivni den se zapise, jen kdyz kolo opravdu dumplinga prineslo
   addPracticeDate(data, dateKey, nowMs);
 
-  /* Splneny legendarni milnik dumplinga nepridava - povysi ten jediny na
+  /* Splnena pravidelnost dumplinga nepridava - povysi ten jediny na
      nejvyssi stupen. Za kolo tak padne porad jen jeden. */
-  const legendary = takeLegendary(data, { level, perfect, speedStep: parts.speed, dateKey });
+  const legendary = takeLegendary(data, { dateKey });
   if (legendary) {
     tier = TIERS.indexOf('legendary');
     why = legendary.why;
@@ -463,51 +449,79 @@ export function applyRound(data, summary, rng = Math.random) {
    Nula patri k druhemu padu ("nula bodu"), ne k mnoznemu cislu. */
 export const plural = (n, one, few, many) => (n === 1 ? one : n >= 2 && n <= 4 ? few : many);
 
-const body = (n) => `${n} ${plural(n, 'bod', 'body', 'bodů')}`;
-
-/* Serazene prispevky jedne osy do jedne vety: "pod 20 s … 1 bod, pod 10 s … 2 body". */
-const osa = (polozky) => polozky
-  .slice()
-  .sort((a, b) => a.step - b.step)
-  .map((p) => `${p.text} – ${body(p.step)}`)
-  .join(', ');
-
 /* Popis, jak se dumpling dane kategorie ziskava. Vsechna cisla se berou
-   z REWARD_RULES, aby text nikdy nelhal proti skutecnym pravidlum. */
+   z REWARD_RULES, aby text nikdy nelhal proti skutecnym pravidlum. Zadne
+   scitani bodu - rekne se rovnou podminka, ktera pro tu kategorii plati. */
 export function howToGet(category) {
+  const s = REWARD_RULES.fastSeconds;
+  const casovy = `v průměru do ${s} s na jeden běžný příklad`;
+  /* Delsi ulohy maji vlastni pridel casu. Nasobky se berou z REWARD_RULES,
+     aby text po jejich zmene nelhal. */
+  const nasobek = (kind, jmeno) => {
+    const n = REWARD_RULES.speedKindMultiplier[kind];
+    return `${jmeno} za ${n} ${plural(n, 'příklad', 'příklady', 'příkladů')}`;
+  };
+  const delsiUlohy = `Delší úlohy mají času víc: ${[
+    nasobek('word', 'slovní úloha se počítá'),
+    nasobek('bond', 'pyramida'),
+    nasobek('riddle', 'hádanka'),
+    nasobek('grid', 'mřížka'),
+  ].join(', ')}.`;
+  const tail = 'Za jedno kolo přijde nejvýš jeden dumpling. Sada s chybou nepřinese žádný.';
+
   if (category === 'legendary') {
     return {
-      lead: 'Legendárního si nevypočítáš. Přijde za vytrvalost a povýší dumplinga, kterého sis v tom kole zasloužila:',
+      lead: 'Legendárního si nevypočítáš. Přijde za pravidelnost a povýší dumplinga, kterého sis v tom kole zasloužila:',
       bullets: [
-        `procvičování v ${REWARD_RULES.legendaryActiveDaysRequired} různých dnech za posledních ${REWARD_RULES.legendaryWindowDays}`,
-        `každých ${REWARD_RULES.perfectSetsMilestoneStep} sad bez jediné chyby`,
-        'dumpling z každé ze čtyř nižších kategorií',
-        'nejtěžší sada bez chyby a k tomu v rekordním čase',
+        `spočítej sadu bez jediné chyby aspoň v ${REWARD_RULES.legendaryActiveDaysRequired} z posledních ${REWARD_RULES.legendaryWindowDays} dnů`,
+        'dny nemusí jít po sobě – jeden vynechaný ti postup nezruší',
       ],
-      tail: 'Za jedno kolo přijde nejvýš jeden.',
+      tail: 'Je to jediná cesta k legendárnímu. Za jedno kolo přijde nejvýš jeden dumpling.',
     };
   }
 
-  const tier = TIERS.indexOf(category);
-  const rozsahy = REWARD_RULES.rangeTiers
-    .filter((r) => r.tier > 0)
-    .map((r) => ({ step: r.tier, text: `do ${r.minRange} a výš` }));
-  const rychlosti = REWARD_RULES.speedThresholdsSeconds
-    .map((t) => ({ step: t.step, text: `pod ${t.under} s` }));
-  const objemy = REWARD_RULES.dailyVolumeSteps
-    .map((v) => ({ step: v.step, text: String(v.atLeast) }));
+  if (category === 'epic') {
+    return {
+      lead: 'Epický přijde za sadu bez jediné chyby a k tomu jednu z těchhle dvou věcí:',
+      bullets: [
+        `spočítej za dnešek víc než ${REWARD_RULES.epicDailyCorrect} příkladů`,
+        `nebo počítej do ${REWARD_RULES.epicMinRange} a výš, a k tomu ${casovy}`,
+        delsiUlohy,
+      ],
+      tail,
+    };
+  }
+
+  if (category === 'rare') {
+    return {
+      lead: 'Raritní přijde za sadu bez jediné chyby, když k tomu zvládneš obojí:',
+      bullets: [
+        `stihni to ${casovy}`,
+        'a měj zapnuté těžší úlohy – slovní úlohy, pyramidy nebo doplň znaménko (u hádanek a mřížek stačí těžká úroveň)',
+        delsiUlohy,
+      ],
+      tail,
+    };
+  }
+
+  if (category === 'uncommon') {
+    return {
+      lead: 'Neobvyklý přijde za sadu bez jediné chyby, když ti to půjde rychle:',
+      bullets: [
+        `stihni to ${casovy}`,
+        delsiUlohy,
+      ],
+      tail,
+    };
+  }
 
   return {
-    lead: 'Po sadě bez jediné chyby se sečtou body:',
+    lead: 'Základní přijde za každou sadu bez jediné chyby:',
     bullets: [
-      `do kolika počítáš: ${osa(rozsahy)}`,
-      `čas na jeden příklad: ${osa(rychlosti)}`,
-      `příkladů za dnešek: ${osa(objemy)}`,
-      `těžká úroveň – ${body(REWARD_RULES.hardLevelStep)}`,
+      'stačí spočítat celou sadu a nic neuhodnout špatně',
+      `když ti to zabere víc než ${s} s na příklad, dostaneš právě tenhle`,
     ],
-    tail: tier === 0
-      ? 'Základní dumpling přijde za každou bezchybnou sadu, i bez jediného bodu.'
-      : `Za ${body(tier)} dostaneš tuhle kategorii. Sada s chybou dumplinga nepřinese.`,
+    tail,
   };
 }
 
@@ -559,6 +573,7 @@ export function collectionSummary(data, todayKey = localDateKey()) {
     legendaryOwned: perCategory.legendary.pieces,
     perfectSets: data.perfectSets,
     dailyCorrect: data.dailyDate === todayKey ? data.dailyCorrect : 0,
-    nextVolumeStep: REWARD_RULES.dailyVolumeSteps[REWARD_RULES.dailyVolumeSteps.length - 1].atLeast,
+    /* "vic nez 50" znamena, ze bonus zabere od 51. */
+    nextVolumeStep: REWARD_RULES.epicDailyCorrect + 1,
   };
 }

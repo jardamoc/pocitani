@@ -1223,11 +1223,22 @@ function finish() {
 function grantRewards(report) {
   if (!gameId) return;
   const solveMs = attempts.reduce((sum, at) => sum + (at.ms > 0 ? at.ms : 0), 0);
+  /* Rozpis druhu uloh - z nej si odmeny spoctou casovy rozpocet sady. Slovni
+     uloha nebo pyramida trva dyl nez bezny priklad a v prumeru za celou sadu
+     by se ten delsi cas rozredil. */
+  const kindCounts = attempts.reduce((acc, at) => {
+    const kind = at.ex?.kind || 'equation';
+    acc[kind] = (acc[kind] || 0) + 1;
+    return acc;
+  }, {});
   const granted = rewards.applyRound(rewardData, {
     gameId,
     mode: config.mode,
     level: rewards.difficultyOf(config),
     max: config.max,
+    // druhy navic (slovni ulohy, pyramidy, znamenka) - podminka raritniho
+    extras: Array.isArray(config.kinds) ? config.kinds.length : 0,
+    kindCounts,
     total: report.total,
     correct: report.correct,
     solveMs,

@@ -91,7 +91,7 @@ function summaryCardHTML(s) {
       <div class="rew-stat"><span class="rew-stat-num">${s.uniqueOwned} / ${s.uniqueTotal}</span><span class="rew-stat-label">objevených postaviček</span></div>
       <div class="rew-stat"><span class="rew-stat-num">${s.practiceDays}</span><span class="rew-stat-label">${plural(s.practiceDays, 'den procvičování', 'dny procvičování', 'dnů procvičování')}</span></div>
       <div class="rew-stat"><span class="rew-stat-num">${s.legendaryOwned}</span><span class="rew-stat-label">${plural(s.legendaryOwned, 'legendární odměna', 'legendární odměny', 'legendárních odměn')}</span></div>
-      <div class="rew-stat"><span class="rew-stat-num">${s.dailyCorrect}</span><span class="rew-stat-label">${s.dailyCorrect >= s.nextVolumeStep ? 'příkladů dnes – bonus máš' : `příkladů dnes, bonus od ${s.nextVolumeStep}`}</span></div>
+      <div class="rew-stat"><span class="rew-stat-num">${s.dailyCorrect}</span><span class="rew-stat-label">${s.dailyCorrect >= s.nextVolumeStep ? 'příkladů dnes – na epického máš' : `příkladů dnes, epický od ${s.nextVolumeStep}`}</span></div>
       <div class="rew-stat"><span class="rew-stat-num">${s.perfectSets}</span><span class="rew-stat-label">${plural(s.perfectSets, 'sada bez chyby', 'sady bez chyby', 'sad bez chyby')}</span></div>
     </div>
     <div class="rew-progress">
