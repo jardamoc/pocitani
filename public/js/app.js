@@ -52,6 +52,11 @@ const LEVEL_KEYS = {
    aby přepnutí režimu nastavení nezahodilo. */
 const LEVEL_ALL = ['easy', 'medium', 'hard'];
 
+/* Rozklad přes desítku umí sčítání i odčítání. Výběr má vlastní klíč
+   `config.over10Ops` - `config.ops` patří režimu Počítání a jsou v něm
+   i operace, které se přes desítku nerozkládají. */
+const OVER10_OPS = ['add', 'sub'];
+
 /* Hádanka, mřížka i rozklad přes desítku se luští déle než příklad, tak na ně
    dáváme jeden pokus navíc - první špatná odpověď ještě neukáže řešení. */
 const RETRY_KINDS = new Set(['riddle', 'grid', 'over10']);
@@ -149,7 +154,8 @@ const SCENERY = {
 
 /* Vychozi nastaveni na jednom miste - pouziva ho start aplikace i mazani. */
 const VYCHOZI_CONFIG = () => ({
-  mode: 'calc', level: 'easy', ops: ['add', 'sub'], kinds: ['word', 'bond'], count: 10, max: 20,
+  mode: 'calc', level: 'easy', ops: ['add', 'sub'], over10Ops: ['add'],
+  kinds: ['word', 'bond'], count: 10, max: 20,
 });
 
 /* Stav se jen deklaruje. Naplni ho `boot()` na konci souboru, protoze
@@ -191,6 +197,11 @@ function normalizeConfig(raw) {
   if (!raw) return null;
   const ops = Array.isArray(raw.ops) ? raw.ops.filter((o) => o in OPS) : [];
   if (!ops.length) return null;
+  /* Rozklad přes desítku má vlastní výběr operací - do `ops` se míchat nesmí,
+     tam patří i × a ÷ pro režim Počítání a filtrováním by se rozbilo. */
+  const over10Ops = Array.isArray(raw.over10Ops)
+    ? raw.over10Ops.filter((o) => OVER10_OPS.includes(o))
+    : [];
   // starsi ulozene nastaveni druhy nezna a mivalo je oba zapnute
   const kinds = Array.isArray(raw.kinds)
     ? raw.kinds.filter((k) => k in EXTRA_KINDS)
@@ -202,6 +213,7 @@ function normalizeConfig(raw) {
        jednoho režimu - všechny tři tabulky mají easy/medium/hard. */
     level: LEVEL_ALL.includes(raw.level) ? raw.level : 'easy',
     ops,
+    over10Ops: over10Ops.length ? over10Ops : ['add'],
     kinds,
     count: clamp(Number(raw.count) || 10, 3, 60),
     max: clamp(Number(raw.max) || 20, 5, 1000),
@@ -337,9 +349,9 @@ function renderModeCards() {
   const over10 = isOver10Mode();
   const pexeso = isPexesoMode();
   const bigmul = isBigmulMode();
-  /* Rozklad přes desítku je vždycky sčítání a velké násobení vždycky
-     násobení - výběr operací by ani v jednom nedával smysl. */
-  el('card-ops').hidden = isRiddleMode() || over10 || bigmul;
+  /* Velké násobení je vždycky násobení - výběr operací by tam nedával smysl.
+     Rozklad přes desítku kartu má, ale jen se sčítáním a odčítáním. */
+  el('card-ops').hidden = isRiddleMode() || bigmul;
   el('card-kinds').hidden = usesLevel();
   el('card-level').hidden = !usesLevel();
   // jedna mřížka i jedna plocha pexesa jsou celé kolo - počet příkladů odpadá
@@ -357,11 +369,15 @@ function renderModeCards() {
   const level = levelTable()[config.level];
 
   if (over10) {
-    /* Upozornění na malý rozsah patří k rozsahu, ne k operacím - karta
-       s operacemi je v tomhle režimu schovaná. */
+    /* Upozornění na malý rozsah patří k rozsahu, ne k operacím - u operací
+       se v tomhle režimu vybírá jenom směr rozkladu. */
     maxNote.textContent = over10RangeNote(config.max)
       || 'Rozsah řídí, jak velká čísla se budou rozkládat. Kolik nápovědy dostaneš, si vybíráš výš u obtížnosti.';
     el('levelNote').textContent = `${level.label} – ${level.note}. Čísla do ${config.max}.`;
+    opsNote.textContent = config.over10Ops.length > 1
+      ? 'Sčítání i odčítání se budou v kole střídat.'
+      : 'Můžeš si zapnout obě naráz, příklady se pak střídají.';
+    opsNote.hidden = false;
     return;
   }
 
@@ -434,8 +450,12 @@ function renderConfigScreen() {
     })
     .join('');
 
-  el('opChips').innerHTML = Object.entries(OPS)
-    .map(([key, op]) => chipHTML(key, `${op.emoji} ${op.label}`, config.ops.includes(key)))
+  /* V rozkladu přes desítku se vybírá jen směr (sčítání / odčítání) a bere
+     se z vlastního klíče `over10Ops`; jinde je to celá nabídka operací. */
+  const opKeys = isOver10Mode() ? OVER10_OPS : Object.keys(OPS);
+  const opOn = isOver10Mode() ? config.over10Ops : config.ops;
+  el('opChips').innerHTML = opKeys
+    .map((key) => chipHTML(key, `${OPS[key].emoji} ${OPS[key].label}`, opOn.includes(key)))
     .join('');
 
   el('kindChips').innerHTML = Object.entries(EXTRA_KINDS)
@@ -565,14 +585,17 @@ el('opChips').addEventListener('click', (e) => {
   const chip = e.target.closest('.chip');
   if (!chip) return;
   const value = chip.dataset.value;
-  const next = config.ops.includes(value) ? config.ops.filter((o) => o !== value) : [...config.ops, value];
+  const over10 = isOver10Mode();
+  const current = over10 ? config.over10Ops : config.ops;
+  const next = current.includes(value) ? current.filter((o) => o !== value) : [...current, value];
   if (!next.length) {
     const err = el('opsError');
     err.hidden = false;
     setTimeout(() => { err.hidden = true; }, 2200);
     return;
   }
-  config.ops = next;
+  if (over10) config.over10Ops = next;
+  else config.ops = next;
   saveConfig();
   renderConfigScreen();
 });
@@ -841,8 +864,11 @@ function renderExercise() {
 function hintFor(ex) {
   if (ex.kind === 'grid') return 'Doplň čísla tak, aby vyšlo každé počítání doprava i dolů. Pak klepni na ✓.';
   if (ex.kind === 'over10') {
-    return 'Rozděl druhé číslo na dvě části: do rámečku dej tolik, aby s prvním číslem byla rovná desítka, '
-      + 'vedle zbytek. Nahoře doplň výsledek a klepni na ✓.';
+    return ex.op === 'sub'
+      ? 'Rozděl druhé číslo na dvě části: vlevo tolik, aby z prvního čísla zbyla rovná desítka, '
+        + 'vpravo zbytek. Ten uber od desítky a nahoře doplň výsledek. Pak klepni na ✓.'
+      : 'Rozděl druhé číslo na dvě části: do rámečku dej tolik, aby s prvním číslem byla rovná desítka, '
+        + 'vedle zbytek. Nahoře doplň výsledek a klepni na ✓.';
   }
   if (ex.kind === 'pexeso') {
     return 'Ke každému příkladu najdi jeho výsledek a klepni na obě kartičky. '
@@ -1016,27 +1042,37 @@ function gridHTML(ex) {
    ho nastavuje jen tomu s id="answerInput" a bez atributu vrací `maxLength`
    −1, takže by klávesnice do zbylých nenapsala ani číslici. */
 const O10_LABEL = {
-  ten: 'Kolik chybí prvnímu číslu do desítky',
-  rest: 'Kolik zbývá přidat přes desítku',
-  c: 'Výsledek',
+  add: {
+    ten: 'Kolik chybí prvnímu číslu do desítky',
+    rest: 'Kolik zbývá přidat přes desítku',
+    c: 'Výsledek',
+  },
+  sub: {
+    ten: 'Kolik ubrat, abys byla na desítce',
+    rest: 'Kolik zbývá ubrat pod desítku',
+    c: 'Výsledek',
+  },
 };
 
 function over10HTML(ex) {
   const digits = String(config.max).length;
+  const label = O10_LABEL[ex.op] || O10_LABEL.add;
   const cell = (key) => {
     const idx = ex.hidden.indexOf(key);
     const slotId = idx === 0 ? ' id="answerSlot"' : '';
     const inputId = idx === 0 ? ' id="answerInput"' : '';
     return `<span class="o10-cell slot o10b-${key}"${slotId}><input${inputId} class="o10-input" type="text"
       inputmode="none" autocomplete="off" data-idx="${idx}" maxlength="${digits}"
-      aria-label="${O10_LABEL[key]}"></span>`;
+      aria-label="${label[key]}"></span>`;
   };
 
+  /* Rámeček obepíná ta dvě čísla, která spolu dají rovnou desítku: u sčítání
+     první číslo s levou větví, u odčítání výsledek s pravou větví. */
   return `${over10FrameHTML(ex)}
-    <div class="o10b">
+    <div class="o10b" data-op="${ex.op}">
       <span class="o10b-box" aria-hidden="true"></span>
       <span class="o10-num o10b-a">${ex.a}</span>
-      <span class="o10-op o10b-plus">+</span>
+      <span class="o10-op o10b-op">${OPS[ex.op].symbol}</span>
       <span class="o10-num o10b-b">${ex.b}</span>
       <span class="o10-op o10b-eq">=</span>
       ${cell('c')}
@@ -1048,13 +1084,21 @@ function over10HTML(ex) {
 }
 
 /* Kroužky jako nápověda (lehká a střední úroveň): prvních deset v řadě,
-   zbytek přeteče do druhé - je tak vidět, kde se desítka láme. Nad dvacet
-   se rámec nekreslí, tolik koleček se na řádek nevejde. */
+   zbytek přeteče do druhé - je tak vidět, kde se desítka láme. U odčítání
+   se odebraná kolečka přeškrtnou (`tf-gone`), stejně jako ve vysvětlení
+   po chybě. Nad dvacet se rámec nekreslí, tolik koleček se na řádek
+   nevejde - u odčítání rozhoduje první číslo, to je tam to největší. */
 function over10FrameHTML(ex) {
-  if (ex.hint === 'none' || ex.c > 20) return '';
+  const sub = ex.op === 'sub';
+  if (ex.hint === 'none' || (sub ? ex.a : ex.c) > 20) return '';
   const cells = [];
   for (let i = 0; i < 20; i++) {
-    const cls = i < ex.a ? 'tf-cell tf-a' : i < ex.c ? 'tf-cell tf-b' : 'tf-cell';
+    let cls = 'tf-cell';
+    if (sub) {
+      if (i < ex.c) cls += ' tf-a';
+      else if (i < ex.a) cls += ' tf-gone';
+    } else if (i < ex.a) cls += ' tf-a';
+    else if (i < ex.c) cls += ' tf-b';
     cells.push(`<span class="${cls}"></span>`);
   }
   return `<div class="tenframe tenframe-hint" aria-hidden="true">${cells.join('')}</div>`;
@@ -1582,8 +1626,12 @@ const RETRY_NOTE = {
     return `${wrong} ${kolecka} (červená). Hledej řádek nebo sloupec,
       kde chybí jediné číslo – od něj se rozmotá zbytek.`;
   },
-  over10: (wrong) => {
+  over10: (wrong, ex) => {
     const policka = wrong === 1 ? 'políčko ještě nesedí' : wrong <= 4 ? 'políčka ještě nesedí' : 'políček ještě nesedí';
+    if (ex.op === 'sub') {
+      return `${wrong} ${policka} (červená). Začni levou větví: kolik ubrat z prvního čísla,
+        abys byla na rovné desítce? Zbytek druhého čísla pak uber od té desítky.`;
+    }
     return `${wrong} ${policka} (červená). Začni rámečkem: kolik chybí prvnímu číslu do desítky?
       Přesně tolik si uber z toho druhého a zbytek napiš do pravé větve.`;
   },
@@ -1601,7 +1649,7 @@ function partRetry(ex) {
   const fb = el('feedback');
   fb.dataset.state = 'retry';
   fb.innerHTML = `<div class="fb-badge"><span aria-hidden="true">💪</span> Ještě ne – zkus to znovu!</div>
-    <p class="fb-retry-note">${RETRY_NOTE[ex.kind](wrong)}</p>`;
+    <p class="fb-retry-note">${RETRY_NOTE[ex.kind](wrong, ex)}</p>`;
   fb.hidden = false;
   beep('wrong');
   partInputs(ex)[0]?.focus({ preventScroll: true });

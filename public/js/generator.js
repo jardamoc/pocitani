@@ -404,13 +404,15 @@ export function buildGridRound(config) {
 /* ---------------- počítej přes 10 ----------------
    Odpovědí je stejně jako u mřížky ŘETĚZEC hodnot doplňovaných políček
    spojený ', ' v pořadí `ex.hidden`, takže `given === ex.answer` v submit()
-   funguje beze změny. `op: 'add'` je tu skutečné sčítání, ne zástupná
-   hodnota - desítkový rámec ve vysvětlení proto dává smysl a nechává se. */
+   funguje beze změny. `op` je tu skutečné sčítání nebo odčítání, ne zástupná
+   hodnota - desítkový rámec ve vysvětlení proto dává smysl a nechává se.
+   Operaci si vybírá uživatel v kartě "Co budeme počítat?"; když jsou zapnuté
+   obě, střídají se příklad od příkladu. */
 function over10Exercise(config) {
-  const o = makeOver10(config.max, config.level);
+  const ops = config.over10Ops?.length ? config.over10Ops : ['add'];
+  const o = makeOver10(config.max, config.level, pick(ops));
   return {
     ...o,
-    op: 'add',
     kind: 'over10',
     missing: 'c',
     cross: true,               // přes desítku se přechází z definice úlohy

@@ -161,7 +161,7 @@ Na úvodní obrazovce se vybírá karta **„Co si zahrajeme?"**:
 | režim | `config.mode` | co se v nastavení skryje |
 |---|---|---|
 | **Počítání** | `calc` | — (vybírají se operace i druhy úloh navíc) |
-| **Počítej přes 10** | `over10` | operace (je to vždy sčítání), „něco navíc" |
+| **Počítej přes 10** | `over10` | „něco navíc" (v operacích zůstává jen ➕ a ➖) |
 | **Obrázkové hádanky** | `riddle` | operace, „něco navíc" |
 | **Mřížka** | `grid` | „něco navíc", **počet příkladů** (jedna mřížka = jedno kolo) |
 | **Najdi dvojice** | `pexeso` | „něco navíc", **počet příkladů** (jedna plocha = jedno kolo) |
@@ -296,6 +296,44 @@ do desítky (`ten`), a teprve k tomu se dolosuje zbytek. Druhé číslo tak vžd
 jednociferné a přes desítku se opravdu přejde. Jednotky prvního čísla musí být **aspoň 2** —
 při jedničce by do desítky chybělo 9 a druhé číslo by bylo dvojciferné.
 
+### Odčítání přes desítku
+
+Týž zápis jde i opačným směrem (`rollSub()` v `over10.js`):
+
+```
+○○○○○ ○○○○   ⊗⊗          odebraná kolečka jsou přeškrtnutá (.tf-gone)
+                        ┌──────┐
+ 16   −   8    =        │ [8]  │   rámeček je vpravo: 10 − 2 = 8
+          ╱   ╲         │      │
+        [6]   ─────────→│ [2]  │
+                        └──────┘
+```
+
+`ten` jsou tu **jednotky prvního čísla** (16 − 6 = 10), `rest` se odečte od desítky.
+**Rámeček (`.o10b-box`) se u odčítání přesouvá na pravý sloupec** — obepíná ta dvě
+čísla, která spolu dají rovnou desítku, tedy výsledek a zbytek. Řídí to
+`data-op` na `.o10b` a jediné pravidlo v CSS; uživatel si to takhle vyžádal
+podle školní předlohy.
+Jednotky musí být **1 až 8**: při nule není co rozkládat, při devítce by na zbytek
+nic nezbylo. Rozsah hlídá **první číslo** — u odčítání je to to největší, kdežto
+u sčítání je největší výsledek.
+
+**Volba sčítání/odčítání má vlastní klíč `config.over10Ops`** (jen `add`/`sub`,
+prázdné spadne na `add`). Do `config.ops` ji **nedávej** — tam patří i × a ÷ pro
+režim Počítání a filtrováním by se uživateli rozbilo nastavení běžného počítání.
+Karta „Co budeme počítat?" se v tomhle režimu **ukazuje** (na rozdíl od hádanek
+a velkého násobení), ale jen se dvěma chipy; `renderConfigScreen()` i posluchač
+`#opChips` mají větev podle `isOver10Mode()`. Když jsou zapnuté obě, losuje se
+operace u každého příkladu zvlášť (`pick()` v `over10Exercise()`).
+
+Dvě věci, které se snadno rozbijí:
+
+- **Znaménko musí být v `ex.key`**, jinak dedup v `buildOver10Round()` považuje
+  `16 + 8` a `16 − 8` za tentýž příklad.
+- `tenFrameHTML()` ve vysvětlení odčítání uměl už předtím (`removing`, `tf-gone`),
+  ale `over10FrameHTML()` v zadání má vlastní kopii — ta strop počítá z `ex.a`,
+  ne z `ex.c`.
+
 Čtyřřádkový zápis rovnic (`= 6 + [4] + [3]` …) tu **byl a nevracej ho** — uživateli
 nebyl srozumitelný. Obrázek s větvičkou říká totéž a dítě z něj hned vidí, proč se
 druhé číslo dělí zrovna takhle.
@@ -317,8 +355,9 @@ ne po číslicích jako běžná klávesnice. Sada se jmenuje `ex.numbers`, ne `
 tak se jmenuje nabídka operací u „Doplň znaménko" a míchat je dohromady by se vymstilo.
 
 Kroužky v zadání kreslí `over10FrameHTML()` v `app.js` (třída `.tenframe-hint`), což je
-něco jiného než `tenFrameHTML()` ve vysvětlení po chybě. Nad součtem 20 se nekreslí,
-tolik koleček se na dva řádky nevejde.
+něco jiného než `tenFrameHTML()` ve vysvětlení po chybě. Nad dvacet se nekreslí,
+tolik koleček se na dva řádky nevejde (u sčítání rozhoduje výsledek, u odčítání
+první číslo).
 
 Větvička je **mřížka 5 × 3** bez jediného obrázku a bez SVG: šikmé čáry jsou pruh
 v `linear-gradient` (CSS vede osu přechodu tak, že pruh padne přesně na úhlopříčku),
@@ -329,10 +368,11 @@ Pár věcí, které se snadno rozbijí:
 
 - **Do 10 se přes desítku přejít nedá** — nejmenší takový součet je 11. Pod hranicí
   `OVER10_MIN_MAX` (12) se místo tichého porušení rozsahu počítá do 20 a `over10RangeNote()`
-  to napíše. Hláška patří pod **„Do kolika počítáme?"**, ne k operacím — karta s operacemi
-  je v tomhle režimu schovaná.
-- `op: 'add'` je tu **skutečné sčítání**, ne zástupná hodnota jako u mřížky. Desítkový
-  rámec (`tenFrameHTML`) se proto schválně kreslí a `cross` je natvrdo `true`.
+  to napíše. Hláška patří pod **„Do kolika počítáme?"**, ne k operacím — u operací se
+  v tomhle režimu vybírá jen směr rozkladu. (Platí i pro odčítání: nejmenší takový
+  příklad je `12 − 3`.)
+- `op` je tu **skutečné sčítání nebo odčítání**, ne zástupná hodnota jako u mřížky.
+  Desítkový rámec (`tenFrameHTML`) se proto schválně kreslí a `cross` je natvrdo `true`.
 - **`diagnose()` musí tenhle druh vyloučit hned na začátku** jako mřížku — odpovědí je
   řetězec a `Math.abs(given − answer)` by dal `NaN`.
 - Rozklad se **neukládá do „k procvičení"** (`NO_REPEAT` ve `stats.js`) — `makeExercise()`

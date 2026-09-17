@@ -307,10 +307,10 @@ export function analyze(state, config, attempts) {
     }
   } else if (over10Mode) {
     if (pct < 100) {
-      tips.push('Vždycky se nejdřív zeptej: kolik chybí prvnímu číslu do desítky? Přesně tolik si uber z druhého čísla.');
+      tips.push('Vždycky se nejdřív zeptej: jak se dostaneš na rovnou desítku? Přesně tolik si vezmi z druhého čísla.');
     }
     if (attempts.some((a) => a.retried)) {
-      tips.push('Zbytek se nikam neztratí – co z druhého čísla odejde do desítky, to se pak přičte navrch.');
+      tips.push('Zbytek se nikam neztratí – co z druhého čísla padne na desítku, to se pak dopočítá navrch.');
     }
     if (pct >= 90) {
       const harder = { easy: 'střední', medium: 'těžkou' }[config.level];
