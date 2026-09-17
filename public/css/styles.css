@@ -931,6 +931,9 @@ body.is-dark { --pair-task: #93c5fd; --pair-result: #fdba74; }
   background: var(--good-tint); color: var(--ink);
   font-family: 'Baloo 2', sans-serif; font-weight: 800;
   font-size: clamp(1.1rem, 5.2vw, 1.5rem); letter-spacing: -.3px;
+  /* Odsazení plusu od členů. Platí jen pro obyčejnou mezeru mezi členy,
+     uvnitř členu je úzká U+2009, na kterou `word-spacing` nesahá. */
+  word-spacing: .45em;
 }
 .bm-label {
   justify-self: start; padding: 3px 10px; border-radius: 10px;
@@ -946,6 +949,7 @@ body.is-dark { --pair-task: #93c5fd; --pair-result: #fdba74; }
   background: var(--card); color: var(--ink);
   font-family: 'Baloo 2', sans-serif; font-weight: 800;
   font-size: clamp(1.1rem, 5vw, 1.55rem); letter-spacing: -.3px;
+  word-spacing: .45em;
   box-shadow: var(--ring);
   transition: transform .12s ease, border-color .12s ease;
 }

@@ -136,7 +136,12 @@ function splitTerms(levelKey, a, b) {
   return { splitFirst: true, terms: [[Math.floor(a / 10) * 10, b], [a % 10, b]] };
 }
 
-const termsText = (terms) => terms.map(([x, y]) => `${x} ${MUL} ${y}`).join(' + ');
+/* Uvnitř členu je úzká mezera U+2009, mezi členy obyčejná. CSS `word-spacing`
+   na `.bm-value` / `.bm-opt` platí jen pro obyčejnou mezeru, takže se plus
+   odsadí od okolí, ale `×` zůstane u svých čísel natěsno. Kdyby tu byly
+   všude obyčejné mezery, roztáhlo by se i okolí křížku. */
+const TIGHT = ' ';
+const termsText = (terms) => terms.map(([x, y]) => `${x}${TIGHT}${MUL}${TIGHT}${y}`).join(' + ');
 
 /* Prohození desítek a jednotek - typická chyba při sčítání zpaměti.
    `null` znamená, že by vyšlo totéž (jednociferné číslo nebo 33, 44 …). */
