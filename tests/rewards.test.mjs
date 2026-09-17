@@ -6,23 +6,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 /* Testy logiky odmen. Bezi v Node, bez prohlizece a bez zavislosti:
  *   node --test "tests/*.test.mjs"
  *
- * Uloziste nahrazuje pametova atrapa na globalThis - moduly odmen sahaji na
- * localStorage az uvnitr load()/save(), takze staci ji nastavit pred importem. */
+ * Zadna atrapa uloziste tu uz neni potreba - rewards.js na localStorage
+ * nesaha, cteni i zapis obstarava storage.js (viz storage.test.mjs). */
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-
-function fakeStorage(initial = {}) {
-  const map = new Map(Object.entries(initial));
-  return {
-    getItem: (k) => (map.has(k) ? map.get(k) : null),
-    setItem: (k, v) => map.set(k, String(v)),
-    removeItem: (k) => map.delete(k),
-    clear: () => map.clear(),
-    _map: map,
-  };
-}
-
-globalThis.localStorage = fakeStorage();
 
 const load = (name) => import(pathToFileURL(resolve(root, 'public/js', name)).href);
 const rewards = await load('rewards.js');
@@ -298,16 +285,8 @@ test('tataz dokoncena sada se nezapocita dvakrat', () => {
   assert.equal(d.completedSets, 1);
 });
 
-test('po znovuspusteni aplikace zustanou odmeny ulozene', () => {
-  globalThis.localStorage = fakeStorage();
-  const d = rewards.load();
-  rewards.applyRound(d, round({ total: 10, correct: 10 }), firstPick);
-
-  const reloaded = rewards.load(); // jako po obnoveni stranky
-  assert.equal(reloaded.totalCorrectAnswers, 10);
-  assert.equal(reloaded.completedSets, 1);
-  assert.equal(Object.values(reloaded.rewardInventory).reduce((a, b) => a + b, 0), 1);
-});
+/* Ulozeni a znovunacteni uz neresi tenhle modul - testuje se ve
+   storage.test.mjs ("odmeny prezijou obnoveni stranky"). */
 
 /* ---------------- 12-13. ferovy vyber postavicky ---------------- */
 
@@ -410,12 +389,13 @@ test('neobjeveny dumpling nezobrazi sve skutecne jmeno', () => {
   assert.equal(rewards.displayName('legendary_01', 0).includes('Zlatý'), false);
 });
 
-/* ---------------- 20. poskozene uloziste ---------------- */
+/* ---------------- 20. poskozena data ----------------
+   Cteni z uloziste uz tady neni - obstarava ho storage.js a testuje
+   storage.test.mjs. Zbyva ciste sanitizace toho, co z uloziste prijde. */
 
-test('pri poskozenem ulozisti se aplikace spusti bez padu', () => {
-  for (const broken of ['{', 'null', '[]', '"text"', '{"rewardInventory":42}', '']) {
-    globalThis.localStorage = fakeStorage({ [rewards.STORAGE_KEY]: broken });
-    const d = rewards.load();
+test('z nesmyslneho vstupu vznikne platny vychozi stav', () => {
+  for (const broken of [null, undefined, 42, 'text', [], { rewardInventory: 42 }]) {
+    const d = rewards.sanitize(broken);
     assert.equal(d.version, rewards.DATA_VERSION);
     assert.equal(Object.keys(d.rewardInventory).length, 40);
     assert.equal(d.totalCorrectAnswers, 0);
@@ -423,17 +403,14 @@ test('pri poskozenem ulozisti se aplikace spusti bez padu', () => {
 });
 
 test('pri poskozeni jednoho udaje zustanou ostatni platna data', () => {
-  globalThis.localStorage = fakeStorage({
-    [rewards.STORAGE_KEY]: JSON.stringify({
-      version: 1,
-      rewardInventory: { basic_01: 3, basic_02: -5, vymysleny_klic: 9, basic_03: 'x' },
-      totalCorrectAnswers: 42,
-      completedSets: 'nesmysl',
-      activePracticeDates: ['2026-09-13', 'zitra', 12345],
-      newRewardIds: ['basic_01', 'neexistuje'],
-    }),
+  const d = rewards.sanitize({
+    version: 1,
+    rewardInventory: { basic_01: 3, basic_02: -5, vymysleny_klic: 9, basic_03: 'x' },
+    totalCorrectAnswers: 42,
+    completedSets: 'nesmysl',
+    activePracticeDates: ['2026-09-13', 'zitra', 12345],
+    newRewardIds: ['basic_01', 'neexistuje'],
   });
-  const d = rewards.load();
   assert.equal(d.rewardInventory.basic_01, 3, 'platna polozka musi prezit');
   assert.equal(d.rewardInventory.basic_02, 0, 'zaporne cislo spadne na nulu');
   assert.equal(d.rewardInventory.basic_03, 0, 'text spadne na nulu');
@@ -442,15 +419,6 @@ test('pri poskozeni jednoho udaje zustanou ostatni platna data', () => {
   assert.equal(d.completedSets, 0);
   assert.deepEqual(d.activePracticeDates, ['2026-09-13']);
   assert.deepEqual(d.newRewardIds, ['basic_01']);
-});
-
-test('chybejici uloziste aplikaci neshodi', () => {
-  const saved = globalThis.localStorage;
-  delete globalThis.localStorage;
-  const d = rewards.load();
-  assert.equal(d.totalCorrectAnswers, 0);
-  assert.doesNotThrow(() => rewards.save(d));
-  globalThis.localStorage = saved;
 });
 
 /* ---------------- texty odmen ---------------- */

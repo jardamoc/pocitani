@@ -1,8 +1,9 @@
 import { OPS, signature, exToText, TAGS } from './generator.js';
+import { wholeNumber, textList } from './validate.js';
 
 export const KEY = 'pocitani.v1';
 
-const emptyState = () => ({
+export const emptyState = () => ({
   config: null,
   theme: 'panda',
   dark: false,
@@ -12,21 +13,64 @@ const emptyState = () => ({
   rounds: [],
 });
 
-export function load() {
-  try {
-    const raw = localStorage.getItem(KEY);
-    return raw ? { ...emptyState(), ...JSON.parse(raw) } : emptyState();
-  } catch {
-    return emptyState();
-  }
-}
+/* Na uloziste tenhle modul uz nesaha - cte i zapisuje jedine storage.js.
+   Tady zustava ciste logika a validace, takze se da spustit i v Node. */
 
-export function save(state) {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(state));
-  } catch {
-    /* privátní režim nebo zakázané ukládání - aplikace funguje i bez historie */
+/* Klic tematu se neoveruje proti seznamu temat schvalne: ten zna jen app.js
+   a import odsud by udelal kruh v zavislostech. Neznamy klic navic nic
+   nerozbije - `currentTheme()` v app.js spadne na vychozi pandu. */
+const THEME_RE = /^[a-z]{2,20}$/;
+
+const MISSED_KEYS = ['op', 'kind', 'missing', 'a', 'b', 'c', 'cross'];
+
+const plainObject = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
+
+/* Kazde pole se validuje zvlast, aby jedna poskozena polozka nevzala ostatni
+   platna data - stejny vzor jako sanitize() v rewards.js.
+
+   `config` se sem zamerne bere jak je: jeho pravidla zna `normalizeConfig()`
+   v app.js a ten si ho pri startu prozene sam. */
+export function sanitizeState(raw) {
+  const state = emptyState();
+  if (!plainObject(raw)) return state;
+
+  if (plainObject(raw.config)) state.config = raw.config;
+  if (typeof raw.theme === 'string' && THEME_RE.test(raw.theme)) state.theme = raw.theme;
+  if (typeof raw.dark === 'boolean') state.dark = raw.dark;
+  if (typeof raw.sound === 'boolean') state.sound = raw.sound;
+
+  if (plainObject(raw.skills)) {
+    for (const [skill, hodnoty] of Object.entries(raw.skills)) {
+      if (!plainObject(hodnoty)) continue;
+      const seen = wholeNumber(hodnoty.seen);
+      if (!seen) continue;
+      // chyb nemuze byt vic nez pokusu, jinak by vysly zaporne procenta
+      state.skills[skill] = { seen, wrong: Math.min(seen, wholeNumber(hodnoty.wrong)) };
+    }
   }
+
+  if (Array.isArray(raw.missed)) {
+    state.missed = raw.missed
+      .filter((m) => plainObject(m) && MISSED_KEYS.some((k) => m[k] !== undefined))
+      .slice(0, 40);
+  }
+
+  if (Array.isArray(raw.rounds)) {
+    state.rounds = raw.rounds
+      .filter((r) => plainObject(r) && Number.isFinite(Number(r.at)) && wholeNumber(r.total) > 0)
+      .map((r) => ({
+        at: wholeNumber(r.at),
+        total: wholeNumber(r.total),
+        correct: Math.min(wholeNumber(r.total), wholeNumber(r.correct)),
+        max: wholeNumber(r.max),
+        ops: textList(r.ops, (o) => o in OPS, 4),
+        mode: typeof r.mode === 'string' ? r.mode : 'calc',
+      }))
+      .sort((a, b) => b.at - a.at)
+      .slice(0, 20);
+  }
+
+  return state;
 }
 
 /* Druhy úloh, které se nedají z descriptoru znovu poskládat. */
@@ -68,7 +112,8 @@ export function recordRound(state, config, attempts) {
     ...state.rounds,
   ].slice(0, 20);
 
-  save(state);
+  /* Ulozeni uz tady neni - o zapis se stara volajici pres storage.js.
+     Diky tomu vede na uloziste jedina cesta. */
   return state;
 }
 

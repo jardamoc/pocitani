@@ -1,6 +1,4 @@
 import { ALL_IDS } from './rewards-data.js';
-import * as rewards from './rewards.js';
-import * as store from './stats.js';
 
 /* Prenos progresu mezi zarizenimi.
  *
@@ -12,7 +10,10 @@ import * as store from './stats.js';
  * Slucovani je zamerne **idempotentni** - u poctu se bere vyssi hodnota,
  * u seznamu sjednoceni. Naskenovani tehoz QR podruhe tak nic nezdvoji.
  *
- * Zavislosti: rewards-data.js / rewards.js / stats.js -> TENHLE MODUL -> app.js
+ * Modul sam nic neuklada - `mergePayload()` slouci data v pameti a vrati
+ * souhrn zmen. O zapis se stara app.js pres storage.js.
+ *
+ * Zavislosti: rewards-data.js -> TENHLE MODUL -> app.js
  */
 
 export const PARAM = 'p';
@@ -226,8 +227,9 @@ export function mergePayload(state, rewardData, payload) {
     if (typeof payload.sn === 'boolean') state.sound = payload.sn;
   }
 
-  store.save(state);
-  rewards.save(rewardData);
+  /* Ulozeni tady neni schvalne - funkce jen slouci data v pameti a vrati
+     souhrn. Zapis obstara volajici (acceptIncoming v app.js) pres
+     storage.js, takze na uloziste vede jedina cesta. */
   return zmeny;
 }
 

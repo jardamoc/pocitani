@@ -71,10 +71,12 @@ běžel. Vypadalo to jako chyba nasazení, a nebyla.
 | `public/js/generator.js` | generování příkladů, vysvětlení po chybě, rozbor chyby |
 | `public/js/riddle.js` | generátor obrázkových hádanek (samostatný, generator.js si ho importuje) |
 | `public/js/grid.js` | generátor mřížek (stejně samostatný jako `riddle.js`) |
-| `public/js/stats.js` | ukládání do localStorage, rozbor kola, rady |
+| `public/js/stats.js` | rozbor kola, rady, `sanitizeState()` — **na úložiště nesahá** |
+| `public/js/storage.js` | **jediná vrstva nad úložištěm** — načtení, fronta zápisů, mazání, vyměnitelný backend |
+| `public/js/validate.js` | `wholeNumber` / `textList` — sdílené kousky validace, bez DOM |
 | `public/js/random.js` | `rnd` / `pick` / `chance` / `shuffle` / `range` |
 | `public/js/rewards-data.js` | souřadnice sprite sheetu a česká jména 40 dumplingů — čistá data |
-| `public/js/rewards.js` | pravidla odměn, vyhodnocení kola, výběr postavičky, ukládání — **bez DOM** |
+| `public/js/rewards.js` | pravidla odměn, vyhodnocení kola, výběr postavičky — **bez DOM a bez úložiště** |
 | `public/js/rewards-ui.js` | vykreslení odměn: sprite, sbírka, závěrečné okno, animace |
 | `public/js/qr.js` | generátor QR kódu podle normy — bez knihovny |
 | `public/js/transfer.js` | přenos postupu mezi zařízeními: zabalení, adresa, slučování |
@@ -90,8 +92,45 @@ běžel. Vypadalo to jako chyba nasazení, a nebyla.
 
 Prosté ES moduly, žádný framework, žádné závislosti. Závislosti jdou jedním směrem:
 `random.js → riddle.js / grid.js → generator.js → app.js`,
-`rewards-data.js → rewards.js → rewards-ui.js → app.js` a
+`rewards-data.js → rewards.js → rewards-ui.js → app.js`,
+`validate.js → stats.js / rewards.js → storage.js → app.js` a
 `qr.js / transfer.js → export-ui.js → app.js`. Kruh nezaváděj.
+
+## Ukládání dat
+
+**Na `localStorage` smí sahat jedině `storage.js`.** Nikde jinde v aplikaci se
+`localStorage` už neobjevuje a nevracej ho tam — ani „jen na jedno místo".
+
+Rozhraní je **asynchronní schválně**, přestože uvnitř běží synchronní `localStorage`.
+Server ani databáze synchronní být nemůže, a dokud si data tahal `app.js` přímo, znamenal
+by jejich příchod přepsat celý soubor. Takhle se vymění jediný backend
+(`setBackend()`) a zbytek aplikace se nezmění.
+
+Co z toho plyne pro psaní kódu:
+
+- **`stats.js` ani `rewards.js` neukládají.** Dřív si `recordRound()`, `applyRound()`
+  i `markCollectionSeen()` volaly `save()` samy; zápis teď patří volajícímu v `app.js`.
+  Když přidáš funkci, která mění stav, ulož ho **v `app.js`**, ne uvnitř modulu.
+- **Zápisy se sbírají do fronty** (300 ms) a vždy se uloží poslední stav — deset kliknutí
+  po sobě skončí jedním zápisem. U serveru je to rozdíl mezi jedním požadavkem a deseti.
+  **Na `saveState` / `saveRewards` se nečeká** (`await` ne), aby se UI kvůli ukládání
+  nezaseklo. `flush()` je navázaný na `visibilitychange`, takže zavření karty nic neztratí.
+- **`clear()` zahodí i čekající zápis.** Bez toho by se pár set milisekund po smazání
+  vrátilo zpátky to, co se právě smazalo.
+- **Start aplikace je `boot()`** na konci `app.js`. Načtení je asynchronní, takže všechno,
+  co potřebuje data (`applyTheme`, `renderConfigScreen`, `acceptIncoming`), se volá až
+  odtamtud. Posluchače se dál váží na úrovni modulu — spustí se stejně až po kliknutí.
+- **Data se při načtení validují.** `rewards.js` má `sanitize()`, `stats.js` má
+  `sanitizeState()`; obojí validuje každé pole zvlášť, takže jedna poškozená položka
+  nevezme ostatní platná data. Sdílené kousky jsou ve `validate.js` — **nekopíruj je**.
+  Obě funkce jsou bez DOM i bez úložiště schválně: až data začnou chodit po síti, bude
+  tentýž soubor potřeba i na serveru.
+- `sanitizeState()` **neověřuje `config`** — jeho pravidla zná `normalizeConfig()` v
+  `app.js` a import odsud by udělal kruh. `boot()` si ho proto prožene sám. Téma se
+  z téhož důvodu kontroluje jen jako tvar slova; neznámý klíč nic nerozbije, protože
+  `currentTheme()` spadne na výchozí pandu.
+- **`mergePayload()` v `transfer.js` neukládá.** Slučování je čistá operace v paměti,
+  která vrátí souhrn změn; zapisuje až `acceptIncoming()` v `app.js`.
 
 ## Tři režimy hry
 
@@ -376,8 +415,9 @@ a invertovaný kód spousta telefonů nepřečte.
 
 ## Testy
 
-Externí testovací framework tu není a nepřibude. Logika odměn má testy ve vestavěném
-běhu Node (žádná závislost):
+Externí testovací framework tu není a nepřibude. Testy má logika odměn, sprite sheet a
+ukládací vrstva (`storage.test.mjs`: fronta zápisů, sanitizace, tři rozsahy mazání,
+výměna backendu) — všechno ve vestavěném běhu Node, bez jediné závislosti:
 
 ```powershell
 npm test          # node --test "tests/*.test.mjs"

@@ -1,4 +1,5 @@
 import { ALL_IDS, CATEGORIES, CATEGORY_ORDER, ITEM_BY_ID, UNKNOWN_NAME } from './rewards-data.js';
+import { wholeNumber, textList } from './validate.js';
 
 /* Logika odmen. Cisty modul bez DOM - vsechno se da spustit i v Node, takze
  * vyhodnoceni je testovatelne. Nahodny je jedine vyber konkretni postavicky
@@ -115,15 +116,8 @@ export function emptyData() {
 
 const DATE_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 
-const wholeNumber = (value, fallback = 0) => {
-  const n = Number(value);
-  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : fallback;
-};
-
-const textList = (value, isValid, limit) =>
-  Array.isArray(value)
-    ? [...new Set(value.filter((x) => typeof x === 'string' && isValid(x)))].slice(0, limit)
-    : [];
+/* `wholeNumber` a `textList` sdili tenhle modul se stats.js - jsou ve
+   validate.js, aby nikde nevznikly dve rozchazejici se kopie. */
 
 /* Kazde pole se validuje zvlast, aby jedna poskozena polozka nevzala ostatni
    platna data. Neznama nebo nesmyslna hodnota spadne na vychozi. */
@@ -155,24 +149,9 @@ export function sanitize(raw) {
   return data;
 }
 
-export function load() {
-  try {
-    return sanitize(JSON.parse(localStorage.getItem(STORAGE_KEY)));
-  } catch {
-    /* prazdne, poskozene nebo zakazane uloziste - sbirka zacne od nuly,
-       ale aplikace se musi spustit */
-    return emptyData();
-  }
-}
-
-export function save(data) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  } catch {
-    /* privatni rezim nebo plne uloziste - hra funguje dal i bez ulozeni */
-  }
-  return data;
-}
+/* Cteni ani zapis tady uz nejsou - oboji obstarava storage.js, ktery si
+   `sanitize()` a `emptyData()` odsud zavola. Modul tim zustava cisty:
+   zadny DOM, zadne uloziste, cela logika spustitelna v Node. */
 
 /* ---------------- odvozena obtiznost ---------------- */
 
@@ -395,7 +374,8 @@ export function applyRound(data, summary, rng = Math.random) {
       .slice(0, 50);
     data.lastUpdatedMs = Math.max(data.lastUpdatedMs, nowMs);
     data.lastUpdated = new Date(data.lastUpdatedMs).toISOString();
-    save(data);
+    /* Ulozeni resi volajici pres storage.js - i kdyz kolo zadnou odmenu
+       neprinese, zapsat se musi (pribyl dokonceny set i denni objem). */
   };
 
   /* Bezchybna sada je podminkou vseho. Kolo s chybou dumplinga neprinese -
@@ -538,7 +518,7 @@ export const newCount = (data) => data.newRewardIds.length;
 
 export function markCollectionSeen(data) {
   data.newRewardIds = [];
-  return save(data);
+  return data; // zapis obstara volajici pres storage.js
 }
 
 export function collectionSummary(data, todayKey = localDateKey()) {

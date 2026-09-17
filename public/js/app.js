@@ -3,6 +3,7 @@ import { RIDDLE_LEVELS, RIDDLE_LEVEL_KEYS } from './riddle.js';
 import { GRID_LEVELS, GRID_LEVEL_KEYS, gridOpsNote, gridRangeNote } from './grid.js';
 import * as store from './stats.js';
 import * as rewards from './rewards.js';
+import * as storage from './storage.js';
 import { bindCollectionTaps, dismissGranted, dismissPopup, renderCollection, showGranted, updateBadge } from './rewards-ui.js';
 import { dismissExport, openExport } from './export-ui.js';
 import { mergePayload, readIncoming } from './transfer.js';
@@ -123,9 +124,15 @@ const SCENERY = {
   },
 };
 
-let state = store.load();
-let config = normalizeConfig(state.config)
-  || { mode: 'calc', level: 'easy', ops: ['add', 'sub'], kinds: ['word', 'bond'], count: 10, max: 20 };
+/* Vychozi nastaveni na jednom miste - pouziva ho start aplikace i mazani. */
+const VYCHOZI_CONFIG = () => ({
+  mode: 'calc', level: 'easy', ops: ['add', 'sub'], kinds: ['word', 'bond'], count: 10, max: 20,
+});
+
+/* Stav se jen deklaruje. Naplni ho `boot()` na konci souboru, protoze
+   nacteni je asynchronni - dnes z localStorage, pozdeji ze serveru. */
+let state = store.emptyState();
+let config = VYCHOZI_CONFIG();
 
 let round = [];
 let index = 0;
@@ -141,7 +148,7 @@ let activeField = null; // políčko, do kterého píše klávesnice (odpověď 
 /* Sbirka odmen a identifikator rozehraneho kola. `gameId` vznika pri startu
    kola a zajistuje, ze se tataz dokoncena sada nezapocita dvakrat - ani po
    obnoveni stranky, ani pri navratu na vysledek. */
-let rewardData = rewards.load();
+let rewardData = rewards.emptyData();
 let gameId = null;
 
 /* Barevne zastavky hodin. Mezi nimi se interpoluje, takze barva prejizdi
@@ -441,7 +448,7 @@ function renderLastHint() {
 for (const id of ['darkBtn', 'darkBtnQuiz']) {
   el(id).addEventListener('click', () => {
     state.dark = !state.dark;
-    store.save(state);
+    storage.saveState(state);
     applyTheme();
   });
 }
@@ -464,7 +471,7 @@ el('themeChips').addEventListener('click', (e) => {
   const chip = e.target.closest('.chip');
   if (!chip) return;
   state.theme = chip.dataset.value;
-  store.save(state);
+  storage.saveState(state);
   applyTheme();
   renderConfigScreen();
 });
@@ -531,7 +538,7 @@ bindCustomField('maxCustom', 'maxChips', 'max', 5, 1000);
 
 el('soundBtn').addEventListener('click', () => {
   state.sound = !state.sound;
-  store.save(state);
+  storage.saveState(state);
   renderConfigScreen();
   if (state.sound) beep('correct');
 });
@@ -546,6 +553,7 @@ el('startBtn').addEventListener('click', startRound);
    ulozeneho se otevrenim sbirky neztrati. */
 el('rewardsBtn').addEventListener('click', () => {
   rewards.markCollectionSeen(rewardData);
+  storage.saveRewards(rewardData);
   renderCollection(rewardData);
   updateBadge(rewardData);
   show('rewards');
@@ -568,26 +576,24 @@ el('exportBtn').addEventListener('click', () => {
 
 /* Tri rozsahy mazani. Vsechny jsou nevratne, proto se kazdy jeste potvrzuje
    v dialogu (export-ui.js) - sem uz prijde jen rozhodnuti. */
-function wipe(scope) {
+async function wipe(scope) {
+  /* `clear()` zahodi i cekajici zapis, takze se o par set milisekund
+     pozdeji nevrati zpatky to, co se prave smazalo. */
+  await storage.clear(scope);
+
+  if (scope === 'progress') {
+    // nastaveni a tema zustavaji, maze se jen to, co se nacitalo
+    state.skills = {};
+    state.missed = [];
+    state.rounds = [];
+    storage.saveState(state);
+  }
+
+  const data = await storage.load();
+  rewardData = data.rewards;
   if (scope === 'all') {
-    try {
-      localStorage.removeItem(store.KEY);
-      localStorage.removeItem(rewards.STORAGE_KEY);
-    } catch { /* zakazane uloziste - stav aspon vycistime v pameti */ }
-    state = store.load();
-    rewardData = rewards.load();
-    config = { mode: 'calc', level: 'easy', ops: ['add', 'sub'], kinds: ['word', 'bond'], count: 10, max: 20 };
-  } else {
-    if (scope === 'progress') {
-      state.skills = {};
-      state.missed = [];
-      state.rounds = [];
-      store.save(state);
-    }
-    try {
-      localStorage.removeItem(rewards.STORAGE_KEY);
-    } catch { /* viz vyse */ }
-    rewardData = rewards.load();
+    state = data.state;
+    config = VYCHOZI_CONFIG();
   }
   applyTheme();
   renderScenery();
@@ -602,6 +608,11 @@ async function acceptIncoming() {
   if (!payload) return;
   const zmeny = mergePayload(state, rewardData, payload);
   if (!zmeny) return;
+
+  /* `mergePayload` uz sama neuklada - zapis patri sem, aby na uloziste
+     vedla jedina cesta. */
+  storage.saveState(state);
+  storage.saveRewards(rewardData);
 
   config = normalizeConfig(state.config) || config;
   applyTheme();
@@ -622,8 +633,6 @@ async function acceptIncoming() {
     ? `📥 Přenos z druhého zařízení: přibylo ${casti.join(', ')}.`
     : '📥 Přenos z druhého zařízení: všechno už jsi tady měla.';
 }
-
-acceptIncoming();
 
 /* ---------------- kvíz ---------------- */
 function startRound() {
@@ -1211,6 +1220,7 @@ function finish() {
   stopClock();
   const report = store.analyze(state, config, attempts);
   store.recordRound(state, config, attempts);
+  storage.saveState(state); // recordRound uz sam neuklada
   renderResult(report);
   show('result');
   if (report.pct >= 70) confetti(46);
@@ -1245,6 +1255,10 @@ function grantRewards(report) {
     nowMs: Date.now(),
   });
   gameId = null; // totez kolo uz se znovu vyhodnotit nemuze
+  /* Zapis hned tady, jeste pred animaci - `applyRound` uz sam neuklada.
+     Ulozit se musi i kdyz kolo zadnou odmenu neprineslo: pribyl dokonceny
+     set, denni objem i zaznam o zpracovanem gameId. */
+  storage.saveRewards(rewardData);
   updateBadge(rewardData);
   if (!granted?.length) return;
   showGranted(granted, () => {
@@ -1384,5 +1398,18 @@ el('backToConfigBtn').addEventListener('click', () => {
   renderConfigScreen();
 });
 
-applyTheme();
-renderConfigScreen();
+/* Start aplikace. Nacteni uloziste je asynchronni, takze se vsechno, co
+   potrebuje data, deje az tady - posluchace vyse se navazaly hned, ale
+   spusti se nejdriv po kliknuti, tedy davno po `boot()`. */
+async function boot() {
+  const data = await storage.load();
+  state = data.state;
+  rewardData = data.rewards;
+  config = normalizeConfig(state.config) || VYCHOZI_CONFIG();
+
+  applyTheme();
+  renderConfigScreen();
+  await acceptIncoming(); // prenos z QR kodu az nad nactenym stavem
+}
+
+boot();
