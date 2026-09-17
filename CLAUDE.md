@@ -97,6 +97,13 @@ běžel. Vypadalo to jako chyba nasazení, a nebyla.
 | `public/_headers` | bezpečnostní hlavičky pro živý web; wrangler ho sám neservíruje |
 | `tests/*.test.mjs` | testy pro `node --test`, bez frameworku i bez závislostí |
 | `README.md` | popis projektu pro GitHub; podrobná pravidla zůstávají tady |
+
+**Obrázky v repozitáři jsou vypnuté.** `.gitignore` vyřazuje `*.jpeg`, `*.jpg` i `*.png` —
+jsou to lokální podklady (fotky zadání), ne obsah aplikace. Jediná výjimka je
+`!public/img/*.png` kvůli sprite sheetu s dumplingy; bez ní by nasazení přišlo o všech
+40 postaviček. **Do README proto nedávej snímky obrazovky**, odkaz by na GitHubu ukazoval
+na neexistující soubor. Když je tam někdy mít chceš, přidej napřed vlastní výjimku
+(např. `!docs/*.png`) a obrázky ukládej tam.
 | `package.json` | jen ty tři zkratky a `"type": "module"`; žádné závislosti |
 
 Prosté ES moduly, žádný framework, žádné závislosti. Závislosti jdou jedním směrem:
