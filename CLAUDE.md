@@ -1,4 +1,4 @@
-# Počítání pro Alžbětu
+﻿# Počítání pro Alžbětu
 
 Hravý trenažér matematiky pro **konkrétní dítě** — dceru majitele repozitáře, školačku
 **1. až 3. třídy**. Není to obecný produkt; když se rozhoduješ mezi „správně obecně" a
@@ -80,6 +80,7 @@ běžel. Vypadalo to jako chyba nasazení, a nebyla.
 | `public/js/grid.js` | generátor mřížek (stejně samostatný jako `riddle.js`) |
 | `public/js/over10.js` | generátor rozkladů přes desítku (stejně samostatný jako `grid.js`) |
 | `public/js/pexeso.js` | generátor ploch pro „Najdi dvojice" (stejně samostatný jako `grid.js`) |
+| `public/js/bigmul.js` | generátor velkého násobení — rozklad a tři kroky s dvojí volbou |
 | `public/js/stats.js` | rozbor kola, rady, `sanitizeState()` — **na úložiště nesahá** |
 | `public/js/storage.js` | **jediná vrstva nad úložištěm** — načtení, fronta zápisů, mazání, vyměnitelný backend |
 | `public/js/validate.js` | `wholeNumber` / `textList` — sdílené kousky validace, bez DOM |
@@ -109,7 +110,7 @@ na neexistující soubor. Když je tam někdy mít chceš, přidej napřed vlast
 | `package.json` | jen ty tři zkratky a `"type": "module"`; žádné závislosti |
 
 Prosté ES moduly, žádný framework, žádné závislosti. Závislosti jdou jedním směrem:
-`random.js → riddle.js / grid.js / over10.js / pexeso.js → generator.js → app.js`,
+`random.js → riddle.js / grid.js / over10.js / pexeso.js / bigmul.js → generator.js → app.js`,
 `rewards-data.js → rewards.js → rewards-ui.js → app.js`,
 `validate.js → stats.js / rewards.js → storage.js → app.js` a
 `qr.js / transfer.js → export-ui.js → app.js`. Kruh nezaváděj.
@@ -153,7 +154,7 @@ Co z toho plyne pro psaní kódu:
 - **`mergePayload()` v `transfer.js` neukládá.** Slučování je čistá operace v paměti,
   která vrátí souhrn změn; zapisuje až `acceptIncoming()` v `app.js`.
 
-## Pět režimů hry
+## Šest režimů hry
 
 Na úvodní obrazovce se vybírá karta **„Co si zahrajeme?"**:
 
@@ -164,12 +165,13 @@ Na úvodní obrazovce se vybírá karta **„Co si zahrajeme?"**:
 | **Obrázkové hádanky** | `riddle` | operace, „něco navíc" |
 | **Mřížka** | `grid` | „něco navíc", **počet příkladů** (jedna mřížka = jedno kolo) |
 | **Najdi dvojice** | `pexeso` | „něco navíc", **počet příkladů** (jedna plocha = jedno kolo) |
+| **Velké násobení** | `bigmul` | operace (je to vždy násobení), „něco navíc" |
 
 Větve se rozcházejí až v `startRound()`, kde je tabulka builderů. Všechno ostatní —
 klávesnice, vyhodnocení, statistiky — je společné, protože každá úloha má stejný tvar:
 `{ op, kind, missing, a, b, c, answer, skill }`.
 
-`config.level` je **společný pro všechny čtyři režimy s obtížností** (klíče
+`config.level` je **společný pro všech pět režimů s obtížností** (klíče
 `easy`/`medium`/`hard`), takže přepnutí režimu obtížnost neztratí. Hlídá se proti společné
 množině `LEVEL_ALL` v `normalizeConfig()`, ne proti tabulce jednoho režimu. Tabulku
 popisků vybírá `levelTable()` podle režimu.
@@ -188,10 +190,8 @@ větev v `hintFor()` / `explain()` / `exToText()` a popisek v `KIND_LABEL` ve `s
 Všechny tři etapy plánu `~/.claude/plans/dynamic-swimming-sparkle.md` (Větší/menší,
 Počítej přes 10, Pexeso) jsou hotové a nasazené. Třetí etapa se během práce
 na uživatelovo přání změnila z pexesa na spojovačku „Najdi dvojice" (viz níž).
-
-**Chystá se:** režim „Velké násobení" (`bigmul`) — rozklad `85 · 5` na kroky, v každém
-se vybírá ze dvou možností. Plán je v `~/.claude/plans/lexical-rolling-floyd.md`,
-odsouhlasený, zatím nezačatý.
+Šestý režim „Velké násobení" podle plánu `~/.claude/plans/lexical-rolling-floyd.md`
+je hotový, ověřený a nasazený (viz níž).
 
 ## Obrázkové hádanky — jak se staví
 
@@ -407,6 +407,79 @@ Pár věcí, které se snadno rozbijí:
   do kartičky nevejde ani při nejmenším písmu. Ve vysvětlení po chybě mezery má.
 - `<button>` **nedědí barvu textu**, takže si ji kartička nastavuje sama.
 
+## Velké násobení
+
+```
+Vypočítej 85 × 5
+  80 × 5 + 5 × 5        ← vybráno, zelený řádek
+Rozdělíme si to.
+  400 + 25
+Roznásobíme.
+  425
+Sečteme.
+```
+
+Zápis roste shora dolů a v každém ze **tří kroků** dítě vybírá ze **dvou možností**.
+Netrénuje se výsledek, ale rozklad na desítky a jednotky — tedy proč se velké
+násobení dá spočítat zpaměti. Dítě nic nepíše, jen rozhoduje.
+
+**Rozkládá se víceciferný činitel; když jsou víceciferní oba, rozkládá se druhý.**
+Jedno pravidlo, dá se dítěti vysvětlit jednou větou:
+
+| úroveň | tvar | příklad | rozklad | `minMax` |
+|---|---|---|---|---|
+| lehká | 2cif × 1cif | `85 × 5` | `80 × 5 + 5 × 5` | 100 |
+| střední | 3cif × 1cif | `238 × 4` | `200 × 4 + 30 × 4 + 8 × 4` | 500 |
+| těžká | 2cif × 2cif | `24 × 13` | `24 × 10 + 24 × 3` | 200 |
+
+**Obtížnost = velikost činitelů, rozsah = tvrdý strop na výsledek.** Dvě nezávislé osy
+jako všude jinde. Pod `minMax` by nevyšel jediný příklad, takže se počítá do minima
+a `bigmulRangeNote()` to **napíše nahlas** — stejná pojistka jako `over10RangeNote()`.
+Hláška patří pod **„Do kolika počítáme?"**, ne k operacím: karta s operacemi je
+v tomhle režimu schovaná.
+
+**Špatná možnost není náhodná — je to typická chyba.** Jinak by se dala poznat od oka,
+aniž by dítě cokoli počítalo:
+
+| krok | popisek | správně (`85 × 5`) | špatně | typická chyba |
+|---|---|---|---|---|
+| 1 | `Rozdělíme si to.` | `80 × 5 + 5 × 5` | `80 × 5 + 5 × 1` | v posledním členu se ztratí činitel |
+| 2 | `Roznásobíme.` | `400 + 25` | `40 + 25` | v prvním součinu se ztratí nula |
+| 3 | `Sečteme.` | `425` | `452` | prohozené číslice v druhém sčítanci |
+
+Pár věcí, které se snadno rozbijí:
+
+- **Pořadí obou tlačítek se losuje** a je uložené v `step.options`, ne dolosované při
+  vykreslení. Zápis se po každém kroku překresluje celý, takže by se možnosti při
+  každém překreslení přeházely.
+- **Jednotky druhého činitele u těžké úrovně musí být aspoň 2.** Špatná možnost v prvním
+  kroku nahrazuje jednotky jedničkou — při `b = 21` by vyšla stejně jako správná.
+  Z téhož důvodu mají u střední úrovně **všechny tři číslice být 1 až 9**: nula by
+  dala nesmyslný člen `0 × 4`.
+- **Žádné číslo nesmí přerůst rozsah, ani to špatné.** Špatný součet se proto hledá
+  ze seznamu záložních hodnot (prohozené číslice → `+10` → `−10` → `−1`) a bere se
+  první, která je kladná, liší se od správné a do stropu se vejde.
+- `op: 'mul'` je tu **poctivé násobení**, ne zástupná hodnota jako u mřížky — nemusí se
+  tedy nikde z aritmetiky vylučovat. `tenFrameHTML()` u něj vrací prázdno samo od sebe
+  (`relation` vyjde `null`), nový řádek tam nepatří.
+- **Ovladač je v `app.js` (`bigTap`) a společnou cestou `submit()` neprochází.** Po
+  posledním kroku si sám zapíše záznam do `attempts` v témž tvaru jako ostatní úlohy;
+  `given` je text první špatně zvolené možnosti, `tag` je tag toho kroku.
+- **Do `RETRY_KINDS`, `RETRY_NOTE`, `FIELD_SEL`, `PART_SEL` ani `REVEAL_CLASS` tenhle
+  druh nepatří** — ty cesty počítají s políčkem na odpověď. Druhý pokus se řeší uvnitř
+  kroku: špatné tlačítko zčervená a **zůstane nefunkční**, dítě musí klepnout na to druhé.
+- **Klávesnice se v tomhle režimu schová** (`#keypad.hidden`), `renderKeypad()` se nevolá,
+  a posluchač `keydown` musí hned odejít — Enter by šel do `submit()` a spadl na
+  chybějícím `#answerInput`. Klávesy `1` a `2` vyberou možnost.
+- **Stav zápisu (`bigStep`) se nuluje ještě před vykreslením těla úlohy**, jinak by nová
+  úloha začala s krokem od předchozí.
+- Rozklad se **neukládá do „k procvičení"** (`NO_REPEAT` ve `stats.js`) — z descriptoru
+  by se nesložil. Ve `stats.js` patří do `levelMode`: násobení je tu všude, takže
+  „násobení ti jde" by neřeklo nic.
+- **Křížek je tentýž jako všude jinde** (`OPS.mul.symbol`), jen se do `bigmul.js` nedá
+  naimportovat — `generator.js` si tenhle soubor importuje a byl by z toho kruh.
+  Tečka `·` z předlohy se zkoušela a uživatel ji zamítl: dítě má vidět pořád týž znak.
+
 ## Doplň znaménko
 
 `7 __ 3 = 10`. Nabídka tlačítek je přesně ta sada operací, kterou má uživatel zapnutou,
@@ -488,7 +561,7 @@ Pár věcí, které se snadno rozbijí:
   je 15 s na jeden běžný příklad (`REWARD_RULES.fastSeconds`). Každá úloha si do rozpočtu
   přispěje vlastním přídělem podle druhu (`speedKindMultiplier`): běžný příklad 1×, slovní
   úloha 3×, pyramida 2×, doplňování znaménka 2×, rozklad přes desítku 2×, hádanka 3×,
-  mřížka 4×, plocha s dvojicemi 6×. Rozpočet ještě
+  mřížka 4×, plocha s dvojicemi 6×, velké násobení 3×. Rozpočet ještě
   násobí obtížnost (`speedLevelMultiplier`: lehká 1, střední 1,3, těžká 1,7). Porovnává se
   součet skutečného času celé sady proti součtu těchhle přídělů (`speedBudget()`).
   Dřív se počítal jeden průměr na celou sadu a roztahoval se jen podle režimu (hádanka ×3,
@@ -672,6 +745,13 @@ zdědí `--on-bg` z `body`. U většiny témat to projde náhodou, ale téma **H
 kulisu a `--on-bg: #fdf4ff` — ve světlém režimu z toho byl bílý text na bílém dialogu.
 Takhle byly neviditelné všechny tři dialogy (odměny, popup, Nastavení), než dostaly
 `color: var(--ink)` na `.reward-dialog`.
+
+**Tmavá barva na tintu v tmavém režimu nesvítí.** `--good-tint` a `--bad-tint` se
+v tmavém režimu přepnou na tmavé (`#0f3d31`, `#45162a`), ale `--good-dark` a `--bad-dark`
+zůstávají stejné — tmavě zelená na tmavě zelené má kontrast **2,2**. Barvu proto nech
+nést **podklad a rámeček** a text dej `var(--ink)`; ten se přepíná spolu s tintem a vyjde
+v obou režimech přes 10. Takhle byl nečitelný zápis velkého násobení, než dostal
+`color: var(--ink)` a zelený proužek vlevo.
 
 Po zásahu do barev projeď **všech šest témat × oba režimy** a změř kontrast, ne jen mrkni
 na jedno téma. Po opravě vycházelo: dialog 13,3–13,5, jméno ve slotu 5,3–6,8, podnadpis

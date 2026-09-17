@@ -8,7 +8,7 @@ v zenskem rode a nikde se neobjevi zaporne ani desetinne cislo.
 
 ## Co to umi
 
-**Pet rezimu hry**
+**Sest rezimu hry**
 
 | rezim | co se v nem deje |
 |---|---|
@@ -17,9 +17,10 @@ v zenskem rode a nikde se neobjevi zaporne ani desetinne cislo.
 | **Obrazkove hadanky** | soustava rovnic z obrazku, kde kazdy radek prozradi prave jeden novy obrazek |
 | **Mrizka** | kolecka s cisly, kde rovnice plati vodorovne i svisle |
 | **Najdi dvojice** | karticky s priklady a vysledky, dite je spojuje; co je na nich, ridi zapnute operace (jen × = nasobilka) |
+| **Velke nasobeni** | rozklad `85 × 5` na desitky a jednotky ve trech krocich, v kazdem se vybira ze dvou moznosti |
 
 Rozsah cisel (do 10 az do 100), pocet prikladu i druhy uloh se vybiraji na uvodni
-obrazovce; obtiznost je u ctyr rezimu samostatna osa, nezavisla na rozsahu.
+obrazovce; obtiznost je u peti rezimu samostatna osa, nezavisla na rozsahu.
 
 **Sbirka dumplingu.** Za bezchybne kolo padne jedna sberatelska postavicka z 40
 v peti kategoriich. Vzacnost se ridi tim, jak rychle a jak tezke kolo bylo;
@@ -62,6 +63,7 @@ public/
     grid.js         mrizky
     over10.js       rozklady pres desitku
     pexeso.js       plochy pro "Najdi dvojice"
+    bigmul.js       velke nasobeni - rozklad na desitky a jednotky
     stats.js        rozbor kola a rady
     storage.js      jedina vrstva nad ulozistem
     rewards*.js     pravidla odmen, data sprite sheetu, vykresleni

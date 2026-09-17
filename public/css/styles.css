@@ -403,6 +403,7 @@ h1, h2, h3, .num, .box-value, .key, .score-big { font-family: 'Baloo 2', 'Nunito
 .chips-mode .chip.is-on[data-value="grid"] { background: linear-gradient(135deg, #34d399, #0891b2); }
 .chips-mode .chip.is-on[data-value="over10"] { background: linear-gradient(135deg, #facc15, #ea580c); }
 .chips-mode .chip.is-on[data-value="pexeso"] { background: linear-gradient(135deg, #f472b6, #7c3aed); }
+.chips-mode .chip.is-on[data-value="bigmul"] { background: linear-gradient(135deg, #60a5fa, #1d4ed8); }
 
 /* obtížnost hádanek - barvy sedí na kolečka 🟢 🟡 🔴 na chipech */
 .chips .chip.is-on[data-value="easy"] { background: linear-gradient(135deg, #4ade80, #15803d); }
@@ -421,12 +422,13 @@ h1, h2, h3, .num, .box-value, .key, .score-big { font-family: 'Baloo 2', 'Nunito
    border-radius ve všech prohlížečích a u pilulkových tlačítek pak trčí do hran. */
 :root { --ring-off: 0 0 0 0 rgba(0, 0, 0, 0); --ring-on: 0 0 0 4px rgba(124, 92, 255, .55); }
 .btn, .chip, .key, .icon-btn, .custom-max input, .dark-toggle, .rewards-toggle, .rew-slot,
-.rewards-back, .popup-close, .export-pass { --ring: var(--ring-off); }
+.rewards-back, .popup-close, .export-pass, .bm-opt { --ring: var(--ring-off); }
 .btn:focus-visible, .chip:focus-visible, .key:focus-visible, .icon-btn:focus-visible,
 .custom-max input:focus-visible, .dark-toggle:focus-visible,
 .rewards-toggle:focus-visible, .rew-slot:focus-visible,
 .rewards-back:focus-visible, .popup-close:focus-visible,
-.export-pass:focus-visible, .export-pass:focus { --ring: var(--ring-on); outline: none; }
+.export-pass:focus-visible, .export-pass:focus,
+.bm-opt:focus-visible { --ring: var(--ring-on); outline: none; }
 
 .field-error { margin: 12px 0 0; color: var(--bad-dark); font-weight: 800; }
 .field-note { margin: 12px 0 0; color: var(--ink-soft); font-weight: 700; font-size: .95rem; }
@@ -902,6 +904,60 @@ body.is-dark { --pair-task: #93c5fd; --pair-result: #fdba74; }
 .pex-card.is-miss { border-color: var(--bad); color: var(--bad-dark); }
 
 .pex-status { margin: 14px 0 0; text-align: center; font-weight: 700; color: var(--ink-soft); }
+
+/* ---------- velké násobení ----------
+   Zápis roste shora dolů: hotový krok je hodnota na zeleném podkladu
+   a pod ní popisek na šedém - jako v sešitě. Volba jsou dvě tlačítka
+   POD SEBOU přes celou šířku; vedle sebe se `80 · 5 + 5 · 5` na 320 px
+   nevejde ani při nejmenším písmu.
+
+   `<button>` NEDĚDÍ barvu textu, takže si ji tlačítko nastavuje samo,
+   jinak by byl v tmavém režimu černý text na tmavém podkladu. A cokoli
+   s `background: var(--card)` musí mít i `color: var(--ink)` - `--on-bg`
+   z body je barva textu na kulise, ne na kartě. */
+.bigmul { display: grid; gap: 10px; }
+.bm-task { margin: 0; text-align: center; font-size: 1.15rem; font-weight: 800; color: var(--ink); }
+.bm-task b { font-family: 'Baloo 2', sans-serif; font-size: 1.5rem; }
+
+.bm-log { display: grid; gap: 8px; }
+.bm-line { display: grid; gap: 2px; }
+/* Barvu nese podklad, ne text: `--good-dark` na `--good-tint` má v tmavém
+   režimu kontrast jen 2,2 (tmavě zelená na tmavě zelené). `--ink` vyjde
+   v obou režimech nad 10, protože se `--good-tint` přepíná spolu s ním.
+   Zelenou tedy drží pozadí a levý proužek. */
+.bm-value {
+  justify-self: start; padding: 8px 14px; border-radius: 14px;
+  border-left: 5px solid var(--good); border-top-left-radius: 6px; border-bottom-left-radius: 6px;
+  background: var(--good-tint); color: var(--ink);
+  font-family: 'Baloo 2', sans-serif; font-weight: 800;
+  font-size: clamp(1.1rem, 5.2vw, 1.5rem); letter-spacing: -.3px;
+}
+.bm-label {
+  justify-self: start; padding: 3px 10px; border-radius: 10px;
+  background: var(--surface-2); color: var(--ink-soft);
+  font-weight: 700; font-size: .82rem;
+}
+
+.bm-ask { margin: 6px 0 0; font-weight: 800; color: var(--ink); }
+.bm-choices { display: grid; gap: 10px; }
+.bm-opt {
+  display: block; width: 100%; padding: 14px 10px; cursor: pointer;
+  border: 3px solid var(--line); border-radius: 18px;
+  background: var(--card); color: var(--ink);
+  font-family: 'Baloo 2', sans-serif; font-weight: 800;
+  font-size: clamp(1.1rem, 5vw, 1.55rem); letter-spacing: -.3px;
+  box-shadow: var(--ring);
+  transition: transform .12s ease, border-color .12s ease;
+}
+.bm-opt:hover { border-color: var(--violet); }
+.bm-opt:active { transform: scale(.98); }
+/* Špatná volba zůstane červená a nefunkční - dítě musí klepnout na tu druhou.
+   Červenou nese rámeček a podklad; text zůstává `--ink`, protože `--bad-dark`
+   má na `--bad-tint` v tmavém režimu kontrast jen 2,4. */
+.bm-opt.is-miss {
+  background: var(--bad-tint); border-color: var(--bad); color: var(--ink);
+  cursor: default; transform: none;
+}
 
 /* velký odznak místo prstence s procenty na výsledkové obrazovce */
 .grid-verdict {

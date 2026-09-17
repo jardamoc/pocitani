@@ -1,8 +1,9 @@
-import { OPS, COMPARES, EXTRA_KINDS, MISSING_LABEL, kindOps, buildRound, buildRiddleRound, buildGridRound, buildOver10Round, buildPexesoRound, explain, diagnose } from './generator.js';
+import { OPS, COMPARES, EXTRA_KINDS, MISSING_LABEL, kindOps, buildRound, buildRiddleRound, buildGridRound, buildOver10Round, buildPexesoRound, buildBigmulRound, explain, diagnose } from './generator.js';
 import { RIDDLE_LEVELS, RIDDLE_LEVEL_KEYS } from './riddle.js';
 import { GRID_LEVELS, GRID_LEVEL_KEYS, gridOpsNote, gridRangeNote } from './grid.js';
 import { OVER10_LEVELS, OVER10_LEVEL_KEYS, over10RangeNote } from './over10.js';
 import { PEXESO_LEVELS, PEXESO_LEVEL_KEYS, pexesoRangeNote } from './pexeso.js';
+import { BIGMUL_LEVELS, BIGMUL_LEVEL_KEYS, bigmulMax, bigmulRangeNote } from './bigmul.js';
 import * as store from './stats.js';
 import * as rewards from './rewards.js';
 import * as storage from './storage.js';
@@ -34,13 +35,17 @@ const MODES = {
      ne paměťová hra. Klíč se schválně nepřejmenovává: je v uloženém
      nastavení i v historii kol. */
   pexeso: { label: 'Najdi dvojice', icon: '🔗', sub: 'Spoj příklad s jeho výsledkem' },
+  bigmul: { label: 'Velké násobení', icon: '✖️', sub: 'Rozlož si ho na desítky a jednotky' },
 };
 
 /* Tabulky obtížností podle režimu - klíče (easy/medium/hard) jsou schválně
    společné, takže `config.level` přežije přepnutí režimu. */
-const LEVEL_TABLES = { riddle: RIDDLE_LEVELS, grid: GRID_LEVELS, over10: OVER10_LEVELS, pexeso: PEXESO_LEVELS };
+const LEVEL_TABLES = {
+  riddle: RIDDLE_LEVELS, grid: GRID_LEVELS, over10: OVER10_LEVELS, pexeso: PEXESO_LEVELS, bigmul: BIGMUL_LEVELS,
+};
 const LEVEL_KEYS = {
   riddle: RIDDLE_LEVEL_KEYS, grid: GRID_LEVEL_KEYS, over10: OVER10_LEVEL_KEYS, pexeso: PEXESO_LEVEL_KEYS,
+  bigmul: BIGMUL_LEVEL_KEYS,
 };
 
 /* Společná množina klíčů obtížnosti. Tabulky výš ji musí mít všechny stejnou,
@@ -216,6 +221,7 @@ const isRiddleMode = () => config.mode === 'riddle';
 const isGridMode = () => config.mode === 'grid';
 const isOver10Mode = () => config.mode === 'over10';
 const isPexesoMode = () => config.mode === 'pexeso';
+const isBigmulMode = () => config.mode === 'bigmul';
 /* Režimy, které mají obtížnost místo výběru druhů úloh. */
 const usesLevel = () => config.mode !== 'calc';
 const levelTable = () => LEVEL_TABLES[config.mode] || RIDDLE_LEVELS;
@@ -330,8 +336,10 @@ function renderModeCards() {
   const grid = isGridMode();
   const over10 = isOver10Mode();
   const pexeso = isPexesoMode();
-  // rozklad přes desítku je vždycky sčítání, výběr operací by tam nedával smysl
-  el('card-ops').hidden = isRiddleMode() || over10;
+  const bigmul = isBigmulMode();
+  /* Rozklad přes desítku je vždycky sčítání a velké násobení vždycky
+     násobení - výběr operací by ani v jednom nedával smysl. */
+  el('card-ops').hidden = isRiddleMode() || over10 || bigmul;
   el('card-kinds').hidden = usesLevel();
   el('card-level').hidden = !usesLevel();
   // jedna mřížka i jedna plocha pexesa jsou celé kolo - počet příkladů odpadá
@@ -354,6 +362,16 @@ function renderModeCards() {
     maxNote.textContent = over10RangeNote(config.max)
       || 'Rozsah řídí, jak velká čísla se budou rozkládat. Kolik nápovědy dostaneš, si vybíráš výš u obtížnosti.';
     el('levelNote').textContent = `${level.label} – ${level.note}. Čísla do ${config.max}.`;
+    return;
+  }
+
+  if (bigmul) {
+    /* Hláška o malém rozsahu patří k rozsahu, ne k operacím - karta
+       s operacemi je v tomhle režimu schovaná, stejně jako u over10. */
+    maxNote.textContent = bigmulRangeNote(config.level, config.max)
+      || 'Rozsah je strop pro výsledek. Jak velká čísla se budou násobit, si vybíráš výš u obtížnosti.';
+    el('levelNote').textContent = `${level.label} – ${level.note}, třeba ${level.example}. `
+      + `Výsledek do ${bigmulMax(config.level, config.max)}.`;
     return;
   }
 
@@ -501,7 +519,9 @@ function renderLastHint() {
     ? ' Každá hádanka je pokaždé nová.'
     : isOver10Mode()
       ? ' Každý rozklad je pokaždé nový.'
-      : state.missed.length
+      : isBigmulMode()
+        ? ' Každý příklad je pokaždé nový.'
+        : state.missed.length
         ? ` Do dalšího kola zařadím ${Math.min(state.missed.length, 12)} podobných příkladů, které minule nevyšly.`
         : ' Minule ti nic neuteklo. 🎉';
   hint.textContent = `Naposledy ${what}: ${last.correct} z ${last.total} (${pct} %).${focus}`;
@@ -715,6 +735,7 @@ function startRound() {
     grid: () => buildGridRound(config),   // jedna mřížka je celé kolo
     over10: () => buildOver10Round(config),
     pexeso: () => buildPexesoRound(config), // jedna plocha je celé kolo
+    bigmul: () => buildBigmulRound(config),
   };
   round = (build[config.mode] || build.calc)();
   index = 0;
@@ -781,6 +802,9 @@ function renderExercise() {
       : `${index + 1} / ${round.length}`;
   el('dots').querySelectorAll('.dot').forEach((dot, i) => dot.classList.toggle('is-current', i === index));
   el('exerciseHint').textContent = hintFor(ex);
+  /* Zápis velkého násobení roste podle toho, kolik kroků je za námi -
+     stav se proto musí vynulovat dřív, než se tělo úlohy vykreslí. */
+  if (ex.kind === 'bigmul') resetBigmul();
   el('exerciseBody').innerHTML = (BODY_HTML[ex.kind] || equationHTML)(ex);
   /* Mřížka 5×5 a plocha pexesa o čtyřech sloupcích jsou nejširší, co
      aplikace kreslí. Na úzkém telefonu jim uvolníme okraje, ať nemusíme
@@ -791,9 +815,11 @@ function renderExercise() {
   );
   el('feedback').hidden = true;
   el('feedback').innerHTML = '';
-  /* Pexeso se ovládá klepáním na kartičky, žádná klávesnice u něj není. */
-  el('keypad').hidden = ex.kind === 'pexeso';
-  if (ex.kind !== 'pexeso') renderKeypad(ex);
+  /* Pexeso i velké násobení se ovládají klepáním, žádná klávesnice u nich
+     není. */
+  const tapOnly = ex.kind === 'pexeso' || ex.kind === 'bigmul';
+  el('keypad').hidden = tapOnly;
+  if (!tapOnly) renderKeypad(ex);
   el('keypad').dataset.disabled = 'false';
   retriesLeft = RETRY_KINDS.has(ex.kind) ? 1 : 0;
   retried = false;
@@ -821,6 +847,9 @@ function hintFor(ex) {
   if (ex.kind === 'pexeso') {
     return 'Ke každému příkladu najdi jeho výsledek a klepni na obě kartičky. '
       + 'Když k sobě patří, spojí se. Takhle najdi všechny dvojice.';
+  }
+  if (ex.kind === 'bigmul') {
+    return 'Rozlož si násobení na desítky a jednotky. V každém kroku klepni na tu možnost, která je správně.';
   }
   if (ex.kind === 'riddle') return 'Zjisti z rovnic, kolik je který obrázek, a dopočítej poslední řádek.';
   if (ex.kind === 'sign') return 'Doplň chybějící znaménko, aby příklad vyšel.';
@@ -1050,10 +1079,106 @@ function pexesoHTML(ex) {
     <p id="pexStatus" class="pex-status" aria-live="polite"></p>`;
 }
 
+/* Velké násobení: nahoře zadání, pod ním rostoucí zápis hotových kroků
+   a dole dvě možnosti na celou šířku POD SEBOU - vedle sebe se text
+   `80 · 5 + 5 · 5` na 320 px nevejde. */
+function bigmulHTML(ex) {
+  const done = ex.steps
+    .slice(0, bigStep)
+    .map((s) => `<div class="bm-line">
+        <span class="bm-value">${s.correct}</span>
+        <span class="bm-label">${s.label}</span>
+      </div>`)
+    .join('');
+
+  const step = ex.steps[bigStep];
+  const choices = step
+    ? `<p class="bm-ask">${step.label}</p>
+       <div class="bm-choices">${step.options
+         .map((text) => `<button type="button" class="bm-opt" data-text="${text}">${text}</button>`)
+         .join('')}</div>`
+    : '';
+
+  return `<div class="bigmul">
+      <p class="bm-task">Vypočítej <b>${ex.task}</b></p>
+      <div class="bm-log">${done}</div>
+      ${choices}
+    </div>`;
+}
+
 const BODY_HTML = {
   bond: bondHTML, word: wordHTML, riddle: riddleHTML, sign: signHTML, grid: gridHTML,
-  compare: compareHTML, over10: over10HTML, pexeso: pexesoHTML,
+  compare: compareHTML, over10: over10HTML, pexeso: pexesoHTML, bigmul: bigmulHTML,
 };
+
+/* ---------------- ovladač velkého násobení ----------------
+   Úloha se neodpovídá políčkem, takže společnou cestou `submit()` neprochází.
+   Po posledním kroku si ovladač sám zapíše záznam do `attempts` - přesně
+   v tom tvaru, jaký čekají `finish()`, `recordRound()` i `applyRound()`.
+
+   Druhý pokus se řeší uvnitř kroku: špatná možnost zčervená a přestane
+   fungovat, dítě musí klepnout na tu druhou. Do `RETRY_KINDS` tenhle druh
+   nepatří - ta cesta počítá s políčkem na odpověď. */
+let bigStep = 0;      // kolik kroků je hotových
+let bigMiss = 0;      // kolikrát se kleplo vedle
+let bigWrong = null;  // text první špatné volby (do výpisu k procvičení)
+let bigTag = null;    // tag kroku, ve kterém přišla první chyba
+
+function resetBigmul() {
+  bigStep = 0;
+  bigMiss = 0;
+  bigWrong = null;
+  bigTag = null;
+}
+
+function bigTap(btn) {
+  const ex = round[index];
+  if (locked || ex?.kind !== 'bigmul' || btn.disabled) return;
+  const step = ex.steps[bigStep];
+  if (!step) return;
+
+  /* Špatná možnost zůstane červená a nefunkční - dítě se musí rozhodnout
+     pro tu druhou, aby zápis pokračoval správně. */
+  if (btn.dataset.text !== step.correct) {
+    btn.classList.add('is-miss');
+    btn.disabled = true;
+    if (!bigMiss) {
+      bigWrong = btn.dataset.text;
+      bigTag = step.tag;
+    }
+    bigMiss += 1;
+    beep('wrong');
+    return;
+  }
+
+  bigStep += 1;
+  el('exerciseBody').innerHTML = bigmulHTML(ex);
+  // po posledním kroku pípne až vyhodnocení, ať to nezazní dvakrát
+  if (bigStep >= ex.steps.length) finishBigmul(ex);
+  else beep('correct');
+}
+
+function finishBigmul(ex) {
+  locked = true;
+  stopClock();
+  const correct = bigMiss === 0;
+
+  attempts.push({
+    ex,
+    given: bigWrong ?? '',
+    correct,
+    retried: false,
+    ms: Date.now() - shownAt,
+    tag: correct ? null : bigTag,
+  });
+
+  el('dots').querySelectorAll('.dot')[index]?.classList.add(correct ? 'is-correct' : 'is-wrong');
+  el('quizScore').textContent = String(attempts.filter((a) => a.correct).length);
+
+  renderFeedback(ex, bigWrong, correct);
+  beep(correct ? 'correct' : 'wrong');
+  if (correct) confetti();
+}
 
 /* ---------------- ovladač plochy s dvojicemi ----------------
    Plocha se neodpovídá políčkem, takže společnou cestou `submit()` neprochází.
@@ -1094,7 +1219,12 @@ function renderPexStatus(ex) {
 
 el('exerciseBody').addEventListener('click', (e) => {
   const card = e.target.closest('.pex-card');
-  if (card) pexTap(card);
+  if (card) {
+    pexTap(card);
+    return;
+  }
+  const opt = e.target.closest('.bm-opt');
+  if (opt) bigTap(opt);
 });
 
 function pexTap(card) {
@@ -1310,8 +1440,15 @@ document.addEventListener('keydown', (e) => {
   /* Pexeso nemá políčko na odpověď - Enter by šel do `submit()` a ten by na
      chybějícím `#answerInput` spadl. Hotovou plochu potvrzuje tlačítko
      ve vyhodnocení, takže se tu jen odejde. */
-  if (round[index]?.kind === 'pexeso') {
-    if (e.key === 'Enter' && locked) el('feedback').querySelector('.btn')?.click();
+  /* Velké násobení je na tom stejně - žádné políčko na odpověď. Navíc se
+     obě možnosti dají vybrat klávesou 1 a 2. */
+  if (round[index]?.kind === 'pexeso' || round[index]?.kind === 'bigmul') {
+    if (e.key === 'Enter' && locked) {
+      el('feedback').querySelector('.btn')?.click();
+    } else if (!locked && round[index].kind === 'bigmul' && (e.key === '1' || e.key === '2')) {
+      el('exerciseBody').querySelectorAll('.bm-opt')[Number(e.key) - 1]?.click();
+      e.preventDefault();
+    }
     return;
   }
   if (round[index]?.kind === 'compare' && COMPARE_KEYS[e.key]) {
@@ -1775,7 +1912,9 @@ function renderResult(r) {
     ? 'Příště přijdou nové hádanky s jinými obrázky.'
     : isOver10Mode()
       ? 'Příště přijdou nové příklady na rozklad.'
-      : 'Podobné příklady se objeví v dalším kole.';
+      : isBigmulMode()
+        ? 'Příště přijdou nová čísla.'
+        : 'Podobné příklady se objeví v dalším kole.';
 
   const retry = r.missedList.length
     ? `<div class="card">

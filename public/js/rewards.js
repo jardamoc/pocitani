@@ -50,7 +50,7 @@ export const REWARD_RULES = {
      ulohu zvlast, ne az na hotovy prumer - jedna slovni uloha v sade tak
      opravdu prida cas na tri priklady. Drz cela cisla, nasobek se zobrazuje
      v navodu a desetinne cislo do textu pro dite nepatri. */
-  speedKindMultiplier: { equation: 1, word: 3, bond: 2, sign: 2, compare: 1, over10: 2, riddle: 3, grid: 4, pexeso: 6 },
+  speedKindMultiplier: { equation: 1, word: 3, bond: 2, sign: 2, compare: 1, over10: 2, riddle: 3, grid: 4, pexeso: 6, bigmul: 3 },
   speedLevelMultiplier: { easy: 1, medium: 1.3, hard: 1.7 },
 
   /* Rezim "Najdi dvojice" (vnitrni klic `pexeso`): karticky jsou vsechny
@@ -189,7 +189,7 @@ const kindWeight = (kind) => REWARD_RULES.speedKindMultiplier[kind] ?? 1;
 
 /* Druh, kterym nahradime ulohy bez rozpisu - stara ulozena data i souhrn,
    ktery `kindCounts` neposlal. */
-const DEFAULT_KIND_BY_MODE = { riddle: 'riddle', grid: 'grid', over10: 'over10', pexeso: 'pexeso' };
+const DEFAULT_KIND_BY_MODE = { riddle: 'riddle', grid: 'grid', over10: 'over10', pexeso: 'pexeso', bigmul: 'bigmul' };
 const defaultKind = (mode) => DEFAULT_KIND_BY_MODE[mode] || 'equation';
 
 /* Casovy rozpocet cele sady v sekundach. Kazda uloha si prispeje vlastnim
@@ -457,6 +457,7 @@ export function howToGet(category) {
     nasobek('riddle', 'hádanka'),
     nasobek('grid', 'mřížka'),
     nasobek('pexeso', 'plocha s dvojicemi'),
+    nasobek('bigmul', 'velké násobení'),
   ].join(', ')}.`;
   /* U "Najdi dvojice" je chybou spojeni dvou karticek, ktere k sobe nepatri.
      Jedno prehlednuti se odpousti. Cisla se berou z REWARD_RULES, aby text

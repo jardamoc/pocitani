@@ -74,7 +74,7 @@ export function sanitizeState(raw) {
 }
 
 /* Druhy úloh, které se nedají z descriptoru znovu poskládat. */
-const NO_REPEAT = new Set(['riddle', 'grid', 'over10', 'pexeso']);
+const NO_REPEAT = new Set(['riddle', 'grid', 'over10', 'pexeso', 'bigmul']);
 
 const descriptor = (ex) => ({
   op: ex.op,
@@ -148,6 +148,7 @@ const KIND_LABEL = {
   'grid:c': { acc: 'mřížky', gen: 'mřížek' },
   'over10:c': { acc: 'rozklady přes desítku', gen: 'rozkladů přes desítku' },
   'pexeso:c': { acc: 'plochy s dvojicemi', gen: 'ploch s dvojicemi' },
+  'bigmul:c': { acc: 'velká násobení', gen: 'velkých násobení' },
 };
 
 function starsFor(pct) {
@@ -180,18 +181,20 @@ const LEVEL_NAME = { easy: 'Lehké', medium: 'Střední', hard: 'Těžké' };
 
 /* Jak se v rozpadu podle obtížnosti pojmenuje jedna úloha daného režimu.
    Rod i číslo musí sedět na věty "Lehké mřížky ti jdou výborně". */
-const MODE_UNITS = { grid: 'mřížky', riddle: 'hádanky', over10: 'rozklady', pexeso: 'plochy' };
+const MODE_UNITS = { grid: 'mřížky', riddle: 'hádanky', over10: 'rozklady', pexeso: 'plochy', bigmul: 'příklady' };
 
 export function analyze(state, config, attempts) {
   const riddleMode = config.mode === 'riddle';
   const gridMode = config.mode === 'grid';
   const over10Mode = config.mode === 'over10';
   const pexesoMode = config.mode === 'pexeso';
+  const bigmulMode = config.mode === 'bigmul';
   /* Režimy, kde se rozpad podle operací nehodí - hádanky, mřížky i pexeso
      mají `op: 'add'` jen jako zástupnou hodnotu a u rozkladu přes desítku je
      sčítání zase úplně všude, takže by "sčítání ti jde" nic neřeklo.
-     Ve všech čtyřech jedeme podle obtížnosti. */
-  const levelMode = riddleMode || gridMode || over10Mode || pexesoMode;
+     Ve všech pěti jedeme podle obtížnosti. U velkého násobení je zase
+     násobení úplně všude, takže by rozpad podle operací neřekl nic. */
+  const levelMode = riddleMode || gridMode || over10Mode || pexesoMode || bigmulMode;
   const total = attempts.length;
   const correct = attempts.filter((a) => a.correct).length;
   const pct = total ? Math.round((correct / total) * 100) : 0;
@@ -291,6 +294,16 @@ export function analyze(state, config, attempts) {
       tips.push(harder
         ? `Šlo ti to skvěle – zkus příště ${harder} obtížnost, kartiček bude víc.`
         : 'Šlo ti to skvěle – tohle je největší plocha. Zkus zvýšit rozsah nebo přidat další operaci.');
+    }
+  } else if (bigmulMode) {
+    if (pct < 100) {
+      tips.push('Hlídej si nuly: 8 × 50 není 40, ale 400. Nejdřív vynásob číslice a pak přidej tolik nul, kolik jich v čísle bylo.');
+      tips.push('Velké číslo si vždycky rozděl na desítky a jednotky. Každou část vynásob zvlášť a nakonec obě sečti.');
+    } else {
+      const harder = { easy: 'střední', medium: 'těžkou' }[config.level];
+      tips.push(harder
+        ? `Šlo ti to skvěle – zkus příště ${harder} obtížnost, čísla budou větší.`
+        : 'Šlo ti to skvěle – tohle je nejtěžší velké násobení. Zkus si dát víc příkladů v kole.');
     }
   } else if (over10Mode) {
     if (pct < 100) {
