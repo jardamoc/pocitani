@@ -9,6 +9,14 @@ export const OPS = {
   div: { symbol: '÷', label: 'Dělení', name: 'dělení', emoji: '➗' },
 };
 
+/* Znamenka porovnani. Zamerne NEJSOU v `OPS` - nejsou to operace, nic se
+   jimi nepocita a `OPS` se pouziva tam, kde se ma neco spocitat. */
+export const COMPARES = {
+  lt: { symbol: '<', label: 'Menší' },
+  gt: { symbol: '>', label: 'Větší' },
+  eq: { symbol: '=', label: 'Stejně' },
+};
+
 export const MISSING_LABEL = {
   a: 'chybí první číslo',
   b: 'chybí druhé číslo',
@@ -24,6 +32,10 @@ export const EXTRA_KINDS = {
   /* Doplnovani znamenka potrebuje aspon dve operace - z jedne moznosti
      by nebylo co vybirat a dite by trefilo spravne vzdycky. */
   sign: { label: 'Doplň znaménko', emoji: '❓', ops: ['add', 'sub', 'mul', 'div'], minOps: 2 },
+  /* Porovnavani na zadne operaci nezavisi - `ops` jsou tu jen proto, aby druh
+     prosel filtrem `usableKinds()`. Zapnuta je vzdycky aspon jedna operace,
+     takze se porovnavani nabizi vzdy. */
+  compare: { label: 'Větší/menší', emoji: '⚖️', ops: ['add', 'sub', 'mul', 'div'] },
 };
 
 /* Zapnuty druh ma byt videt vic nez drive (drive vychazelo ~2 z 10).
@@ -203,8 +215,24 @@ function makeSign(choices, max) {
   return null;
 }
 
+/* Porovnavani dvou cisel: 12 __ 9. Odpovedi neni cislo, ale klic znamenka,
+   takze se drzi v `rel` a `finalize` z nej udela `answer` (stejny trik jako
+   u doplnovani znamenka, kde odpoved sedi v `op`).
+   `op: 'add'` je jen zastupna hodnota, aby `OPS[ex.op]` nikde nespadlo -
+   porovnavani zadnou operaci nepotrebuje. */
+function makeCompare(max) {
+  const a = rnd(1, max);
+  // shodna cisla musi padat dost casto, aby dite "=" vubec vidělo, ale ne tak
+  // casto, aby se dalo tipnout
+  const b = chance(0.12) ? a : rnd(1, max);
+  const rel = a < b ? 'lt' : a > b ? 'gt' : 'eq';
+  return finalize({ op: 'add', kind: 'compare', missing: 'rel', a, b, c: 0, rel });
+}
+
 function makeExercise(op, max, opts = {}) {
   const kind = opts.kind || 'equation';
+
+  if (kind === 'compare') return makeCompare(max);
 
   if (kind === 'sign') return makeSign(opts.choices?.length ? opts.choices : [op], max);
 
@@ -242,6 +270,10 @@ export function kindOps(kind, ops) {
 }
 
 function focusAllowed(m, ops, kinds) {
+  /* Porovnavani ma `op` jen zastupne, takze na zapnutych operacich nezalezi -
+     bez teto vetve by z "k procvičení" tise mizelo, kdykoli by dite melo
+     vypnute scitani. */
+  if (m.kind === 'compare') return kinds.includes('compare');
   if (!ops.includes(m.op)) return false;
   return m.kind === 'equation' || kinds.includes(m.kind);
 }
@@ -368,6 +400,9 @@ export function exToText(ex, reveal = false) {
   if (ex.kind === 'sign') {
     return `${ex.a} ${reveal ? OPS[ex.op].symbol : '__'} ${ex.b} = ${ex.c}`;
   }
+  if (ex.kind === 'compare') {
+    return `${ex.a} ${reveal ? COMPARES[ex.answer].symbol : '__'} ${ex.b}`;
+  }
   const shown = (key) => (ex.missing === key ? (reveal ? String(ex.answer) : '__') : String(ex[key]));
   if (ex.kind === 'bond') {
     return `pyramida ${shown('c')} = ${shown('a')} ${ex.family === 'mul' ? '×' : '+'} ${shown('b')}`;
@@ -416,6 +451,19 @@ export function explain(ex) {
 
   if (kind === 'grid') return gridExplain(ex);
   if (kind === 'riddle') return riddleExplain(ex);
+
+  /* Porovnavani vysvetlujeme slovy, ne odectenim - rozdil by u obraceneho
+     poradi vysel zaporne a zaporna cisla se tu nikde neobjevuji. */
+  if (kind === 'compare') {
+    if (a === b) return [`${a} a ${b} jsou stejně velká čísla.`, `Proto platí **${a} = ${b}**.`];
+    const vetsi = Math.max(a, b);
+    const mensi = Math.min(a, b);
+    return [
+      `Porovnej ${a} a ${b}.`,
+      `Když počítáš od jedničky nahoru, na ${mensi} dojdeš dřív než na ${vetsi}. Větší je tedy ${vetsi}.`,
+      `Zobáček se vždycky otevírá k většímu číslu: **${a} ${COMPARES[ex.answer].symbol} ${b}**.`,
+    ];
+  }
 
   /* U znamenka je nejnazornejsi zkusit vsechny moznosti, ze kterych dite
      vybiralo, a ukazat, ktera jedina vyjde. */
@@ -527,6 +575,7 @@ export const TAGS = {
   offTen: 'chyba o desítku',
   riddleSymbol: 'hodnota obrázku místo součtu',
   gridPartial: 'část mřížky správně',
+  compareFlip: 'obrácený zobáček',
   other: 'jiná chyba',
 };
 
@@ -543,6 +592,13 @@ export function diagnose(ex, given) {
 
   // u znaménka je jakákoli jiná volba prostě záměna operace
   if (kind === 'sign') return 'swapOp';
+
+  /* Porovnavani musi ven driv, nez se sahne na aritmetiku - odpovedi je klic
+     znamenka, takze `Math.abs(given - answer)` by dal NaN. */
+  if (kind === 'compare') {
+    const obraceny = { lt: 'gt', gt: 'lt', eq: 'eq' };
+    return given === obraceny[answer] ? 'compareFlip' : 'other';
+  }
 
   if (kind === 'equation') {
     if (op === 'add' && missing === 'c' && given === Math.abs(a - b)) return 'swapOp';

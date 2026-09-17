@@ -388,6 +388,7 @@ h1, h2, h3, .num, .box-value, .key, .score-big { font-family: 'Baloo 2', 'Nunito
 .chips .chip.is-on[data-value="word"] { background: linear-gradient(135deg, #fbbf24, #f97316); }
 .chips .chip.is-on[data-value="bond"] { background: linear-gradient(135deg, #2dd4bf, #0d9488); }
 .chips .chip.is-on[data-value="sign"] { background: linear-gradient(135deg, #f87171, #b91c1c); }
+.chips .chip.is-on[data-value="compare"] { background: linear-gradient(135deg, #a78bfa, #6d28d9); }
 /* Volba hry - dvě velké dlaždice vedle sebe, na úzkém displeji pod sebou. */
 .chips-mode { display: grid; grid-template-columns: repeat(auto-fit, minmax(158px, 1fr)); gap: 10px; }
 .chip-mode {

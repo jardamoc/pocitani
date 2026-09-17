@@ -1,4 +1,4 @@
-import { OPS, EXTRA_KINDS, MISSING_LABEL, kindOps, buildRound, buildRiddleRound, buildGridRound, explain, diagnose } from './generator.js';
+import { OPS, COMPARES, EXTRA_KINDS, MISSING_LABEL, kindOps, buildRound, buildRiddleRound, buildGridRound, explain, diagnose } from './generator.js';
 import { RIDDLE_LEVELS, RIDDLE_LEVEL_KEYS } from './riddle.js';
 import { GRID_LEVELS, GRID_LEVEL_KEYS, gridOpsNote, gridRangeNote } from './grid.js';
 import * as store from './stats.js';
@@ -744,6 +744,7 @@ function hintFor(ex) {
   if (ex.kind === 'grid') return 'Doplň čísla tak, aby vyšlo každé počítání doprava i dolů. Pak klepni na ✓.';
   if (ex.kind === 'riddle') return 'Zjisti z rovnic, kolik je který obrázek, a dopočítej poslední řádek.';
   if (ex.kind === 'sign') return 'Doplň chybějící znaménko, aby příklad vyšel.';
+  if (ex.kind === 'compare') return 'Co je větší? Klepni na správné znaménko – zobáček se otevírá k většímu číslu.';
   if (ex.kind === 'word') return `Slovní úloha – ${OPS[ex.op].name}.`;
   if (ex.kind === 'bond') {
     const relation = ex.family === 'mul' ? 'součin' : 'součet';
@@ -777,6 +778,19 @@ function signHTML(ex) {
       <span class="num">${ex.b}</span>
       <span class="eq-op">=</span>
       <span class="num">${ex.c}</span>
+    </div>`;
+}
+
+/* Porovnavani je stejny tvar jako doplneni znamenka, jen bez vysledku -
+   dve cisla a mezi nimi policko na zobacek. */
+function compareHTML(ex) {
+  return `<div class="equation">
+      <span class="num">${ex.a}</span>
+      <span class="slot slot-op" id="answerSlot">
+        <input id="answerInput" type="text" inputmode="none" autocomplete="off" readonly
+               aria-label="Doplň znaménko porovnání">
+      </span>
+      <span class="num">${ex.b}</span>
     </div>`;
 }
 
@@ -884,7 +898,9 @@ function gridHTML(ex) {
   return `<div class="grid" data-size="${size}" data-digits="${String(config.max).length}">${out.join('')}</div>`;
 }
 
-const BODY_HTML = { bond: bondHTML, word: wordHTML, riddle: riddleHTML, sign: signHTML, grid: gridHTML };
+const BODY_HTML = {
+  bond: bondHTML, word: wordHTML, riddle: riddleHTML, sign: signHTML, grid: gridHTML, compare: compareHTML,
+};
 
 /* klávesnice - číselná, nebo se znaménky u úlohy "doplň znaménko" */
 const DEL_KEY = '<button type="button" class="key key-del" data-key="del" aria-label="Smazat">⌫</button>';
@@ -904,10 +920,24 @@ function signKeys(ex) {
   return `<div class="key-ops">${ops}</div>${DEL_KEY}${OK_KEY}`;
 }
 
+/* Porovnavani ma vlastni trojici tlacitek. Prefix klice je zamerne jiny nez
+   u operaci (`cmp:` misto `op:`) - podle nej se v `handleKey` pozna, ze se
+   symbol bere z `COMPARES`, ne z `OPS`. */
+function compareKeys() {
+  const btns = Object.entries(COMPARES)
+    .map(([key, c]) => `<button type="button" class="key key-op" data-key="cmp:${key}" aria-label="${c.label}">${c.symbol}</button>`)
+    .join('');
+  return `<div class="key-ops">${btns}</div>${DEL_KEY}${OK_KEY}`;
+}
+
+const CHOICE_KINDS = new Set(['sign', 'compare']);
+
 function renderKeypad(ex) {
   const keypad = el('keypad');
-  keypad.dataset.mode = ex.kind === 'sign' ? 'sign' : 'digits';
-  keypad.innerHTML = ex.kind === 'sign' ? signKeys(ex) : DIGIT_KEYS;
+  keypad.dataset.mode = CHOICE_KINDS.has(ex.kind) ? 'sign' : 'digits';
+  if (ex.kind === 'sign') keypad.innerHTML = signKeys(ex);
+  else if (ex.kind === 'compare') keypad.innerHTML = compareKeys();
+  else keypad.innerHTML = DIGIT_KEYS;
 }
 
 el('keypad').addEventListener('click', (e) => {
@@ -933,6 +963,15 @@ function handleKey(key) {
     if (!slot) return;
     slot.dataset.op = key.slice(3);
     slot.value = OPS[key.slice(3)].symbol;
+    return;
+  }
+
+  // totéž pro porovnávání, jen se symbol bere z tabulky zobáčků
+  if (key.startsWith('cmp:')) {
+    const slot = el('answerInput');
+    if (!slot) return;
+    slot.dataset.op = key.slice(4);
+    slot.value = COMPARES[key.slice(4)].symbol;
     return;
   }
 
@@ -966,8 +1005,16 @@ document.addEventListener('input', (e) => {
    protože × a ÷ na běžné klávesnici nejsou. */
 const SIGN_KEYS = { '+': 'add', '-': 'sub', '−': 'sub', '*': 'mul', x: 'mul', X: 'mul', '/': 'div', ':': 'div' };
 
+/* Zobáčky z fyzické klávesnice. */
+const COMPARE_KEYS = { '<': 'lt', ',': 'lt', '>': 'gt', '.': 'gt', '=': 'eq' };
+
 document.addEventListener('keydown', (e) => {
   if (!screens.quiz.classList.contains('is-active')) return;
+  if (round[index]?.kind === 'compare' && COMPARE_KEYS[e.key]) {
+    handleKey(`cmp:${COMPARE_KEYS[e.key]}`);
+    e.preventDefault();
+    return;
+  }
   if (round[index]?.kind === 'sign' && SIGN_KEYS[e.key]) {
     const op = SIGN_KEYS[e.key];
     if ((round[index].choices || []).includes(op)) handleKey(`op:${op}`);
@@ -1006,7 +1053,8 @@ function readAnswer(ex) {
   }
   const raw = el('answerInput').value.trim();
   if (raw === '') return null;
-  return ex.kind === 'sign' ? (el('answerInput').dataset.op || null) : Number(raw);
+  // u znaménka i u porovnávání je odpovědí klíč z datasetu, ne číslo
+  return CHOICE_KINDS.has(ex.kind) ? (el('answerInput').dataset.op || null) : Number(raw);
 }
 
 /* Co zatřese, když odpověď chybí. U mřížky jen nevyplněná kolečka. */
@@ -1119,8 +1167,8 @@ function softRetry(given) {
 /* Grafické vysvětlení pro rozsah do 20: dva řádky po deseti kroužcích.
    Zlom řádku je přesně desítka, takže je vidět přechod přes ni. */
 function tenFrameHTML(ex) {
-  // mřížka má op:'add' jen jako zástupnou hodnotu - rámec by byl nesmysl
-  if (ex.kind === 'grid') return '';
+  // mřížka a porovnávání mají op:'add' jen zástupně - rámec by byl nesmysl
+  if (ex.kind === 'grid' || ex.kind === 'compare') return '';
   // u hádanky jen tehdy, když je poslední řádek prostý součet dvou obrázků
   if (ex.kind === 'riddle' && !ex.simpleSum) return '';
   const relation = ex.kind === 'bond' ? ex.family : ex.op === 'add' || ex.op === 'sub' ? 'add' : null;
@@ -1196,9 +1244,10 @@ function renderFeedback(ex, given, correct) {
   }
 
   const steps = explain(ex).map((s) => `<li>${s.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')}</li>`).join('');
-  // u znaménka je odpovědí operace, ne číslo - ukážeme rovnou symbol
-  const shown = (v) => (ex.kind === 'sign' ? OPS[v]?.symbol : v);
-  const gave = ex.kind === 'sign' ? OPS[given]?.symbol : (Number.isFinite(given) ? given : null);
+  // u znaménka i u porovnávání je odpovědí klíč, ne číslo - ukážeme symbol
+  const symbol = (v) => (ex.kind === 'compare' ? COMPARES[v]?.symbol : OPS[v]?.symbol);
+  const shown = (v) => (CHOICE_KINDS.has(ex.kind) ? symbol(v) : v);
+  const gave = CHOICE_KINDS.has(ex.kind) ? symbol(given) : (Number.isFinite(given) ? given : null);
   /* U mřížky by výpis "Správně je 2, 3, 4" nic neřekl - správné hodnoty už
      jsou vidět v kolečkách, která se právě doplnila. */
   const head = ex.kind === 'grid'

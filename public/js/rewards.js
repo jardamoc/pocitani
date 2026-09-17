@@ -50,7 +50,7 @@ export const REWARD_RULES = {
      ulohu zvlast, ne az na hotovy prumer - jedna slovni uloha v sade tak
      opravdu prida cas na tri priklady. Drz cela cisla, nasobek se zobrazuje
      v navodu a desetinne cislo do textu pro dite nepatri. */
-  speedKindMultiplier: { equation: 1, word: 3, bond: 2, sign: 2, riddle: 3, grid: 4 },
+  speedKindMultiplier: { equation: 1, word: 3, bond: 2, sign: 2, compare: 1, riddle: 3, grid: 4 },
   speedLevelMultiplier: { easy: 1, medium: 1.3, hard: 1.7 },
 
   /* Epicky: bud hodne spocitanych prikladu za dnesek (podminka je "vic nez"),

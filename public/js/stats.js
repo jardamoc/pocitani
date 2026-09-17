@@ -1,4 +1,4 @@
-import { OPS, signature, exToText, TAGS } from './generator.js';
+import { OPS, COMPARES, signature, exToText, TAGS } from './generator.js';
 import { wholeNumber, textList } from './validate.js';
 
 export const KEY = 'pocitani.v1';
@@ -144,6 +144,7 @@ const KIND_LABEL = {
   'word:b': { acc: 'slovní úlohy na změnu', gen: 'slovních úloh na změnu' },
   'riddle:c': { acc: 'obrázkové hádanky', gen: 'obrázkových hádanek' },
   'sign:op': { acc: 'příklady s chybějícím znaménkem', gen: 'příkladů s chybějícím znaménkem' },
+  'compare:rel': { acc: 'porovnávání čísel', gen: 'porovnávání čísel' },
   'grid:c': { acc: 'mřížky', gen: 'mřížek' },
 };
 
@@ -186,11 +187,15 @@ export function analyze(state, config, attempts) {
   const correct = attempts.filter((a) => a.correct).length;
   const pct = total ? Math.round((correct / total) * 100) : 0;
 
-  const byOp = group(attempts, (a) => a.ex.op).sort((x, y) => y.seen - x.seen);
+  /* Porovnávání má `op: 'add'` jen zástupně - do rozpadu podle operací ani
+     do přechodu přes desítku nepatří, jinak by "sčítání ti jde" stálo z půlky
+     na úlohách, kde se nic nesčítá. */
+  const scored = attempts.filter((a) => a.ex.kind !== 'compare');
+  const byOp = group(scored, (a) => a.ex.op).sort((x, y) => y.seen - x.seen);
   const byLevel = group(attempts, (a) => a.ex.level || null)
     .sort((x, y) => LEVEL_ORDER.indexOf(x.key) - LEVEL_ORDER.indexOf(y.key));
   const byKind = group(attempts, (a) => `${a.ex.kind}:${a.ex.missing}`).sort((x, y) => y.seen - x.seen);
-  const crossGroup = group(attempts, (a) => (a.ex.op === 'add' || a.ex.op === 'sub' ? (a.ex.cross ? 'cross' : 'plain') : null));
+  const crossGroup = group(scored, (a) => (a.ex.op === 'add' || a.ex.op === 'sub' ? (a.ex.cross ? 'cross' : 'plain') : null));
   const cross = crossGroup.find((g) => g.key === 'cross') || null;
 
   const tags = new Map();
@@ -285,8 +290,13 @@ export function analyze(state, config, attempts) {
   }
   if (!tips.length) tips.push('Jsi na dobré cestě. Klidně dej ještě jedno kolo se stejným nastavením.');
 
-  // u chybějícího znaménka je odpovědí operace, do výpisu patří její symbol
-  const asShown = (ex, value) => (ex.kind === 'sign' ? OPS[value]?.symbol ?? '?' : value);
+  /* U chybějícího znaménka je odpovědí operace a u porovnávání zobáček -
+     do výpisu v obou případech patří symbol, ne klíč ('lt' dítěti nic neřekne). */
+  const asShown = (ex, value) => {
+    if (ex.kind === 'sign') return OPS[value]?.symbol ?? '?';
+    if (ex.kind === 'compare') return COMPARES[value]?.symbol ?? '?';
+    return value;
+  };
   const missedList = attempts.filter((a) => !a.correct).map((a) => ({
     text: exToText(a.ex, false),
     answer: asShown(a.ex, a.ex.answer),

@@ -266,6 +266,31 @@ a **proti téhle sadě se hlídá jednoznačnost** — `2 __ 2 = 4` sedí na `+`
 takový příklad se zahodí. Druh proto potřebuje aspoň dvě operace (`minOps: 2`).
 Odpovědí je klíč operace (`'add'`), ne číslo; `submit()` na to má větev.
 
+## Větší/menší
+
+`12 __ 9`, dítě vybírá `<`, `>` nebo `=`. Druh úlohy navíc v režimu Počítání
+(`kind: 'compare'`), ne samostatný režim.
+
+Odpovědí je klíč znaménka (`'lt'`), ne číslo — stejný princip jako u „Doplň znaménko“,
+kde odpovědí je klíč operace. Znaménka jsou ve vlastní tabulce **`COMPARES`, ne v `OPS`** —
+nejsou to operace, nic se jimi nepočítá. Na klávesnici mají vlastní prefix `cmp:`, aby se
+v `handleKey()` poznalo, ze které tabulky se bere symbol.
+
+Tři věci, které se snadno rozbijí:
+
+- **`op: 'add'` je jen zástupná hodnota**, aby `OPS[ex.op]` nikde nespadlo. Proto musí
+  porovnávání vypadnout z `tenFrameHTML()` (desítkový rámec) a ve `stats.js` z rozpadu
+  podle operací i z „přechodu přes desítku“ (proměnná `scored`). Jinak by „sčítání ti jde“
+  stálo z poloviny na úlohách, kde se nic nesčítá.
+- **`focusAllowed()` v `generator.js`** má pro porovnávání vlastní větev. Bez ní by úloha
+  z „k procvičení“ tiše mizela pokaždé, když má dítě vypnuté sčítání.
+- **Vysvětlení po chybě je slovy, ne odečtením** — rozdíl by při obráceném pořadí vyšel
+  záporně a záporná čísla se v aplikaci neobjevují.
+
+Shoda obou čísel (odpověď `=`) padá zhruba v **16 %** úloh — dost na to, aby ji dítě
+vidělo, málo na to, aby se dala tipnout. Řídí to `chance(0.12)` v `makeCompare()`;
+zbytek dodají náhodné shody při malém rozsahu.
+
 ## Odměny — sbírka dumplingů
 
 Za dokončené kolo může Alžběta získat sběratelskou postavičku. Je jich 40 v pěti
