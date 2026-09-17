@@ -479,6 +479,12 @@ Pár věcí, které se snadno rozbijí:
 - **Křížek je tentýž jako všude jinde** (`OPS.mul.symbol`), jen se do `bigmul.js` nedá
   naimportovat — `generator.js` si tenhle soubor importuje a byl by z toho kruh.
   Tečka `·` z předlohy se zkoušela a uživatel ji zamítl: dítě má vidět pořád týž znak.
+- **Plus je odsazené od členů, křížek ne.** Uvnitř členu je úzká mezera `U+2009`
+  (`100 × 2`), mezi členy obyčejná; `word-spacing: .45em` na `.bm-value` a `.bm-opt`
+  pak roztáhne jedině tu obyčejnou. Kdyby byly všude obyčejné mezery, odsadil by se
+  i křížek od svých čísel. Nejdelší možný zápis (`900 × 9 + 90 × 9 + 9 × 9`) měří
+  na 320 px **192 px** proti 243 px místa v tlačítku — rezerva tam je, ale
+  při dalším zvětšování mezer si to znovu změř.
 
 ## Doplň znaménko
 
