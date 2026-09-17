@@ -1255,6 +1255,9 @@ body.is-rewards .rewards-toggle { display: none; }
 
 .export-danger { margin-top: 18px; padding-top: 14px; border-top: 2px dashed var(--line); }
 .export-danger .btn { margin-top: 10px; }
+
+/* razitko posledniho nasazeni - drobnym pismem uplne dole */
+.export-version { margin-top: 16px; text-align: center; font-size: .82rem; font-weight: 700; opacity: .75; }
 .btn-danger {
   background: linear-gradient(135deg, #fb7185, #be123c);
   box-shadow: var(--ring), inset 0 0 0 3px rgba(255, 255, 255, .3), 0 7px 0 #7f1d3a, 0 14px 26px rgba(20, 49, 77, .28);

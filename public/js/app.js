@@ -183,6 +183,15 @@ function normalizeConfig(raw) {
   };
 }
 
+/* Volby se ukladaji hned pri kazde zmene, ne az po dohranem kole. Bez toho
+   se prenastaveni ztratilo vzdycky, kdyz se kolo nezacalo - pri dalsim
+   spusteni tam bylo zase to stare. Zapisy jsou ve fronte (300 ms), takze
+   proklikani vsech chipu skonci stejne jednim zapisem. */
+function saveConfig() {
+  state.config = config;
+  storage.saveState(state);
+}
+
 const isRiddleMode = () => config.mode === 'riddle';
 const isGridMode = () => config.mode === 'grid';
 /* Režimy, které mají obtížnost místo výběru druhů úloh. */
@@ -457,6 +466,7 @@ el('modeChips').addEventListener('click', (e) => {
   const chip = e.target.closest('.chip');
   if (!chip) return;
   config.mode = chip.dataset.value;
+  saveConfig();
   renderConfigScreen();
 });
 
@@ -464,6 +474,7 @@ el('levelChips').addEventListener('click', (e) => {
   const chip = e.target.closest('.chip');
   if (!chip) return;
   config.level = chip.dataset.value;
+  saveConfig();
   renderConfigScreen();
 });
 
@@ -488,6 +499,7 @@ el('opChips').addEventListener('click', (e) => {
     return;
   }
   config.ops = next;
+  saveConfig();
   renderConfigScreen();
 });
 
@@ -500,6 +512,7 @@ el('kindChips').addEventListener('click', (e) => {
   config.kinds = config.kinds.includes(value)
     ? config.kinds.filter((k) => k !== value)
     : [...config.kinds, value];
+  saveConfig();
   renderConfigScreen();
 });
 
@@ -507,6 +520,7 @@ el('countChips').addEventListener('click', (e) => {
   const chip = e.target.closest('.chip');
   if (!chip) return;
   config.count = Number(chip.dataset.value);
+  saveConfig();
   renderConfigScreen();
 });
 
@@ -514,6 +528,7 @@ el('maxChips').addEventListener('click', (e) => {
   const chip = e.target.closest('.chip');
   if (!chip) return;
   config.max = Number(chip.dataset.value);
+  saveConfig();
   renderConfigScreen();
 });
 
@@ -529,6 +544,7 @@ function bindCustomField(inputId, chipsId, key, min, max) {
       chip.setAttribute('aria-pressed', String(on));
     });
     renderModeCards(); // u hádanek se s rozsahem mění i obtížnost
+    saveConfig();
   });
   input.addEventListener('blur', () => renderConfigScreen());
 }

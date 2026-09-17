@@ -56,6 +56,13 @@ hlavičky jsou v `public/_headers` — wrangler ten soubor přečte a samotný h
 `publish.mjs` si ho ověřuje **předem** přes `wrangler whoami`, aby nasazení nespadlo
 uprostřed na nesrozumitelné hlášce.
 
+Před odesláním si `publish.mjs` **orazítkuje verzi**: do `public/js/version.js` zapíše
+dnešní datum a pořadí nasazení v rámci dne (stejný den = další vydání, jiný den = zase
+od jedničky) a soubor rovnou zacommituje. Musí to být **až po kontrole čistého stromu** —
+jinak by se nasadilo něco jiného, než je v gitu. Aplikace razítko ukazuje dole v dialogu
+„Nastavení", aby šlo poznat, jestli má zařízení skutečně novou verzi. V režimu
+`--dry-run` se razítko nemění.
+
 Skript se pouští jako `node --use-system-ca publish.mjs` a ten přepínač **nesmíš
 odstranit**. Firemní síť rozbaluje HTTPS vlastním certifikátem; Node na rozdíl od
 PowerShellu úložiště certifikátů Windows sám nečte, takže závěrečné ověření webu
@@ -78,6 +85,7 @@ běžel. Vypadalo to jako chyba nasazení, a nebyla.
 | `public/js/rewards-data.js` | souřadnice sprite sheetu a česká jména 40 dumplingů — čistá data |
 | `public/js/rewards.js` | pravidla odměn, vyhodnocení kola, výběr postavičky — **bez DOM a bez úložiště** |
 | `public/js/rewards-ui.js` | vykreslení odměn: sprite, sbírka, závěrečné okno, animace |
+| `public/js/version.js` | razítko posledního nasazení (datum + pořadí v rámci dne) — **přepisuje ho `publish.mjs`**, ručně se needituje |
 | `public/js/qr.js` | generátor QR kódu podle normy — bez knihovny |
 | `public/js/transfer.js` | přenos postupu mezi zařízeními: zabalení, adresa, slučování |
 | `public/js/export-ui.js` | dialog „Export" — heslo, QR kód, tři mazací tlačítka |
@@ -88,6 +96,7 @@ běžel. Vypadalo to jako chyba nasazení, a nebyla.
 | `wrangler.jsonc` | nastavení Cloudflare Workers — jméno služby a složka s aktivy |
 | `public/_headers` | bezpečnostní hlavičky pro živý web; wrangler ho sám neservíruje |
 | `tests/*.test.mjs` | testy pro `node --test`, bez frameworku i bez závislostí |
+| `README.md` | popis projektu pro GitHub; podrobná pravidla zůstávají tady |
 | `package.json` | jen ty tři zkratky a `"type": "module"`; žádné závislosti |
 
 Prosté ES moduly, žádný framework, žádné závislosti. Závislosti jdou jedním směrem:
@@ -129,6 +138,9 @@ Co z toho plyne pro psaní kódu:
   `app.js` a import odsud by udělal kruh. `boot()` si ho proto prožene sám. Téma se
   z téhož důvodu kontroluje jen jako tvar slova; neznámý klíč nic nerozbije, protože
   `currentTheme()` spadne na výchozí pandu.
+- **Volby z úvodní obrazovky se ukládají hned při každé změně** (`saveConfig()` v `app.js`).
+  Dřív je do stavu zapisoval až `recordRound()` po dokončeném kole, takže přenastavení
+  před zavřením aplikace se ztratilo a příště tam bylo zase to staré. **Nevracej to zpátky.**
 - **`mergePayload()` v `transfer.js` neukládá.** Slučování je čistá operace v paměti,
   která vrátí souhrn změn; zapisuje až `acceptIncoming()` v `app.js`.
 

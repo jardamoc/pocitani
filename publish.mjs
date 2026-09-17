@@ -11,6 +11,7 @@
 */
 
 import { spawnSync } from 'node:child_process';
+import { readFileSync, writeFileSync } from 'node:fs';
 
 const NANECISTO = process.argv.includes('--dry-run');
 const WEB = 'https://pocitani.jarda-moc.workers.dev';
@@ -61,6 +62,47 @@ if (zmeny) {
     'Nejdriv: git add -A && git commit -m "..."');
 }
 ok('pracovni strom je cisty');
+
+/* ---- 1b. Razitko verze ----
+   Datum nasazeni a poradi v ramci dne se zapise do public/js/version.js a
+   hned zacommituje - jinak by dalsi krok (cisty strom uz probehl) poslal na
+   web neco jineho, nez je v gitu. Aplikace to ukazuje dole v "Nastaveni". */
+
+const VERZE_SOUBOR = new URL('./public/js/version.js', import.meta.url);
+
+function dnesniDatum() {
+  const d = new Date();
+  const dva = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${dva(d.getMonth() + 1)}-${dva(d.getDate())}`;
+}
+
+function orazitkuj() {
+  const datum = dnesniDatum();
+  const puvodni = readFileSync(VERZE_SOUBOR, 'utf8');
+  const nalez = puvodni.match(/datum: '(\d{4}-\d{2}-\d{2})', poradi: (\d+)/);
+  if (!nalez) konec('V public/js/version.js chybi radek s VERZE.', 'Ocekavam tvar: datum: \'RRRR-MM-DD\', poradi: N');
+  // stejny den = dalsi vydani, jiny den = zase od jednicky
+  const poradi = nalez[1] === datum ? Number(nalez[2]) + 1 : 1;
+  const novy = puvodni.replace(
+    /export const VERZE = \{[^}]*\};/,
+    `export const VERZE = { datum: '${datum}', poradi: ${poradi} };`,
+  );
+  writeFileSync(VERZE_SOUBOR, novy, 'utf8');
+  return { datum, poradi };
+}
+
+if (NANECISTO) {
+  info('nanecisto: razitko verze se nemeni');
+} else {
+  const verze = orazitkuj();
+  const zapsano = git('status', '--porcelain', 'public/js/version.js').out;
+  if (zapsano) {
+    git('add', 'public/js/version.js');
+    const c = git('commit', '-m', `Oznacit nasazeni ${verze.datum} (${verze.poradi}.)`);
+    if (c.kod !== 0) konec('Commit razitka verze selhal.', c.err || c.out);
+  }
+  ok(`verze ${verze.datum}, vydani ${verze.poradi}. toho dne`);
+}
 
 /* ---- 2. Odeslat commity na GitHub ---- */
 

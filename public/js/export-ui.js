@@ -1,5 +1,6 @@
 import { qrMatrix, qrSvg, qrCapacity } from './qr.js';
 import { buildTransferUrl } from './transfer.js';
+import { verzeText } from './version.js';
 
 /* Dialog "Export" - prenos progresu na druhe zarizeni a mazani.
  *
@@ -90,6 +91,9 @@ export function openExport({ state, rewardData, onWipe }) {
     error.hidden = true;
     gate.hidden = true;
     panel.hidden = false;
+    // razitko nasazeni uplne dole, at je videt, jestli zarizeni ma novou verzi
+    const verze = el('exportVersion');
+    if (verze) verze.textContent = verzeText();
     renderQr(state, rewardData);
   };
 
