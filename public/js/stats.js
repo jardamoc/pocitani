@@ -74,7 +74,7 @@ export function sanitizeState(raw) {
 }
 
 /* Druhy úloh, které se nedají z descriptoru znovu poskládat. */
-const NO_REPEAT = new Set(['riddle', 'grid']);
+const NO_REPEAT = new Set(['riddle', 'grid', 'over10']);
 
 const descriptor = (ex) => ({
   op: ex.op,
@@ -146,6 +146,7 @@ const KIND_LABEL = {
   'sign:op': { acc: 'příklady s chybějícím znaménkem', gen: 'příkladů s chybějícím znaménkem' },
   'compare:rel': { acc: 'porovnávání čísel', gen: 'porovnávání čísel' },
   'grid:c': { acc: 'mřížky', gen: 'mřížek' },
+  'over10:c': { acc: 'rozklady přes desítku', gen: 'rozkladů přes desítku' },
 };
 
 function starsFor(pct) {
@@ -176,13 +177,19 @@ function mostMissedFactor(attempts) {
 const LEVEL_ORDER = ['easy', 'medium', 'hard'];
 const LEVEL_NAME = { easy: 'Lehké', medium: 'Střední', hard: 'Těžké' };
 
+/* Jak se v rozpadu podle obtížnosti pojmenuje jedna úloha daného režimu.
+   Rod i číslo musí sedět na věty "Lehké mřížky ti jdou výborně". */
+const MODE_UNITS = { grid: 'mřížky', riddle: 'hádanky', over10: 'rozklady' };
+
 export function analyze(state, config, attempts) {
   const riddleMode = config.mode === 'riddle';
   const gridMode = config.mode === 'grid';
+  const over10Mode = config.mode === 'over10';
   /* Režimy, kde se rozpad podle operací nehodí - hádanky i mřížky mají
-     `op: 'add'` jen jako zástupnou hodnotu, takže by "přechod přes desítku"
-     i rady k násobilce říkaly nesmysl. Jedeme podle obtížnosti. */
-  const levelMode = riddleMode || gridMode;
+     `op: 'add'` jen jako zástupnou hodnotu a u rozkladu přes desítku je
+     sčítání zase úplně všude, takže by "sčítání ti jde" nic neřeklo.
+     Ve všech třech jedeme podle obtížnosti. */
+  const levelMode = riddleMode || gridMode || over10Mode;
   const total = attempts.length;
   const correct = attempts.filter((a) => a.correct).length;
   const pct = total ? Math.round((correct / total) * 100) : 0;
@@ -216,7 +223,7 @@ export function analyze(state, config, attempts) {
      obtížnosti. */
   for (const g of levelMode ? byLevel : byOp) {
     // "Sčítání ti jde" × "Lehké hádanky ti jdou" - jiný rod i číslo
-    const name = levelMode ? `${LEVEL_NAME[g.key]} ${gridMode ? 'mřížky' : 'hádanky'}` : OPS[g.key].label;
+    const name = levelMode ? `${LEVEL_NAME[g.key]} ${MODE_UNITS[config.mode] || 'hádanky'}` : OPS[g.key].label;
     const goes = levelMode ? 'jdou' : 'jde';
     const hard = levelMode ? 'dřou' : 'dře';
     if (g.seen >= 3 && g.pct >= 85) strengths.push(`${name} ti ${goes} výborně – ${g.correct} z ${g.seen} správně.`);
@@ -268,6 +275,19 @@ export function analyze(state, config, attempts) {
       tips.push(harder
         ? `Šlo ti to skvěle – zkus příště ${harder} obtížnost, přibude obrázek navíc.`
         : 'Šlo ti to skvěle – tohle už je nejtěžší obtížnost hádanek.');
+    }
+  } else if (over10Mode) {
+    if (pct < 100) {
+      tips.push('Vždycky se nejdřív zeptej: kolik chybí prvnímu číslu do desítky? Přesně tolik si uber z druhého čísla.');
+    }
+    if (attempts.some((a) => a.retried)) {
+      tips.push('Zbytek se nikam neztratí – co z druhého čísla odejde do desítky, to se pak přičte navrch.');
+    }
+    if (pct >= 90) {
+      const harder = { easy: 'střední', medium: 'těžkou' }[config.level];
+      tips.push(harder
+        ? `Šlo ti to skvěle – zkus příště ${harder} obtížnost, doplňovat budeš víc kroků.`
+        : 'Šlo ti to skvěle – celý zápis už zvládáš. Zkus zvýšit rozsah, čísla budou vyšší.');
     }
   } else {
     if (cross && cross.pct < 65 && cross.seen >= 3) {

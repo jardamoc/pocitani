@@ -1,6 +1,7 @@
-import { OPS, COMPARES, EXTRA_KINDS, MISSING_LABEL, kindOps, buildRound, buildRiddleRound, buildGridRound, explain, diagnose } from './generator.js';
+import { OPS, COMPARES, EXTRA_KINDS, MISSING_LABEL, kindOps, buildRound, buildRiddleRound, buildGridRound, buildOver10Round, explain, diagnose } from './generator.js';
 import { RIDDLE_LEVELS, RIDDLE_LEVEL_KEYS } from './riddle.js';
 import { GRID_LEVELS, GRID_LEVEL_KEYS, gridOpsNote, gridRangeNote } from './grid.js';
+import { OVER10_LEVELS, OVER10_LEVEL_KEYS, over10RangeNote } from './over10.js';
 import * as store from './stats.js';
 import * as rewards from './rewards.js';
 import * as storage from './storage.js';
@@ -19,27 +20,36 @@ const screens = {
 const COUNT_PRESETS = [10, 20, 30];
 const MAX_PRESETS = [10, 15, 20, 30, 50, 100];
 
-/* Dva režimy hry. Počítání je původní trénink, hádanky jsou obrázkové
-   rovnice. Společné zůstává jen "kolik příkladů" a "do kolika" - u hádanek
-   řídí rozsah i obtížnost. */
+/* Režimy hry. Počítání je původní trénink, ostatní tři mají místo výběru
+   druhů úloh vlastní obtížnost. Společné zůstává "kolik příkladů" a
+   "do kolika" - u mřížky je kolo jediná úloha, tak tam počet odpadá. */
 const MODES = {
   calc: { label: 'Počítání', icon: '🧮', sub: 'Příklady, slovní úlohy, pyramidy' },
+  over10: { label: 'Počítej přes 10', icon: '🔟', sub: 'Rozlož si příklad krok za krokem' },
   riddle: { label: 'Obrázkové hádanky', icon: '🧩', sub: 'Zjisti, kolik je který obrázek' },
   grid: { label: 'Mřížka', icon: '🔳', sub: 'Doplň čísla, ať sedí doprava i dolů' },
 };
 
 /* Tabulky obtížností podle režimu - klíče (easy/medium/hard) jsou schválně
    společné, takže `config.level` přežije přepnutí režimu. */
-const LEVEL_TABLES = { riddle: RIDDLE_LEVELS, grid: GRID_LEVELS };
-const LEVEL_KEYS = { riddle: RIDDLE_LEVEL_KEYS, grid: GRID_LEVEL_KEYS };
+const LEVEL_TABLES = { riddle: RIDDLE_LEVELS, grid: GRID_LEVELS, over10: OVER10_LEVELS };
+const LEVEL_KEYS = { riddle: RIDDLE_LEVEL_KEYS, grid: GRID_LEVEL_KEYS, over10: OVER10_LEVEL_KEYS };
 
-/* Hádanka i mřížka se luští déle než příklad, tak na ně dáváme jeden pokus
-   navíc - první špatná odpověď ještě neukáže řešení. */
-const RETRY_KINDS = new Set(['riddle', 'grid']);
+/* Společná množina klíčů obtížnosti. Tabulky výš ji musí mít všechny stejnou,
+   aby přepnutí režimu nastavení nezahodilo. */
+const LEVEL_ALL = ['easy', 'medium', 'hard'];
+
+/* Hádanka, mřížka i rozklad přes desítku se luští déle než příklad, tak na ně
+   dáváme jeden pokus navíc - první špatná odpověď ještě neukáže řešení. */
+const RETRY_KINDS = new Set(['riddle', 'grid', 'over10']);
 
 /* Políčka, do kterých píše klávesnice. Kromě odpovědi jsou to poznámky pod
-   hádankou a jednotlivá kolečka mřížky. */
-const FIELD_SEL = '#answerInput, .riddle-note-input, .grid-input';
+   hádankou, kolečka mřížky a políčka rozkladu. */
+const FIELD_SEL = '#answerInput, .riddle-note-input, .grid-input, .o10-input';
+
+/* Úlohy, které místo jednoho políčka na odpověď mají několik dílčích.
+   Odpovědí je u nich řetězec hodnot spojený ', ' v pořadí `ex.hidden`. */
+const PART_SEL = { grid: '.grid-input', over10: '.o10-input' };
 
 /* `start` je ikona na tlacitku Zacit. Zamerne to neni maskot - ten uz kouka
    z hlavicky, tady se hodi neco, co znamena "jdeme". */
@@ -175,7 +185,9 @@ function normalizeConfig(raw) {
   return {
     // starší uložené nastavení režim nezná a bylo vždycky "počítání"
     mode: raw.mode in MODES ? raw.mode : 'calc',
-    level: RIDDLE_LEVEL_KEYS.includes(raw.level) ? raw.level : 'easy',
+    /* Obtížnost se hlídá proti společné množině klíčů, ne proti tabulce
+       jednoho režimu - všechny tři tabulky mají easy/medium/hard. */
+    level: LEVEL_ALL.includes(raw.level) ? raw.level : 'easy',
     ops,
     kinds,
     count: clamp(Number(raw.count) || 10, 3, 60),
@@ -194,6 +206,7 @@ function saveConfig() {
 
 const isRiddleMode = () => config.mode === 'riddle';
 const isGridMode = () => config.mode === 'grid';
+const isOver10Mode = () => config.mode === 'over10';
 /* Režimy, které mají obtížnost místo výběru druhů úloh. */
 const usesLevel = () => config.mode !== 'calc';
 const levelTable = () => LEVEL_TABLES[config.mode] || RIDDLE_LEVELS;
@@ -306,7 +319,9 @@ function applyTheme() {
    násobící) a naopak nemá počet úloh - jedna mřížka je celé kolo. */
 function renderModeCards() {
   const grid = isGridMode();
-  el('card-ops').hidden = isRiddleMode();
+  const over10 = isOver10Mode();
+  // rozklad přes desítku je vždycky sčítání, výběr operací by tam nedával smysl
+  el('card-ops').hidden = isRiddleMode() || over10;
   el('card-kinds').hidden = usesLevel();
   el('card-level').hidden = !usesLevel();
   el('card-count').hidden = grid;
@@ -321,6 +336,15 @@ function renderModeCards() {
   if (!usesLevel()) return;
 
   const level = levelTable()[config.level];
+
+  if (over10) {
+    /* Upozornění na malý rozsah patří k rozsahu, ne k operacím - karta
+       s operacemi je v tomhle režimu schovaná. */
+    maxNote.textContent = over10RangeNote(config.max)
+      || 'Rozsah řídí, jak velká čísla se budou rozkládat. Kolik kroků doplňuješ, si vybíráš výš u obtížnosti.';
+    el('levelNote').textContent = `${level.label} – ${level.note}. Čísla do ${config.max}.`;
+    return;
+  }
 
   if (grid) {
     maxNote.textContent = 'Rozsah je strop pro všechna čísla v mřížce – i pro roh, ve kterém se všechno sejde.';
@@ -444,12 +468,14 @@ function renderLastHint() {
   }
 
   const pct = Math.round((last.correct / last.total) * 100);
-  const what = isRiddleMode() ? 'hádanek' : 'příkladů';
+  const what = isRiddleMode() ? 'hádanek' : isOver10Mode() ? 'rozkladů' : 'příkladů';
   const focus = isRiddleMode()
     ? ' Každá hádanka je pokaždé nová.'
-    : state.missed.length
-      ? ` Do dalšího kola zařadím ${Math.min(state.missed.length, 12)} podobných příkladů, které minule nevyšly.`
-      : ' Minule ti nic neuteklo. 🎉';
+    : isOver10Mode()
+      ? ' Každý rozklad je pokaždé nový.'
+      : state.missed.length
+        ? ` Do dalšího kola zařadím ${Math.min(state.missed.length, 12)} podobných příkladů, které minule nevyšly.`
+        : ' Minule ti nic neuteklo. 🎉';
   hint.textContent = `Naposledy ${what}: ${last.correct} z ${last.total} (${pct} %).${focus}`;
   hint.hidden = false;
 }
@@ -659,6 +685,7 @@ function startRound() {
     calc: () => buildRound(config, state.missed),
     riddle: () => buildRiddleRound(config),
     grid: () => buildGridRound(config),   // jedna mřížka je celé kolo
+    over10: () => buildOver10Round(config),
   };
   round = (build[config.mode] || build.calc)();
   index = 0;
@@ -742,6 +769,7 @@ function renderExercise() {
 
 function hintFor(ex) {
   if (ex.kind === 'grid') return 'Doplň čísla tak, aby vyšlo každé počítání doprava i dolů. Pak klepni na ✓.';
+  if (ex.kind === 'over10') return 'Rozlož druhé číslo tak, aby se to první doplnilo do desítky. Pak klepni na ✓.';
   if (ex.kind === 'riddle') return 'Zjisti z rovnic, kolik je který obrázek, a dopočítej poslední řádek.';
   if (ex.kind === 'sign') return 'Doplň chybějící znaménko, aby příklad vyšel.';
   if (ex.kind === 'compare') return 'Co je větší? Klepni na správné znaménko – zobáček se otevírá k většímu číslu.';
@@ -898,8 +926,46 @@ function gridHTML(ex) {
   return `<div class="grid" data-size="${size}" data-digits="${String(config.max).length}">${out.join('')}</div>`;
 }
 
+/* Počítej přes 10: řetězec rovnítek pod sebou, ne na jednom řádku - čtyři
+   čísla a tři znaménka by se na 320 px nevešly a písmo by muselo dolů.
+
+   Políčka se berou z `ex.hidden` (pořadí určuje obtížnost) a jejich `data-idx`
+   je pozice v `ex.answer`. `maxlength` musí mít KAŽDÉ z nich: `renderExercise`
+   ho nastavuje jen tomu s id="answerInput" a bez atributu vrací `maxLength`
+   −1, takže by klávesnice do zbylých nenapsala ani číslici. */
+const O10_LABEL = {
+  ten: 'Kolik chybí do desítky',
+  rest: 'Kolik zbývá přidat',
+  sum: 'Kolik je po doplnění do desítky',
+  rest2: 'Zbytek, který ještě přidáš',
+  c: 'Výsledek',
+};
+
+function over10HTML(ex) {
+  const digits = String(config.max).length;
+  const cell = (key, value) => {
+    const idx = ex.hidden.indexOf(key);
+    if (idx < 0) return `<span class="o10-num">${value}</span>`;
+    const slotId = idx === 0 ? ' id="answerSlot"' : '';
+    const inputId = idx === 0 ? ' id="answerInput"' : '';
+    return `<span class="o10-cell slot"${slotId}><input${inputId} class="o10-input" type="text"
+      inputmode="none" autocomplete="off" data-idx="${idx}" maxlength="${digits}"
+      aria-label="${O10_LABEL[key]}"></span>`;
+  };
+  const op = (s) => `<span class="o10-op">${s}</span>`;
+  const num = (n) => `<span class="o10-num">${n}</span>`;
+
+  return `<div class="o10">
+      <div class="o10-line o10-task">${num(ex.a)}${op('+')}${num(ex.b)}</div>
+      <div class="o10-line">${op('=')}${num(ex.a)}${op('+')}${cell('ten', ex.ten)}${op('+')}${cell('rest', ex.rest)}</div>
+      <div class="o10-line">${op('=')}${cell('sum', ex.sum)}${op('+')}${cell('rest2', ex.rest)}</div>
+      <div class="o10-line">${op('=')}${cell('c', ex.c)}</div>
+    </div>`;
+}
+
 const BODY_HTML = {
-  bond: bondHTML, word: wordHTML, riddle: riddleHTML, sign: signHTML, grid: gridHTML, compare: compareHTML,
+  bond: bondHTML, word: wordHTML, riddle: riddleHTML, sign: signHTML, grid: gridHTML,
+  compare: compareHTML, over10: over10HTML,
 };
 
 /* klávesnice - číselná, nebo se znaménky u úlohy "doplň znaménko" */
@@ -997,8 +1063,8 @@ document.addEventListener('input', (e) => {
   const cap = e.target.maxLength > 0 ? e.target.maxLength : undefined;
   const digits = e.target.value.replace(/\D+/g, '').slice(0, cap);
   if (digits !== e.target.value) e.target.value = digits;
-  // jakmile dítě začne přepisovat, červená z kolečka zmizí
-  e.target.closest('.gcell')?.classList.remove('is-wrong');
+  // jakmile dítě začne přepisovat, červená z políčka zmizí
+  e.target.closest('.gcell, .o10-cell')?.classList.remove('is-wrong');
 });
 
 /* Znaménka jdou zadat i z fyzické klávesnice; `x` a `:` bereme taky,
@@ -1040,15 +1106,27 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-const gridInputs = () => [...el('exerciseBody').querySelectorAll('.grid-input')]
+/* Dílčí políčka úlohy (kolečka mřížky, kroky rozkladu) setříděná podle
+   `data-idx`, tedy ve stejném pořadí, v jakém generátor skládá `ex.answer`. */
+const partInputs = (ex) => [...el('exerciseBody').querySelectorAll(PART_SEL[ex.kind] || PART_SEL.grid)]
   .sort((a, b) => Number(a.dataset.idx) - Number(b.dataset.idx));
 
+const hasParts = (ex) => ex.kind in PART_SEL;
+
+/* Očekávaná hodnota i-tého dílčího políčka. */
+function partValue(ex, i) {
+  if (ex.kind !== 'grid') return ex.values[i];
+  const { r, c } = ex.hidden[i];
+  return ex.cells[r][c];
+}
+
 /* Jak se z obrazovky přečte odpověď. `null` znamená "ještě není hotovo".
-   U mřížky je odpovědí řetězec hodnot v pořadí `ex.hidden` - generátor
-   skládá `ex.answer` stejně, takže porovnání níž zůstává obyčejné ===. */
+   U mřížky i u rozkladu je odpovědí řetězec hodnot v pořadí `ex.hidden` -
+   generátor skládá `ex.answer` stejně, takže porovnání níž zůstává
+   obyčejné ===. */
 function readAnswer(ex) {
-  if (ex.kind === 'grid') {
-    const vals = gridInputs().map((i) => i.value.trim());
+  if (hasParts(ex)) {
+    const vals = partInputs(ex).map((i) => i.value.trim());
     return vals.some((v) => v === '') ? null : vals.join(', ');
   }
   const raw = el('answerInput').value.trim();
@@ -1057,25 +1135,24 @@ function readAnswer(ex) {
   return CHOICE_KINDS.has(ex.kind) ? (el('answerInput').dataset.op || null) : Number(raw);
 }
 
-/* Co zatřese, když odpověď chybí. U mřížky jen nevyplněná kolečka. */
+/* Co zatřese, když odpověď chybí. U dílčích políček jen ta nevyplněná. */
 function shakeEmpty(ex) {
-  const spots = ex.kind === 'grid'
-    ? gridInputs().filter((i) => i.value.trim() === '').map((i) => i.closest('.gcell'))
+  const spots = hasParts(ex)
+    ? partInputs(ex).filter((i) => i.value.trim() === '').map((i) => i.closest('.slot'))
     : [el('answerSlot')];
   for (const s of spots) s?.classList.add('is-wrong');
   setTimeout(() => spots.forEach((s) => s?.classList.remove('is-wrong')), 450);
 }
 
-/* Obarvení po vyhodnocení. U mřížky se každé kolečko soudí samo za sebe. */
+/* Obarvení po vyhodnocení. U dílčích políček se každé soudí samo za sebe. */
 function markResult(ex, correct) {
-  if (ex.kind !== 'grid') {
+  if (!hasParts(ex)) {
     el('answerSlot').classList.add(correct ? 'is-correct' : 'is-wrong');
     return;
   }
-  gridInputs().forEach((input, i) => {
-    const { r, c } = ex.hidden[i];
-    const ok = Number(input.value) === ex.cells[r][c];
-    input.closest('.gcell').classList.add(ok ? 'is-correct' : 'is-wrong');
+  partInputs(ex).forEach((input, i) => {
+    const ok = Number(input.value) === partValue(ex, i);
+    input.closest('.slot').classList.add(ok ? 'is-correct' : 'is-wrong');
   });
 }
 
@@ -1095,7 +1172,7 @@ function submit() {
   if (!correct && retriesLeft > 0) {
     retriesLeft -= 1;
     retried = true;
-    if (ex.kind === 'grid') gridRetry(ex); else softRetry(given);
+    if (hasParts(ex)) partRetry(ex); else softRetry(given);
     return;
   }
 
@@ -1121,28 +1198,38 @@ function submit() {
   if (correct) confetti();
 }
 
-/* Druhý pokus u mřížky. Správně vyplněná kolečka necháme být - mazat je
-   by bylo trestání. Vyprázdní se jen ta chybná a zčervenají; červená zmizí,
-   jakmile do kolečka dítě začne psát. */
-function gridRetry(ex) {
+/* Druhý pokus u úloh s dílčími políčky. Správně vyplněná necháme být - mazat
+   je by bylo trestání. Vyprázdní se jen ta chybná a zčervenají; červená
+   zmizí, jakmile do políčka dítě začne psát. */
+const RETRY_NOTE = {
+  grid: (wrong) => {
+    const kolecka = wrong === 1 ? 'kolečko ještě nesedí' : wrong <= 4 ? 'kolečka ještě nesedí' : 'koleček ještě nesedí';
+    return `${wrong} ${kolecka} (červená). Hledej řádek nebo sloupec,
+      kde chybí jediné číslo – od něj se rozmotá zbytek.`;
+  },
+  over10: (wrong) => {
+    const policka = wrong === 1 ? 'políčko ještě nesedí' : wrong <= 4 ? 'políčka ještě nesedí' : 'políček ještě nesedí';
+    return `${wrong} ${policka} (červená). Začni odshora: kolik chybí prvnímu číslu do desítky?
+      Přesně tolik si uber z toho druhého a zbytek napiš vedle.`;
+  },
+};
+
+function partRetry(ex) {
   let wrong = 0;
-  gridInputs().forEach((input, i) => {
-    const { r, c } = ex.hidden[i];
-    if (Number(input.value) === ex.cells[r][c]) return;
+  partInputs(ex).forEach((input, i) => {
+    if (Number(input.value) === partValue(ex, i)) return;
     wrong += 1;
     input.value = '';
-    input.closest('.gcell').classList.add('is-wrong');
+    input.closest('.slot').classList.add('is-wrong');
   });
 
-  const kolecka = wrong === 1 ? 'kolečko ještě nesedí' : wrong <= 4 ? 'kolečka ještě nesedí' : 'koleček ještě nesedí';
   const fb = el('feedback');
   fb.dataset.state = 'retry';
   fb.innerHTML = `<div class="fb-badge"><span aria-hidden="true">💪</span> Ještě ne – zkus to znovu!</div>
-    <p class="fb-retry-note">${wrong} ${kolecka} (červená). Hledej řádek nebo sloupec,
-    kde chybí jediné číslo – od něj se rozmotá zbytek.</p>`;
+    <p class="fb-retry-note">${RETRY_NOTE[ex.kind](wrong)}</p>`;
   fb.hidden = false;
   beep('wrong');
-  gridInputs()[0]?.focus({ preventScroll: true });
+  partInputs(ex)[0]?.focus({ preventScroll: true });
 }
 
 /* Špatná odpověď u hádanky ještě neznamená konec - políčko se vyprázdní
@@ -1204,17 +1291,18 @@ function tenFrameHTML(ex) {
     <p class="tenframe-caption">${caption}</p>`;
 }
 
-/* Po druhé chybě mřížku dopíšeme rovnou do koleček - dítě tak vidí řešení
-   na místě, kde ho hledalo, a ne jako seznam čísel pod tím. Vlastní špatnou
+/* Po druhé chybě řešení dopíšeme rovnou do políček - dítě ho tak vidí na
+   místě, kde ho hledalo, a ne jako seznam čísel pod tím. Vlastní špatnou
    hodnotu ukážeme pod správnou, přeškrtnutou. */
-function revealGrid(ex) {
-  gridInputs().forEach((input, i) => {
-    const { r, c } = ex.hidden[i];
-    const right = ex.cells[r][c];
+const REVEAL_CLASS = { grid: 'gnum', over10: 'o10-revealed' };
+
+function revealParts(ex) {
+  partInputs(ex).forEach((input, i) => {
+    const right = partValue(ex, i);
     const mine = input.value.trim();
-    const cell = input.closest('.gcell');
+    const cell = input.closest('.slot');
     cell.classList.remove('slot');
-    cell.classList.add('gnum', 'is-revealed');
+    cell.classList.add(REVEAL_CLASS[ex.kind], 'is-revealed');
     cell.innerHTML = Number(mine) === right
       ? `<span class="gval">${right}</span>`
       : `<span class="gval">${right}</span><span class="gwas">${mine}</span>`;
@@ -1250,10 +1338,14 @@ function renderFeedback(ex, given, correct) {
   const gave = CHOICE_KINDS.has(ex.kind) ? symbol(given) : (Number.isFinite(given) ? given : null);
   /* U mřížky by výpis "Správně je 2, 3, 4" nic neřekl - správné hodnoty už
      jsou vidět v kolečkách, která se právě doplnila. */
-  const head = ex.kind === 'grid'
-    ? '<div class="fb-answer">Takhle měla mřížka vyjít – doplnila jsem ji nahoře.</div>'
+  const PARTS_HEAD = {
+    grid: 'Takhle měla mřížka vyjít – doplnila jsem ji nahoře.',
+    over10: 'Takhle se příklad rozloží – doplnila jsem ho nahoře.',
+  };
+  const head = hasParts(ex)
+    ? `<div class="fb-answer">${PARTS_HEAD[ex.kind]}</div>`
     : `<div class="fb-answer">Správně je <b>${shown(ex.answer)}</b>${gave ? ` <span class="retry-given">(napsala jsi ${gave})</span>` : ''}</div>`;
-  if (ex.kind === 'grid') revealGrid(ex);
+  if (hasParts(ex)) revealParts(ex);
   fb.innerHTML = `
     <div class="fb-badge"><span aria-hidden="true">🤔</span> Tentokrát ne</div>
     ${head}
@@ -1379,11 +1471,12 @@ function renderResult(r) {
       ? ''
       : `<p class="trend">${r.trend > 0 ? `📈 O ${r.trend} % lepší než minule!` : r.trend < 0 ? `📉 O ${Math.abs(r.trend)} % méně než minule – nic se neděje.` : '➡️ Stejně jako minule.'}</p>`;
 
-  /* U hádanek nemá rozpad podle operací co říct (všechno je sčítání),
-     zajímavější je, jak šly jednotlivé obtížnosti. */
+  /* U hádanek ani u rozkladu přes desítku nemá rozpad podle operací co říct
+     (všechno je sčítání), zajímavější je, jak šly jednotlivé obtížnosti. */
   const riddle = isRiddleMode();
+  const byLevels = usesLevel();
   const levels = levelTable();
-  const groups = riddle
+  const groups = byLevels
     ? r.byLevel.map((g) => ({ ...g, name: `${levels[g.key].emoji} ${levels[g.key].label}` }))
     : r.byOp.map((g) => ({ ...g, name: `${OPS[g.key].emoji} ${OPS[g.key].label}` }));
 
@@ -1407,7 +1500,9 @@ function renderResult(r) {
 
   const retryNote = riddle
     ? 'Příště přijdou nové hádanky s jinými obrázky.'
-    : 'Podobné příklady se objeví v dalším kole.';
+    : isOver10Mode()
+      ? 'Příště přijdou nové příklady na rozklad.'
+      : 'Podobné příklady se objeví v dalším kole.';
 
   const retry = r.missedList.length
     ? `<div class="card">
@@ -1425,8 +1520,9 @@ function renderResult(r) {
     : `<div class="card"><h2 class="card-title"><span aria-hidden="true">✨</span> Bez jediné chyby!</h2>
         <p style="margin:0;font-weight:700;color:var(--ink-soft)">Nic k procvičení – tohle byla čistá práce.</p></div>`;
 
+  const jednotka = riddle ? 'hádanku' : isOver10Mode() ? 'rozklad' : 'příklad';
   const avg = r.avgMs
-    ? `<p class="score-sub">Průměrně ${(r.avgMs / 1000).toFixed(1)} s na ${riddle ? 'hádanku' : 'příklad'}</p>`
+    ? `<p class="score-sub">Průměrně ${(r.avgMs / 1000).toFixed(1)} s na ${jednotka}</p>`
     : '';
 
   el('resultBody').innerHTML = `
@@ -1447,7 +1543,7 @@ function renderResult(r) {
     </div>
 
     <div class="card">
-      <h2 class="card-title"><span aria-hidden="true">📊</span> ${riddle ? 'Podle obtížnosti' : 'Podle operací'}</h2>
+      <h2 class="card-title"><span aria-hidden="true">📊</span> ${byLevels ? 'Podle obtížnosti' : 'Podle operací'}</h2>
       <div class="bars">${bars}</div>
     </div>
 

@@ -50,7 +50,7 @@ export const REWARD_RULES = {
      ulohu zvlast, ne az na hotovy prumer - jedna slovni uloha v sade tak
      opravdu prida cas na tri priklady. Drz cela cisla, nasobek se zobrazuje
      v navodu a desetinne cislo do textu pro dite nepatri. */
-  speedKindMultiplier: { equation: 1, word: 3, bond: 2, sign: 2, compare: 1, riddle: 3, grid: 4 },
+  speedKindMultiplier: { equation: 1, word: 3, bond: 2, sign: 2, compare: 1, over10: 2, riddle: 3, grid: 4 },
   speedLevelMultiplier: { easy: 1, medium: 1.3, hard: 1.7 },
 
   /* Epicky: bud hodne spocitanych prikladu za dnesek (podminka je "vic nez"),
@@ -182,7 +182,8 @@ const kindWeight = (kind) => REWARD_RULES.speedKindMultiplier[kind] ?? 1;
 
 /* Druh, kterym nahradime ulohy bez rozpisu - stara ulozena data i souhrn,
    ktery `kindCounts` neposlal. */
-const defaultKind = (mode) => (mode === 'riddle' ? 'riddle' : mode === 'grid' ? 'grid' : 'equation');
+const DEFAULT_KIND_BY_MODE = { riddle: 'riddle', grid: 'grid', over10: 'over10' };
+const defaultKind = (mode) => DEFAULT_KIND_BY_MODE[mode] || 'equation';
 
 /* Casovy rozpocet cele sady v sekundach. Kazda uloha si prispeje vlastnim
    pridelem podle druhu, takze slovni uloha mezi beznymi priklady rozpocet
@@ -249,7 +250,8 @@ export function performanceTier(summary, dailyCorrect) {
 }
 
 /* Nazev jedne ulohy podle rezimu - do vety o rychlosti. */
-const unitName = (mode) => (mode === 'riddle' ? 'hádanku' : mode === 'grid' ? 'mřížku' : 'příklad');
+const UNIT_BY_MODE = { riddle: 'hádanku', grid: 'mřížku', over10: 'rozklad' };
+const unitName = (mode) => UNIT_BY_MODE[mode] || 'příklad';
 
 /* Cesky duvod: rekne presne tu podminku, ktera dumplinga vynesla nejvys. */
 function reasonFor(parts, summary, dailyCorrect) {
@@ -444,6 +446,7 @@ export function howToGet(category) {
   const delsiUlohy = `Delší úlohy mají času víc: ${[
     nasobek('word', 'slovní úloha se počítá'),
     nasobek('bond', 'pyramida'),
+    nasobek('over10', 'rozklad přes desítku'),
     nasobek('riddle', 'hádanka'),
     nasobek('grid', 'mřížka'),
   ].join(', ')}.`;

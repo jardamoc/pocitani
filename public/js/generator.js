@@ -1,6 +1,7 @@
 import { rnd, pick, chance, shuffle } from './random.js';
 import { makeRiddle, riddleExplain, riddleText } from './riddle.js';
 import { makeGrid, gridExplain, gridText } from './grid.js';
+import { makeOver10, over10Explain, over10Text } from './over10.js';
 
 export const OPS = {
   add: { symbol: '+', label: 'Sčítání', name: 'sčítání', emoji: '➕' },
@@ -394,8 +395,39 @@ export function buildGridRound(config) {
   return [gridExercise(config)];
 }
 
+/* ---------------- počítej přes 10 ----------------
+   Odpovědí je stejně jako u mřížky ŘETĚZEC hodnot doplňovaných políček
+   spojený ', ' v pořadí `ex.hidden`, takže `given === ex.answer` v submit()
+   funguje beze změny. `op: 'add'` je tu skutečné sčítání, ne zástupná
+   hodnota - desítkový rámec ve vysvětlení proto dává smysl a nechává se. */
+function over10Exercise(config) {
+  const o = makeOver10(config.max, config.level);
+  return {
+    ...o,
+    op: 'add',
+    kind: 'over10',
+    missing: 'c',
+    cross: true,               // přes desítku se přechází z definice úlohy
+    skill: `over10:${o.level}`,
+    answer: o.values.join(', '),
+  };
+}
+
+export function buildOver10Round(config) {
+  const items = [];
+  const seen = new Set();
+  for (let i = 0; i < config.count; i++) {
+    let ex = over10Exercise(config);
+    for (let t = 0; t < 8 && seen.has(ex.key); t++) ex = over10Exercise(config);
+    seen.add(ex.key);
+    items.push(ex);
+  }
+  return items;
+}
+
 export function exToText(ex, reveal = false) {
   if (ex.kind === 'grid') return gridText(ex, reveal);
+  if (ex.kind === 'over10') return over10Text(ex, reveal);
   if (ex.kind === 'riddle') return riddleText(ex, reveal);
   if (ex.kind === 'sign') {
     return `${ex.a} ${reveal ? OPS[ex.op].symbol : '__'} ${ex.b} = ${ex.c}`;
@@ -450,6 +482,7 @@ export function explain(ex) {
   const { op, kind, missing, a, b, c } = ex;
 
   if (kind === 'grid') return gridExplain(ex);
+  if (kind === 'over10') return over10Explain(ex);
   if (kind === 'riddle') return riddleExplain(ex);
 
   /* Porovnavani vysvetlujeme slovy, ne odectenim - rozdil by u obraceneho
@@ -575,6 +608,7 @@ export const TAGS = {
   offTen: 'chyba o desítku',
   riddleSymbol: 'hodnota obrázku místo součtu',
   gridPartial: 'část mřížky správně',
+  over10Partial: 'část rozkladu správně',
   compareFlip: 'obrácený zobáček',
   other: 'jiná chyba',
 };
@@ -586,6 +620,10 @@ export function diagnose(ex, given) {
   /* Mřížka musí ven dřív, než se sáhne na aritmetiku - odpovědí je řetězec
      a `Math.abs(given - answer)` by dal NaN. */
   if (kind === 'grid') return 'gridPartial';
+
+  /* Rozklad přes desítku musí ven ze stejného důvodu - odpovědí je řetězec
+     hodnot všech políček, ne jedno číslo. */
+  if (kind === 'over10') return 'over10Partial';
 
   // typická chyba u hádanek: dítě napíše, kolik je jeden obrázek
   if (kind === 'riddle' && ex.values.includes(given)) return 'riddleSymbol';

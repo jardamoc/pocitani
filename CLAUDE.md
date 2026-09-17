@@ -78,6 +78,7 @@ běžel. Vypadalo to jako chyba nasazení, a nebyla.
 | `public/js/generator.js` | generování příkladů, vysvětlení po chybě, rozbor chyby |
 | `public/js/riddle.js` | generátor obrázkových hádanek (samostatný, generator.js si ho importuje) |
 | `public/js/grid.js` | generátor mřížek (stejně samostatný jako `riddle.js`) |
+| `public/js/over10.js` | generátor rozkladů přes desítku (stejně samostatný jako `grid.js`) |
 | `public/js/stats.js` | rozbor kola, rady, `sanitizeState()` — **na úložiště nesahá** |
 | `public/js/storage.js` | **jediná vrstva nad úložištěm** — načtení, fronta zápisů, mazání, vyměnitelný backend |
 | `public/js/validate.js` | `wholeNumber` / `textList` — sdílené kousky validace, bez DOM |
@@ -107,7 +108,7 @@ na neexistující soubor. Když je tam někdy mít chceš, přidej napřed vlast
 | `package.json` | jen ty tři zkratky a `"type": "module"`; žádné závislosti |
 
 Prosté ES moduly, žádný framework, žádné závislosti. Závislosti jdou jedním směrem:
-`random.js → riddle.js / grid.js → generator.js → app.js`,
+`random.js → riddle.js / grid.js / over10.js → generator.js → app.js`,
 `rewards-data.js → rewards.js → rewards-ui.js → app.js`,
 `validate.js → stats.js / rewards.js → storage.js → app.js` a
 `qr.js / transfer.js → export-ui.js → app.js`. Kruh nezaváděj.
@@ -151,13 +152,14 @@ Co z toho plyne pro psaní kódu:
 - **`mergePayload()` v `transfer.js` neukládá.** Slučování je čistá operace v paměti,
   která vrátí souhrn změn; zapisuje až `acceptIncoming()` v `app.js`.
 
-## Tři režimy hry
+## Čtyři režimy hry
 
 Na úvodní obrazovce se vybírá karta **„Co si zahrajeme?"**:
 
 | režim | `config.mode` | co se v nastavení skryje |
 |---|---|---|
 | **Počítání** | `calc` | — (vybírají se operace i druhy úloh navíc) |
+| **Počítej přes 10** | `over10` | operace (je to vždy sčítání), „něco navíc" |
 | **Obrázkové hádanky** | `riddle` | operace, „něco navíc" |
 | **Mřížka** | `grid` | „něco navíc", **počet příkladů** (jedna mřížka = jedno kolo) |
 
@@ -165,16 +167,24 @@ Větve se rozcházejí až v `startRound()`, kde je tabulka builderů. Všechno 
 klávesnice, vyhodnocení, statistiky — je společné, protože každá úloha má stejný tvar:
 `{ op, kind, missing, a, b, c, answer, skill }`.
 
-`config.level` je **společný pro hádanky i mřížku** (klíče `easy`/`medium`/`hard`), takže
-přepnutí režimu obtížnost neztratí. Tabulku popisků vybírá `levelTable()` podle režimu.
+`config.level` je **společný pro všechny tři režimy s obtížností** (klíče
+`easy`/`medium`/`hard`), takže přepnutí režimu obtížnost neztratí. Hlídá se proti společné
+množině `LEVEL_ALL` v `normalizeConfig()`, ne proti tabulce jednoho režimu. Tabulku
+popisků vybírá `levelTable()` podle režimu.
+
+**Úlohy s víc políčky mají společnou cestu.** Mřížka i rozklad přes desítku mají místo
+jednoho políčka na odpověď několik dílčích; odpovědí je u obou **řetězec** hodnot spojený
+`', '` v pořadí `ex.hidden`. V `app.js` je na to tabulka `PART_SEL` a nad ní
+`partInputs()` / `partValue()` / `hasParts()` — čtení odpovědi, třesení prázdných políček,
+obarvení, druhý pokus i dopsání řešení jedou přes ně. **Když přidáš třetí takovou úlohu,
+stačí řádek v `PART_SEL`**, ne nová větev na pěti místech.
 
 **Když přidáváš nový druh úlohy, drž se tohohle tvaru.** Ušetří ti to práci na pěti místech.
 Stačí pak: položka v `EXTRA_KINDS`, větev v `makeExercise()`, funkce v `BODY_HTML`,
 větev v `hintFor()` / `explain()` / `exToText()` a popisek v `KIND_LABEL` ve `stats.js`.
 
-**Chystá se:** režim „Počítej přes 10" (rozklad krok za krokem) a „Pexeso" (kartičky
-příklad ↔ výsledek, obsah řídí zapnuté operace). Plán je v
-`~/.claude/plans/dynamic-swimming-sparkle.md`; u pexesa zbývá potvrdit toleranci chybných
+**Chystá se:** režim „Pexeso" (kartičky příklad ↔ výsledek, obsah řídí zapnuté operace).
+Plán je v `~/.claude/plans/dynamic-swimming-sparkle.md`; zbývá potvrdit toleranci chybných
 otočení, protože doslovná nula je u paměťové hry nedosažitelná.
 
 ## Obrázkové hádanky — jak se staví
@@ -264,6 +274,47 @@ Další pravidla:
   jen jako zástupná hodnota, aby `OPS[ex.op]` nikde nespadlo — proto `tenFrameHTML`
   musí mřížku hned na začátku vyloučit, jinak nakreslí prázdný desítkový rámec.
 
+## Počítej přes 10
+
+```
+6 + 7
+= 6 + [4] + [3]
+= [10] + [3]
+= [13]
+```
+
+Rozklad se **staví, ne hádá**: vylosuje se první číslo, z jeho jednotek plyne, kolik chybí
+do desítky (`ten`), a teprve k tomu se dolosuje zbytek. Druhé číslo tak vždycky vyjde
+jednociferné a přes desítku se opravdu přejde. Jednotky prvního čísla musí být **aspoň 2** —
+při jedničce by do desítky chybělo 9 a druhé číslo by bylo dvojciferné.
+
+**Obtížnost = kolik kroků dítě doplňuje**, ne jak velká jsou čísla (ta řídí výhradně
+rozsah). Pole `fields` v `OVER10_LEVELS` je zároveň pořadí políček na obrazovce i pořadí
+hodnot v odpovědi:
+
+| úroveň | co je skryté |
+|---|---|
+| lehká | jen rozklad `ten`, `rest` |
+| střední | rozklad a výsledek |
+| těžká | celý zápis včetně mezisoučtu (pět políček) |
+
+Pár věcí, které se snadno rozbijí:
+
+- **Do 10 se přes desítku přejít nedá** — nejmenší takový součet je 11. Pod hranicí
+  `OVER10_MIN_MAX` (12) se místo tichého porušení rozsahu počítá do 20 a `over10RangeNote()`
+  to napíše. Hláška patří pod **„Do kolika počítáme?"**, ne k operacím — karta s operacemi
+  je v tomhle režimu schovaná.
+- `op: 'add'` je tu **skutečné sčítání**, ne zástupná hodnota jako u mřížky. Desítkový
+  rámec (`tenFrameHTML`) se proto schválně kreslí a `cross` je natvrdo `true`.
+- **`diagnose()` musí tenhle druh vyloučit hned na začátku** jako mřížku — odpovědí je
+  řetězec a `Math.abs(given − answer)` by dal `NaN`.
+- Rozklad se **neukládá do „k procvičení"** (`NO_REPEAT` ve `stats.js`) — `makeExercise()`
+  ho neumí a z descriptoru by se nesložil.
+- Ve `stats.js` patří do `levelMode` (rozpad podle obtížnosti, ne podle operací) —
+  „sčítání ti jde" by u režimu, kde je sčítání úplně všude, neřeklo nic.
+- **Vlastní hodnota po druhé chybě je v toku pod správnou**, ne absolutně umístěná jako
+  u mřížky. Políčko rozkladu je nižší než kolečko mřížky a obě čísla by se překryla.
+
 ## Doplň znaménko
 
 `7 __ 3 = 10`. Nabídka tlačítek je přesně ta sada operací, kterou má uživatel zapnutou,
@@ -343,7 +394,8 @@ Pár věcí, které se snadno rozbijí:
 - **Rychlost se měří časovým rozpočtem celé sady, ne průměrem na jeden příklad.** Základ
   je 15 s na jeden běžný příklad (`REWARD_RULES.fastSeconds`). Každá úloha si do rozpočtu
   přispěje vlastním přídělem podle druhu (`speedKindMultiplier`): běžný příklad 1×, slovní
-  úloha 3×, pyramida 2×, doplňování znaménka 2×, hádanka 3×, mřížka 4×. Rozpočet ještě
+  úloha 3×, pyramida 2×, doplňování znaménka 2×, rozklad přes desítku 2×, hádanka 3×,
+  mřížka 4×. Rozpočet ještě
   násobí obtížnost (`speedLevelMultiplier`: lehká 1, střední 1,3, těžká 1,7). Porovnává se
   součet skutečného času celé sady proti součtu těchhle přídělů (`speedBudget()`).
   Dřív se počítal jeden průměr na celou sadu a roztahoval se jen podle režimu (hádanka ×3,
