@@ -186,8 +186,12 @@ Stačí pak: položka v `EXTRA_KINDS`, větev v `makeExercise()`, funkce v `BODY
 větev v `hintFor()` / `explain()` / `exToText()` a popisek v `KIND_LABEL` ve `stats.js`.
 
 Všechny tři etapy plánu `~/.claude/plans/dynamic-swimming-sparkle.md` (Větší/menší,
-Počítej přes 10, Pexeso) jsou hotové. Třetí etapa se během práce na uživatelovo přání
-změnila z pexesa na spojovačku „Najdi dvojice" (viz níž) a zatím čeká na nasazení.
+Počítej přes 10, Pexeso) jsou hotové a nasazené. Třetí etapa se během práce
+na uživatelovo přání změnila z pexesa na spojovačku „Najdi dvojice" (viz níž).
+
+**Chystá se:** režim „Velké násobení" (`bigmul`) — rozklad `85 · 5` na kroky, v každém
+se vybírá ze dvou možností. Plán je v `~/.claude/plans/lexical-rolling-floyd.md`,
+odsouhlasený, zatím nezačatý.
 
 ## Obrázkové hádanky — jak se staví
 
