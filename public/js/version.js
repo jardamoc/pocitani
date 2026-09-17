@@ -5,7 +5,7 @@
  * Zavislosti: cista data, nic neimportuje -> export-ui.js
  */
 
-export const VERZE = { datum: '2026-09-17', poradi: 1 };
+export const VERZE = { datum: '2026-09-17', poradi: 2 };
 
 /* "2026-09-17" -> "17. 9. 2026". Bez Intl, at je to jiste ceske i na
    zarizeni nastavenem na jiny jazyk. */
