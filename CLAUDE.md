@@ -79,6 +79,7 @@ běžel. Vypadalo to jako chyba nasazení, a nebyla.
 | `public/js/riddle.js` | generátor obrázkových hádanek (samostatný, generator.js si ho importuje) |
 | `public/js/grid.js` | generátor mřížek (stejně samostatný jako `riddle.js`) |
 | `public/js/over10.js` | generátor rozkladů přes desítku (stejně samostatný jako `grid.js`) |
+| `public/js/pexeso.js` | generátor ploch pro „Najdi dvojice" (stejně samostatný jako `grid.js`) |
 | `public/js/stats.js` | rozbor kola, rady, `sanitizeState()` — **na úložiště nesahá** |
 | `public/js/storage.js` | **jediná vrstva nad úložištěm** — načtení, fronta zápisů, mazání, vyměnitelný backend |
 | `public/js/validate.js` | `wholeNumber` / `textList` — sdílené kousky validace, bez DOM |
@@ -108,7 +109,7 @@ na neexistující soubor. Když je tam někdy mít chceš, přidej napřed vlast
 | `package.json` | jen ty tři zkratky a `"type": "module"`; žádné závislosti |
 
 Prosté ES moduly, žádný framework, žádné závislosti. Závislosti jdou jedním směrem:
-`random.js → riddle.js / grid.js / over10.js → generator.js → app.js`,
+`random.js → riddle.js / grid.js / over10.js / pexeso.js → generator.js → app.js`,
 `rewards-data.js → rewards.js → rewards-ui.js → app.js`,
 `validate.js → stats.js / rewards.js → storage.js → app.js` a
 `qr.js / transfer.js → export-ui.js → app.js`. Kruh nezaváděj.
@@ -152,7 +153,7 @@ Co z toho plyne pro psaní kódu:
 - **`mergePayload()` v `transfer.js` neukládá.** Slučování je čistá operace v paměti,
   která vrátí souhrn změn; zapisuje až `acceptIncoming()` v `app.js`.
 
-## Čtyři režimy hry
+## Pět režimů hry
 
 Na úvodní obrazovce se vybírá karta **„Co si zahrajeme?"**:
 
@@ -162,12 +163,13 @@ Na úvodní obrazovce se vybírá karta **„Co si zahrajeme?"**:
 | **Počítej přes 10** | `over10` | operace (je to vždy sčítání), „něco navíc" |
 | **Obrázkové hádanky** | `riddle` | operace, „něco navíc" |
 | **Mřížka** | `grid` | „něco navíc", **počet příkladů** (jedna mřížka = jedno kolo) |
+| **Najdi dvojice** | `pexeso` | „něco navíc", **počet příkladů** (jedna plocha = jedno kolo) |
 
 Větve se rozcházejí až v `startRound()`, kde je tabulka builderů. Všechno ostatní —
 klávesnice, vyhodnocení, statistiky — je společné, protože každá úloha má stejný tvar:
 `{ op, kind, missing, a, b, c, answer, skill }`.
 
-`config.level` je **společný pro všechny tři režimy s obtížností** (klíče
+`config.level` je **společný pro všechny čtyři režimy s obtížností** (klíče
 `easy`/`medium`/`hard`), takže přepnutí režimu obtížnost neztratí. Hlídá se proti společné
 množině `LEVEL_ALL` v `normalizeConfig()`, ne proti tabulce jednoho režimu. Tabulku
 popisků vybírá `levelTable()` podle režimu.
@@ -183,9 +185,9 @@ stačí řádek v `PART_SEL`**, ne nová větev na pěti místech.
 Stačí pak: položka v `EXTRA_KINDS`, větev v `makeExercise()`, funkce v `BODY_HTML`,
 větev v `hintFor()` / `explain()` / `exToText()` a popisek v `KIND_LABEL` ve `stats.js`.
 
-**Chystá se:** režim „Pexeso" (kartičky příklad ↔ výsledek, obsah řídí zapnuté operace).
-Plán je v `~/.claude/plans/dynamic-swimming-sparkle.md`; zbývá potvrdit toleranci chybných
-otočení, protože doslovná nula je u paměťové hry nedosažitelná.
+Všechny tři etapy plánu `~/.claude/plans/dynamic-swimming-sparkle.md` (Větší/menší,
+Počítej přes 10, Pexeso) jsou hotové. Třetí etapa se během práce na uživatelovo přání
+změnila z pexesa na spojovačku „Najdi dvojice" (viz níž) a zatím čeká na nasazení.
 
 ## Obrázkové hádanky — jak se staví
 
@@ -336,6 +338,71 @@ Pár věcí, které se snadno rozbijí:
 - **Vlastní hodnota po druhé chybě je v toku pod správnou**, ne absolutně umístěná jako
   u mřížky. Políčko rozkladu je nižší než kolečko mřížky a obě čísla by se překryla.
 
+## Najdi dvojice
+
+Kartičky s příklady a výsledky (`7+5` ↔ `12`). Dítě klepne na dvě; když k sobě patří,
+spojí se, jinak obě zčervenají a jde to zkusit znovu. **Jedna plocha = jedno kolo**,
+stejně jako mřížka.
+
+**Kartičky se neotáčejí a všechny jsou vidět od začátku** — uživatel si to takhle
+výslovně vyžádal. Původně to bylo pexeso (kartičky lícem dolů), ale trénovat se má
+počítání, ne paměť. **Otáčení sem nevracej.** Vnitřní klíč režimu zůstal `pexeso`
+(`config.mode`, `ex.kind`, soubor `pexeso.js`), protože je v uloženém nastavení
+i v historii kol — mění se jen viditelný název.
+
+**Příklady a výsledky mají každý svou barvu** (`--pair-task` modrá, `--pair-result`
+oranžová). Jsou schválně mimo tabulku témat: musí být čitelné ve světlém i tmavém režimu
+a rozlišitelné ve všech devíti tématech.
+
+**Co je na kartičkách, řídí karta „Co budeme počítat?"** — v tomhle režimu zůstává
+viditelná (na rozdíl od hádanek a rozkladu). Zapnout jen × znamená pexeso na násobilku;
+funguje i − a ÷.
+
+**Všechny výsledky na ploše musí být různé.** `7 + 5` i `8 + 4` dají 12; na ploše by pak
+byly dvě vizuálně stejné kartičky „12" a dítě by správně spojenou dvojici vidělo jako
+chybu. Výsledky se proto **nelosují a pak neověřují**: nejdřív se spočítá množina
+výsledků, kterých se dá při zapnutých operacích a daném rozsahu vůbec dosáhnout
+(`resultPool`), a teprve z ní se jich potřebný počet vybere. Ke známému výsledku se pak
+dolosuje zadání (`buildExample`), takže na jedné ploše můžou být příklady od všech
+zapnutých operací.
+
+**Plocha se smí zmenšit.** Do rozsahu „do 5" se deset různých výsledků nevejde a mlčky
+porušit rozsah nejde — ubere se tedy dvojice a `pexesoRangeNote()` to dopředu napíše.
+Rozhoduje o tom **jediná funkce `pexesoPlan()`**, kterou používá nastavení i generátor;
+hláška a skutečná plocha se tím nemůžou rozejít. Rada „zvedni rozsah" se dává jen tehdy,
+když opravdu pomůže: samotné dělení dá v násobilce nejvýš devět různých výsledků (2 až 10)
+a větší rozsah s tím nehne — tam se musí přidat operace.
+
+**Obtížnost = velikost plochy** (6 / 8 / 10 dvojic, tedy 3×4 / 4×4 / 4×5). Jak velká jsou
+čísla, řídí výhradně rozsah.
+
+**Chybou je spojení dvou kartiček, které k sobě nepatří.** Protože jsou všechny vidět,
+není to odhad jako u paměťové hry, ale skutečně špatně spočítaný příklad — hranice je
+proto přísná: `REWARD_RULES.pexesoMismatchAllowance` = **1 / 1 / 2**. Jedno přehlédnutí
+se odpouští, na těžké ploše o deseti dvojicích dvě. **Mění se jen na tom jednom místě**
+a návod v popupu se z něj generuje (`howToGet()`).
+
+Pár věcí, které se snadno rozbijí:
+
+- **Ovladač plochy je v `app.js` a společnou cestou `submit()` neprochází.** Po spojení
+  poslední dvojice si sám zapíše záznam do `attempts` v témž tvaru jako ostatní úlohy,
+  takže `next()`, `finish()`, `recordRound()` i `applyRound()` běží beze změny.
+  `given` je počet chybných spojení, ne číslo z políčka.
+- **Čtyři místa, která bez ošetření spadnou:** `renderExercise()` nesmí slepě sahat na
+  `#answerInput` (v tomhle režimu v DOM není), posluchač `keydown` musí hned odejít
+  (Enter by šel do `submit()`), `diagnose()` i `tenFrameHTML()` musí tenhle druh vyloučit
+  hned na začátku jako mřížku — `ex.op` je jen zástupné `'add'`.
+- **Klávesnice se v tomhle režimu schová** (`#keypad.hidden`), `renderKeypad()` se nevolá.
+- **Druhé klepnutí na vybranou kartičku výběr zruší** — dítě si to smí rozmyslet.
+- **Text v horní liště je `Dvojice 4×5`, ne „Dvojice · 8 dvojic"** — delší text se na
+  320 px do lišty nevejde a roztáhne celou stránku. Ověřeno měřením.
+- **Výsledková obrazovka je vlastní** (`renderPexesoResult`), protože prstenec s procenty
+  nad jedinou úlohou nic neřekne. **Pozor na formulaci:** plocha se vždycky nakonec
+  dohraje, takže „nevyšlo" tam neznamená nevyřešeno, ale „s moc chybnými spojeními".
+- **Zadání je na kartičce bez mezer** (`7+5`, `100÷10`) — s mezerami se na 320 px
+  do kartičky nevejde ani při nejmenším písmu. Ve vysvětlení po chybě mezery má.
+- `<button>` **nedědí barvu textu**, takže si ji kartička nastavuje sama.
+
 ## Doplň znaménko
 
 `7 __ 3 = 10`. Nabídka tlačítek je přesně ta sada operací, kterou má uživatel zapnutou,
@@ -396,7 +463,8 @@ na epického.
 
 **Bezchybná sada je podmínkou všeho.** Kolo s chybou dumplinga nepřinese. Chyba ale nic
 neodebírá — už získané postavičky se **nikdy** neztrácejí a „Smazat historii" se jich
-nedotkne.
+nedotkne. Jedinou výjimkou je režim „Najdi dvojice": tam se odpustí jedno přehlédnutí
+(`pexesoMismatchAllowance` = 1 / 1 / 2, viz *Najdi dvojice*).
 
 Legendárního nelze získat výkonem. Má **jedinou cestu — pravidelnost**: bezchybná sada
 aspoň v pěti z posledních sedmi kalendářních dnů. Dřív tu byly ještě tři další milníky
@@ -416,7 +484,7 @@ Pár věcí, které se snadno rozbijí:
   je 15 s na jeden běžný příklad (`REWARD_RULES.fastSeconds`). Každá úloha si do rozpočtu
   přispěje vlastním přídělem podle druhu (`speedKindMultiplier`): běžný příklad 1×, slovní
   úloha 3×, pyramida 2×, doplňování znaménka 2×, rozklad přes desítku 2×, hádanka 3×,
-  mřížka 4×. Rozpočet ještě
+  mřížka 4×, plocha s dvojicemi 6×. Rozpočet ještě
   násobí obtížnost (`speedLevelMultiplier`: lehká 1, střední 1,3, těžká 1,7). Porovnává se
   součet skutečného času celé sady proti součtu těchhle přídělů (`speedBudget()`).
   Dřív se počítal jeden průměr na celou sadu a roztahoval se jen podle režimu (hádanka ×3,

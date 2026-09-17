@@ -402,6 +402,7 @@ h1, h2, h3, .num, .box-value, .key, .score-big { font-family: 'Baloo 2', 'Nunito
 .chips-mode .chip.is-on[data-value="riddle"] { background: linear-gradient(135deg, #fb923c, #db2777); }
 .chips-mode .chip.is-on[data-value="grid"] { background: linear-gradient(135deg, #34d399, #0891b2); }
 .chips-mode .chip.is-on[data-value="over10"] { background: linear-gradient(135deg, #facc15, #ea580c); }
+.chips-mode .chip.is-on[data-value="pexeso"] { background: linear-gradient(135deg, #f472b6, #7c3aed); }
 
 /* obtížnost hádanek - barvy sedí na kolečka 🟢 🟡 🔴 na chipech */
 .chips .chip.is-on[data-value="easy"] { background: linear-gradient(135deg, #4ade80, #15803d); }
@@ -842,6 +843,65 @@ body.is-quiz .wrap { padding-top: 18px; }
 }
 .o10-revealed .gval { font-size: calc(var(--cell) * .40); }
 .o10-revealed .gwas { position: static; font-size: calc(var(--cell) * .22); margin-top: 2px; }
+
+/* ---------- najdi dvojice ----------
+   Všechny kartičky jsou vidět od začátku, dítě klepnutím spojuje příklad
+   s jeho výsledkem. **Kartičky se neotáčejí** - uživatel si to takhle
+   výslovně vyžádal, otáčení sem nevracej.
+
+   Příklady a výsledky mají každý svou barvu, aby bylo hned vidět, co se
+   s čím spojuje. Barvy jsou schválně mimo témata: musí být dobře čitelné
+   ve světlém i tmavém režimu a rozlišitelné ve všech devíti tématech.
+
+   Nejtěsnější případ je těžká plocha 4×5 na 320 px - kartička vyjde na
+   ~62 px, což je ještě dotykový cíl; proto má `body.is-wide-grid` uvolněné
+   okraje stránky (stejně jako u mřížky 5×5).
+
+   `<button>` NEDĚDÍ barvu textu, takže si ji kartička nastavuje sama -
+   jinak by byl v tmavém režimu černý text na tmavém podkladu. */
+:root { --pair-task: #1d4ed8; --pair-result: #b45309; }
+body.is-dark { --pair-task: #93c5fd; --pair-result: #fdba74; }
+
+.pex {
+  --pcell: clamp(76px, 24vw, 108px);
+  display: grid; justify-content: center;
+  gap: clamp(5px, 1.8vw, 10px);
+  grid-template-columns: repeat(3, var(--pcell));
+  min-width: 0;
+}
+.pex[data-cols="4"] {
+  --pcell: clamp(62px, 19vw, 92px);
+  grid-template-columns: repeat(4, var(--pcell));
+}
+
+/* Zadání je na kartičce bez mezer (`7+5`), jinak by se "100÷10" na 320 px
+   nevešlo ani při nejmenším písmu. */
+.pex-card {
+  width: var(--pcell); height: var(--pcell); min-width: 0;
+  display: grid; place-items: center; padding: 0 3px; cursor: pointer;
+  border: 3px solid var(--line); border-radius: 16px; background: var(--card);
+  font-family: 'Baloo 2', sans-serif; font-weight: 800; white-space: nowrap;
+  font-size: calc(var(--pcell) * .26); letter-spacing: -.5px;
+  transition: transform .12s ease, border-color .12s ease, opacity .25s ease;
+}
+.pex-card[data-face="task"] { color: var(--pair-task); }
+.pex-card[data-face="result"] { color: var(--pair-result); }
+
+/* vybraná kartička čeká na svůj protějšek */
+.pex-card.is-picked { border-color: var(--violet); transform: translateY(-3px); box-shadow: var(--shadow); }
+/* Spojená dvojice zůstane čitelná (dítě si může práci zkontrolovat), ale musí
+   být na první pohled hotová - proto celá zelená, ne jen světlejší. Zesvětlení
+   samo o sobě bylo od nespojených kartiček k nerozeznání.
+   Selektor má `[data-face]` schválně: barvu textu nastavuje i
+   `.pex-card[data-face="task"]` se stejnou specificitou a bez toho by
+   rozhodovalo pouhé pořadí pravidel. Bílá na `--good-dark` má kontrast 5,9. */
+.pex-card.is-done[data-face] {
+  background: var(--good-dark); border-color: var(--good-dark);
+  color: #fff; cursor: default;
+}
+.pex-card.is-miss { border-color: var(--bad); color: var(--bad-dark); }
+
+.pex-status { margin: 14px 0 0; text-align: center; font-weight: 700; color: var(--ink-soft); }
 
 /* velký odznak místo prstence s procenty na výsledkové obrazovce */
 .grid-verdict {

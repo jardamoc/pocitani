@@ -74,7 +74,7 @@ export function sanitizeState(raw) {
 }
 
 /* Druhy úloh, které se nedají z descriptoru znovu poskládat. */
-const NO_REPEAT = new Set(['riddle', 'grid', 'over10']);
+const NO_REPEAT = new Set(['riddle', 'grid', 'over10', 'pexeso']);
 
 const descriptor = (ex) => ({
   op: ex.op,
@@ -147,6 +147,7 @@ const KIND_LABEL = {
   'compare:rel': { acc: 'porovnávání čísel', gen: 'porovnávání čísel' },
   'grid:c': { acc: 'mřížky', gen: 'mřížek' },
   'over10:c': { acc: 'rozklady přes desítku', gen: 'rozkladů přes desítku' },
+  'pexeso:c': { acc: 'plochy s dvojicemi', gen: 'ploch s dvojicemi' },
 };
 
 function starsFor(pct) {
@@ -179,25 +180,27 @@ const LEVEL_NAME = { easy: 'Lehké', medium: 'Střední', hard: 'Těžké' };
 
 /* Jak se v rozpadu podle obtížnosti pojmenuje jedna úloha daného režimu.
    Rod i číslo musí sedět na věty "Lehké mřížky ti jdou výborně". */
-const MODE_UNITS = { grid: 'mřížky', riddle: 'hádanky', over10: 'rozklady' };
+const MODE_UNITS = { grid: 'mřížky', riddle: 'hádanky', over10: 'rozklady', pexeso: 'plochy' };
 
 export function analyze(state, config, attempts) {
   const riddleMode = config.mode === 'riddle';
   const gridMode = config.mode === 'grid';
   const over10Mode = config.mode === 'over10';
-  /* Režimy, kde se rozpad podle operací nehodí - hádanky i mřížky mají
-     `op: 'add'` jen jako zástupnou hodnotu a u rozkladu přes desítku je
+  const pexesoMode = config.mode === 'pexeso';
+  /* Režimy, kde se rozpad podle operací nehodí - hádanky, mřížky i pexeso
+     mají `op: 'add'` jen jako zástupnou hodnotu a u rozkladu přes desítku je
      sčítání zase úplně všude, takže by "sčítání ti jde" nic neřeklo.
-     Ve všech třech jedeme podle obtížnosti. */
-  const levelMode = riddleMode || gridMode || over10Mode;
+     Ve všech čtyřech jedeme podle obtížnosti. */
+  const levelMode = riddleMode || gridMode || over10Mode || pexesoMode;
   const total = attempts.length;
   const correct = attempts.filter((a) => a.correct).length;
   const pct = total ? Math.round((correct / total) * 100) : 0;
 
-  /* Porovnávání má `op: 'add'` jen zástupně - do rozpadu podle operací ani
-     do přechodu přes desítku nepatří, jinak by "sčítání ti jde" stálo z půlky
-     na úlohách, kde se nic nesčítá. */
-  const scored = attempts.filter((a) => a.ex.kind !== 'compare');
+  /* Porovnávání a pexeso mají `op: 'add'` jen zástupně - do rozpadu podle
+     operací ani do přechodu přes desítku nepatří, jinak by "sčítání ti jde"
+     stálo z půlky na úlohách, kde se nic nesčítá. */
+  const PLACEHOLDER_OP = new Set(['compare', 'pexeso']);
+  const scored = attempts.filter((a) => !PLACEHOLDER_OP.has(a.ex.kind));
   const byOp = group(scored, (a) => a.ex.op).sort((x, y) => y.seen - x.seen);
   const byLevel = group(attempts, (a) => a.ex.level || null)
     .sort((x, y) => LEVEL_ORDER.indexOf(x.key) - LEVEL_ORDER.indexOf(y.key));
@@ -275,6 +278,19 @@ export function analyze(state, config, attempts) {
       tips.push(harder
         ? `Šlo ti to skvěle – zkus příště ${harder} obtížnost, přibude obrázek navíc.`
         : 'Šlo ti to skvěle – tohle už je nejtěžší obtížnost hádanek.');
+    }
+  } else if (pexesoMode) {
+    /* Plocha se vždycky dohraje do konce, takže `pct` neříká, jestli jsou
+       dvojice spojené, ale jestli se to vešlo do povoleného počtu chybných
+       spojení. Rady tomu musí odpovídat. */
+    if (pct < 100) {
+      tips.push('Spočítej si příklad celý, teprve pak hledej jeho výsledek. Uhodnout se to nedá.');
+      tips.push('Začni dvojicemi, kterými si jsi jistá. Čím míň kartiček zbyde, tím snáz dopadnou ty zbylé.');
+    } else {
+      const harder = { easy: 'střední', medium: 'těžkou' }[config.level];
+      tips.push(harder
+        ? `Šlo ti to skvěle – zkus příště ${harder} obtížnost, kartiček bude víc.`
+        : 'Šlo ti to skvěle – tohle je největší plocha. Zkus zvýšit rozsah nebo přidat další operaci.');
     }
   } else if (over10Mode) {
     if (pct < 100) {

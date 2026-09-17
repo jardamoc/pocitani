@@ -2,6 +2,7 @@ import { rnd, pick, chance, shuffle } from './random.js';
 import { makeRiddle, riddleExplain, riddleText } from './riddle.js';
 import { makeGrid, gridExplain, gridText } from './grid.js';
 import { makeOver10, over10Explain, over10Text } from './over10.js';
+import { makePexeso, pexesoExplain, pexesoText } from './pexeso.js';
 
 export const OPS = {
   add: { symbol: '+', label: 'Sčítání', name: 'sčítání', emoji: '➕' },
@@ -131,6 +132,8 @@ function finalize(ex) {
 export function signature(ex) {
   // mřížka nemá trojici a,b,c - podpisem je otisk celé mřížky
   if (ex.kind === 'grid') return `grid|${ex.key}`;
+  // pexeso taky ne - podpisem je otisk všech dvojic na ploše
+  if (ex.kind === 'pexeso') return `pexeso|${ex.key}`;
   return `${ex.op}|${ex.kind}|${ex.missing}|${ex.a}|${ex.b}`;
 }
 
@@ -413,6 +416,34 @@ function over10Exercise(config) {
   };
 }
 
+/* ---------------- pexeso ----------------
+   Jedna plocha je celé kolo, stejně jako mřížka. Odpověď se ale nečte
+   z políčka - plochu obsluhuje vlastní ovladač v app.js, který po poslední
+   nalezené dvojici sám zapíše záznam do `attempts`. `answer` je tu proto jen
+   zástupné, aby na něj šlo bez obav sáhnout.
+
+   `op: 'add'` je zástupná hodnota jako u mřížky, ať `OPS[ex.op]` nikde
+   nespadne - skutečné operace jsou až na jednotlivých kartičkách. */
+function pexesoExercise(config) {
+  const p = makePexeso(config.max, config.level, config.ops);
+  return {
+    op: 'add',
+    kind: 'pexeso',
+    missing: 'c',
+    a: 0, b: 0, c: 0,
+    cross: false,
+    skill: `pexeso:${p.level}`,
+    answer: '',
+    ...p,
+  };
+}
+
+/* Jedna plocha je celé kolo - karta "kolik příkladů" se v tomhle režimu
+   schovává, stejně jako u mřížky. */
+export function buildPexesoRound(config) {
+  return [pexesoExercise(config)];
+}
+
 export function buildOver10Round(config) {
   const items = [];
   const seen = new Set();
@@ -428,6 +459,7 @@ export function buildOver10Round(config) {
 export function exToText(ex, reveal = false) {
   if (ex.kind === 'grid') return gridText(ex, reveal);
   if (ex.kind === 'over10') return over10Text(ex, reveal);
+  if (ex.kind === 'pexeso') return pexesoText(ex, reveal);
   if (ex.kind === 'riddle') return riddleText(ex, reveal);
   if (ex.kind === 'sign') {
     return `${ex.a} ${reveal ? OPS[ex.op].symbol : '__'} ${ex.b} = ${ex.c}`;
@@ -483,6 +515,7 @@ export function explain(ex) {
 
   if (kind === 'grid') return gridExplain(ex);
   if (kind === 'over10') return over10Explain(ex);
+  if (kind === 'pexeso') return pexesoExplain(ex);
   if (kind === 'riddle') return riddleExplain(ex);
 
   /* Porovnavani vysvetlujeme slovy, ne odectenim - rozdil by u obraceneho
@@ -609,6 +642,7 @@ export const TAGS = {
   riddleSymbol: 'hodnota obrázku místo součtu',
   gridPartial: 'část mřížky správně',
   over10Partial: 'část rozkladu správně',
+  pexesoMiss: 'moc chybných otočení',
   compareFlip: 'obrácený zobáček',
   other: 'jiná chyba',
 };
@@ -624,6 +658,10 @@ export function diagnose(ex, given) {
   /* Rozklad přes desítku musí ven ze stejného důvodu - odpovědí je řetězec
      hodnot všech políček, ne jedno číslo. */
   if (kind === 'over10') return 'over10Partial';
+
+  /* Pexeso musí ven ze stejného důvodu - "odpovědí" je počet chybných
+     otočení, ne výsledek příkladu. */
+  if (kind === 'pexeso') return 'pexesoMiss';
 
   // typická chyba u hádanek: dítě napíše, kolik je jeden obrázek
   if (kind === 'riddle' && ex.values.includes(given)) return 'riddleSymbol';

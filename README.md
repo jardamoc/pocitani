@@ -8,16 +8,18 @@ v zenskem rode a nikde se neobjevi zaporne ani desetinne cislo.
 
 ## Co to umi
 
-**Tri rezimy hry**
+**Pet rezimu hry**
 
 | rezim | co se v nem deje |
 |---|---|
-| **Pocitani** | priklady na scitani, odcitani, nasobeni a deleni, k tomu slovni ulohy, pyramidy a doplnovani znamenka |
+| **Pocitani** | priklady na scitani, odcitani, nasobeni a deleni, k tomu slovni ulohy, pyramidy, doplnovani znamenka a porovnavani cisel |
+| **Pocitej pres 10** | rozklad druheho cisla na cestu k desitce a zbytek, nakresleny jako vetvicka |
 | **Obrazkove hadanky** | soustava rovnic z obrazku, kde kazdy radek prozradi prave jeden novy obrazek |
 | **Mrizka** | kolecka s cisly, kde rovnice plati vodorovne i svisle |
+| **Najdi dvojice** | karticky s priklady a vysledky, dite je spojuje; co je na nich, ridi zapnute operace (jen × = nasobilka) |
 
 Rozsah cisel (do 10 az do 100), pocet prikladu i druhy uloh se vybiraji na uvodni
-obrazovce; obtiznost hadanek a mrizky je samostatna osa.
+obrazovce; obtiznost je u ctyr rezimu samostatna osa, nezavisla na rozsahu.
 
 **Sbirka dumplingu.** Za bezchybne kolo padne jedna sberatelska postavicka z 40
 v peti kategoriich. Vzacnost se ridi tim, jak rychle a jak tezke kolo bylo;
@@ -58,6 +60,8 @@ public/
     generator.js    generovani prikladu a vysvetleni po chybe
     riddle.js       obrazkove hadanky
     grid.js         mrizky
+    over10.js       rozklady pres desitku
+    pexeso.js       plochy pro "Najdi dvojice"
     stats.js        rozbor kola a rady
     storage.js      jedina vrstva nad ulozistem
     rewards*.js     pravidla odmen, data sprite sheetu, vykresleni

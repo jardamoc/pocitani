@@ -1,7 +1,8 @@
-import { OPS, COMPARES, EXTRA_KINDS, MISSING_LABEL, kindOps, buildRound, buildRiddleRound, buildGridRound, buildOver10Round, explain, diagnose } from './generator.js';
+import { OPS, COMPARES, EXTRA_KINDS, MISSING_LABEL, kindOps, buildRound, buildRiddleRound, buildGridRound, buildOver10Round, buildPexesoRound, explain, diagnose } from './generator.js';
 import { RIDDLE_LEVELS, RIDDLE_LEVEL_KEYS } from './riddle.js';
 import { GRID_LEVELS, GRID_LEVEL_KEYS, gridOpsNote, gridRangeNote } from './grid.js';
 import { OVER10_LEVELS, OVER10_LEVEL_KEYS, over10RangeNote } from './over10.js';
+import { PEXESO_LEVELS, PEXESO_LEVEL_KEYS, pexesoRangeNote } from './pexeso.js';
 import * as store from './stats.js';
 import * as rewards from './rewards.js';
 import * as storage from './storage.js';
@@ -28,12 +29,19 @@ const MODES = {
   over10: { label: 'Počítej přes 10', icon: '🔟', sub: 'Rozlož si příklad krok za krokem' },
   riddle: { label: 'Obrázkové hádanky', icon: '🧩', sub: 'Zjisti, kolik je který obrázek' },
   grid: { label: 'Mřížka', icon: '🔳', sub: 'Doplň čísla, ať sedí doprava i dolů' },
+  /* Vnitřní klíč zůstal `pexeso` z doby, kdy kartičky ležely lícem dolů.
+     Uživatel si pak vyžádal, aby byly vidět všechny - je z toho spojovačka,
+     ne paměťová hra. Klíč se schválně nepřejmenovává: je v uloženém
+     nastavení i v historii kol. */
+  pexeso: { label: 'Najdi dvojice', icon: '🔗', sub: 'Spoj příklad s jeho výsledkem' },
 };
 
 /* Tabulky obtížností podle režimu - klíče (easy/medium/hard) jsou schválně
    společné, takže `config.level` přežije přepnutí režimu. */
-const LEVEL_TABLES = { riddle: RIDDLE_LEVELS, grid: GRID_LEVELS, over10: OVER10_LEVELS };
-const LEVEL_KEYS = { riddle: RIDDLE_LEVEL_KEYS, grid: GRID_LEVEL_KEYS, over10: OVER10_LEVEL_KEYS };
+const LEVEL_TABLES = { riddle: RIDDLE_LEVELS, grid: GRID_LEVELS, over10: OVER10_LEVELS, pexeso: PEXESO_LEVELS };
+const LEVEL_KEYS = {
+  riddle: RIDDLE_LEVEL_KEYS, grid: GRID_LEVEL_KEYS, over10: OVER10_LEVEL_KEYS, pexeso: PEXESO_LEVEL_KEYS,
+};
 
 /* Společná množina klíčů obtížnosti. Tabulky výš ji musí mít všechny stejnou,
    aby přepnutí režimu nastavení nezahodilo. */
@@ -207,6 +215,7 @@ function saveConfig() {
 const isRiddleMode = () => config.mode === 'riddle';
 const isGridMode = () => config.mode === 'grid';
 const isOver10Mode = () => config.mode === 'over10';
+const isPexesoMode = () => config.mode === 'pexeso';
 /* Režimy, které mají obtížnost místo výběru druhů úloh. */
 const usesLevel = () => config.mode !== 'calc';
 const levelTable = () => LEVEL_TABLES[config.mode] || RIDDLE_LEVELS;
@@ -320,11 +329,13 @@ function applyTheme() {
 function renderModeCards() {
   const grid = isGridMode();
   const over10 = isOver10Mode();
+  const pexeso = isPexesoMode();
   // rozklad přes desítku je vždycky sčítání, výběr operací by tam nedával smysl
   el('card-ops').hidden = isRiddleMode() || over10;
   el('card-kinds').hidden = usesLevel();
   el('card-level').hidden = !usesLevel();
-  el('card-count').hidden = grid;
+  // jedna mřížka i jedna plocha pexesa jsou celé kolo - počet příkladů odpadá
+  el('card-count').hidden = grid || pexeso;
   el('countTitle').innerHTML = isRiddleMode()
     ? '<span aria-hidden="true">🔢</span> Kolik hádanek?'
     : '<span aria-hidden="true">🔢</span> Kolik příkladů?';
@@ -343,6 +354,20 @@ function renderModeCards() {
     maxNote.textContent = over10RangeNote(config.max)
       || 'Rozsah řídí, jak velká čísla se budou rozkládat. Kolik nápovědy dostaneš, si vybíráš výš u obtížnosti.';
     el('levelNote').textContent = `${level.label} – ${level.note}. Čísla do ${config.max}.`;
+    return;
+  }
+
+  if (pexeso) {
+    /* Na ploše nesmí být dva stejné výsledky, takže rozsah rozhoduje i o tom,
+       kolik dvojic se na ni vejde. Hláška o tom patří k rozsahu, hláška
+       o operacích k operacím - obě si říká `pexesoPlan()`. */
+    maxNote.textContent = 'Rozsah řídí, jak velká čísla na kartičkách budou. Kolik je kartiček, si vybíráš výš u obtížnosti.';
+    el('levelNote').textContent = `${level.label} – ${level.note}. Čísla do ${config.max}.`;
+    const note = pexesoRangeNote(config.level, config.ops, config.max);
+    if (note) {
+      opsNote.textContent = note;
+      opsNote.hidden = false;
+    }
     return;
   }
 
@@ -456,13 +481,16 @@ function renderLastHint() {
     hint.hidden = true;
     return;
   }
-  /* U mřížky je kolo jediná úloha, takže procenta nic neřeknou - zajímavější
-     je série z posledních kol. */
-  if (isGridMode()) {
-    const recent = state.rounds.filter((r) => r.mode === 'grid').slice(0, 5);
+  /* U mřížky i u pexesa je kolo jediná úloha, takže procenta nic neřeknou -
+     zajímavější je série z posledních kol. */
+  if (isGridMode() || isPexesoMode()) {
+    const mode = config.mode;
+    const recent = state.rounds.filter((r) => r.mode === mode).slice(0, 5);
     const done = recent.filter((r) => r.correct === r.total).length;
-    hint.textContent = `Z posledních ${recent.length === 1 ? 'mřížky' : `${recent.length} mřížek`} `
-      + `jsi zvládla ${done}.`;
+    const kolik = mode === 'grid'
+      ? (recent.length === 1 ? 'mřížky' : `${recent.length} mřížek`)
+      : (recent.length === 1 ? 'plochy' : `${recent.length} ploch`);
+    hint.textContent = `Z posledních ${kolik} jsi zvládla ${done}.`;
     hint.hidden = false;
     return;
   }
@@ -686,6 +714,7 @@ function startRound() {
     riddle: () => buildRiddleRound(config),
     grid: () => buildGridRound(config),   // jedna mřížka je celé kolo
     over10: () => buildOver10Round(config),
+    pexeso: () => buildPexesoRound(config), // jedna plocha je celé kolo
   };
   round = (build[config.mode] || build.calc)();
   index = 0;
@@ -745,24 +774,40 @@ function renderExercise() {
 
   el('quizCounter').textContent = ex.kind === 'grid'
     ? `Mřížka ${ex.size}×${ex.size}`
-    : `${index + 1} / ${round.length}`;
+    /* Rozměry plochy, ne počet dvojic: "Dvojice · 8 dvojic" je na 320 px
+       delší, než se do horní lišty vejde, a roztáhlo by stránku. */
+    : ex.kind === 'pexeso'
+      ? `Dvojice ${ex.cols}×${ex.rows}`
+      : `${index + 1} / ${round.length}`;
   el('dots').querySelectorAll('.dot').forEach((dot, i) => dot.classList.toggle('is-current', i === index));
   el('exerciseHint').textContent = hintFor(ex);
   el('exerciseBody').innerHTML = (BODY_HTML[ex.kind] || equationHTML)(ex);
-  /* Mřížka 5×5 je nejširší, co aplikace kreslí. Na úzkém telefonu jí
-     uvolníme okraje, ať nemusíme zmenšovat kolečka pod dotykový cíl. */
-  document.body.classList.toggle('is-wide-grid', ex.kind === 'grid' && ex.size >= 5);
+  /* Mřížka 5×5 a plocha pexesa o čtyřech sloupcích jsou nejširší, co
+     aplikace kreslí. Na úzkém telefonu jim uvolníme okraje, ať nemusíme
+     zmenšovat kolečka a kartičky pod dotykový cíl. */
+  document.body.classList.toggle(
+    'is-wide-grid',
+    (ex.kind === 'grid' && ex.size >= 5) || (ex.kind === 'pexeso' && ex.cols >= 4),
+  );
   el('feedback').hidden = true;
   el('feedback').innerHTML = '';
-  renderKeypad(ex);
+  /* Pexeso se ovládá klepáním na kartičky, žádná klávesnice u něj není. */
+  el('keypad').hidden = ex.kind === 'pexeso';
+  if (ex.kind !== 'pexeso') renderKeypad(ex);
   el('keypad').dataset.disabled = 'false';
   retriesLeft = RETRY_KINDS.has(ex.kind) ? 1 : 0;
   retried = false;
   activeField = null;
 
+  if (ex.kind === 'pexeso') startPexeso(ex);
+
+  /* U pexesa žádné políčko na odpověď není - `#answerInput` v DOM chybí
+     a slepé sáhnutí na něj by tady spadlo. */
   const input = el('answerInput');
-  input.maxLength = String(config.max).length + 1;
-  input.focus({ preventScroll: true });
+  if (input) {
+    input.maxLength = String(config.max).length + 1;
+    input.focus({ preventScroll: true });
+  }
   shownAt = Date.now();
   startClock();
 }
@@ -772,6 +817,10 @@ function hintFor(ex) {
   if (ex.kind === 'over10') {
     return 'Rozděl druhé číslo na dvě části: do rámečku dej tolik, aby s prvním číslem byla rovná desítka, '
       + 'vedle zbytek. Nahoře doplň výsledek a klepni na ✓.';
+  }
+  if (ex.kind === 'pexeso') {
+    return 'Ke každému příkladu najdi jeho výsledek a klepni na obě kartičky. '
+      + 'Když k sobě patří, spojí se. Takhle najdi všechny dvojice.';
   }
   if (ex.kind === 'riddle') return 'Zjisti z rovnic, kolik je který obrázek, a dopočítej poslední řádek.';
   if (ex.kind === 'sign') return 'Doplň chybějící znaménko, aby příklad vyšel.';
@@ -982,10 +1031,152 @@ function over10FrameHTML(ex) {
   return `<div class="tenframe tenframe-hint" aria-hidden="true">${cells.join('')}</div>`;
 }
 
+/* Najdi dvojice: všechny kartičky jsou vidět od začátku a dítě klepnutím
+   spojuje příklad s jeho výsledkem. **Není to paměťová hra a kartičky se
+   neotáčejí** - uživatel si to takhle výslovně vyžádal a otáčení už
+   nevracej. Trénuje se tím počítání, ne paměť.
+
+   Příklady a výsledky mají každý svou barvu (`data-face`), aby bylo na první
+   pohled vidět, co se s čím spojuje. `<button>` nedědí barvu textu, takže si
+   ji kartička nastavuje sama - jinak by byl v tmavém režimu černý text
+   na tmavém podkladu. */
+function pexesoHTML(ex) {
+  const cards = ex.cards
+    .map((card, i) => `<button type="button" class="pex-card" data-i="${i}" data-pair="${card.pair}"
+        data-face="${card.face}"
+        aria-label="${card.face === 'task' ? 'Příklad' : 'Výsledek'} ${card.text}">${card.text}</button>`)
+    .join('');
+  return `<div class="pex" data-cols="${ex.cols}">${cards}</div>
+    <p id="pexStatus" class="pex-status" aria-live="polite"></p>`;
+}
+
 const BODY_HTML = {
   bond: bondHTML, word: wordHTML, riddle: riddleHTML, sign: signHTML, grid: gridHTML,
-  compare: compareHTML, over10: over10HTML,
+  compare: compareHTML, over10: over10HTML, pexeso: pexesoHTML,
 };
+
+/* ---------------- ovladač plochy s dvojicemi ----------------
+   Plocha se neodpovídá políčkem, takže společnou cestou `submit()` neprochází.
+   Po spojení poslední dvojice si ovladač sám zapíše záznam do `attempts` -
+   přesně v tom tvaru, jaký čekají `finish()`, `recordRound()` i `applyRound()`,
+   takže se zbytek aplikace kvůli tomuhle režimu neměnil.
+
+   Chybou je spojení dvou kartiček, které k sobě nepatří. Protože jsou všechny
+   vidět, je to skutečně špatně spočítaný příklad, ne odhad - hranice je proto
+   přísná. Kolik chyb kolo ještě snese, bydlí v `REWARD_RULES`, ne tady. */
+let pexPicked = null;    // první vybraná kartička, dokud nepřijde druhá
+let pexFound = 0;        // spojené dvojice
+let pexMiss = 0;         // chybná spojení
+let pexBusy = false;     // krátká pauza, než z neshodné dvojice zmizí červená
+
+const PEX_MISS_MS = 700;
+
+const pexAllowance = () => rewards.REWARD_RULES.pexesoMismatchAllowance[config.level] ?? 0;
+
+function startPexeso(ex) {
+  pexPicked = null;
+  pexFound = 0;
+  pexMiss = 0;
+  pexBusy = false;
+  renderPexStatus(ex);
+}
+
+function renderPexStatus(ex) {
+  const status = el('pexStatus');
+  if (!status) return;
+  if (pexFound >= ex.pairs) {
+    status.textContent = `Všech ${ex.pairs} dvojic máš spojených!`;
+    return;
+  }
+  status.textContent = `Spojeno ${pexFound} z ${ex.pairs}`
+    + (pexMiss ? ` · chyb: ${pexMiss}` : '');
+}
+
+el('exerciseBody').addEventListener('click', (e) => {
+  const card = e.target.closest('.pex-card');
+  if (card) pexTap(card);
+});
+
+function pexTap(card) {
+  const ex = round[index];
+  if (locked || pexBusy || ex?.kind !== 'pexeso') return;
+  if (card.classList.contains('is-done')) return;
+
+  // druhé klepnutí na tutéž kartičku výběr zruší - dítě si to smí rozmyslet
+  if (card === pexPicked) {
+    card.classList.remove('is-picked');
+    pexPicked = null;
+    return;
+  }
+
+  if (!pexPicked) {
+    card.classList.add('is-picked');
+    pexPicked = card;
+    return;
+  }
+
+  const first = pexPicked;
+  pexPicked = null;
+
+  if (first.dataset.pair === card.dataset.pair) {
+    for (const c of [first, card]) {
+      c.classList.remove('is-picked');
+      c.classList.add('is-done');
+      c.disabled = true;
+    }
+    pexFound += 1;
+    beep('correct');
+    renderPexStatus(ex);
+    if (pexFound >= ex.pairs) finishPexeso(ex);
+    return;
+  }
+
+  // neshoda: obě kartičky chvilku zčervenají, ať je vidět, co spolu nešlo
+  pexMiss += 1;
+  pexBusy = true;
+  card.classList.add('is-picked');
+  for (const c of [first, card]) c.classList.add('is-miss');
+  beep('wrong');
+  renderPexStatus(ex);
+  advanceTimer = setTimeout(() => {
+    for (const c of [first, card]) c.classList.remove('is-picked', 'is-miss');
+    pexBusy = false;
+  }, PEX_MISS_MS);
+}
+
+/* Plocha se vždycky nakonec dohraje, takže "nevyšlo" tu neznamená
+   nevyřešeno, ale "s moc chybnými spojeními" - texty tomu musí odpovídat,
+   jinak to dítě zmate. */
+function finishPexeso(ex) {
+  locked = true;
+  stopClock();
+  const limit = pexAllowance();
+  const correct = pexMiss <= limit;
+
+  attempts.push({
+    ex,
+    given: pexMiss,
+    correct,
+    retried: false,
+    ms: Date.now() - shownAt,
+    tag: correct ? null : diagnose(ex, pexMiss),
+  });
+
+  const fb = el('feedback');
+  fb.dataset.state = correct ? 'correct' : 'wrong';
+  fb.innerHTML = correct
+    ? `<div class="fb-badge"><span aria-hidden="true">🎉</span> Všechny dvojice máš spojené!</div>
+       <p class="fb-retry-note">${pexMiss ? `Spletla ses ${pexMiss}× – a to se ještě počítá.` : 'A bez jediné chyby.'}</p>
+       <button type="button" class="btn btn-primary">Hotovo <span aria-hidden="true">➜</span></button>`
+    : `<div class="fb-badge"><span aria-hidden="true">🤔</span> Dvojice máš, ale s chybami</div>
+       <p class="fb-retry-note">Špatně spojených bylo ${pexMiss}, vejít ses měla do ${limit}.
+         Spočítej si příklad celý, než klepneš na výsledek.</p>
+       <button type="button" class="btn btn-primary">Rozumím <span aria-hidden="true">➜</span></button>`;
+  fb.hidden = false;
+  fb.querySelector('.btn').addEventListener('click', next);
+  beep(correct ? 'correct' : 'wrong');
+  if (correct) confetti();
+}
 
 /* klávesnice - číselná, nebo se znaménky u úlohy "doplň znaménko" */
 const DEL_KEY = '<button type="button" class="key key-del" data-key="del" aria-label="Smazat">⌫</button>';
@@ -1116,6 +1307,13 @@ const COMPARE_KEYS = { '<': 'lt', ',': 'lt', '>': 'gt', '.': 'gt', '=': 'eq' };
 
 document.addEventListener('keydown', (e) => {
   if (!screens.quiz.classList.contains('is-active')) return;
+  /* Pexeso nemá políčko na odpověď - Enter by šel do `submit()` a ten by na
+     chybějícím `#answerInput` spadl. Hotovou plochu potvrzuje tlačítko
+     ve vyhodnocení, takže se tu jen odejde. */
+  if (round[index]?.kind === 'pexeso') {
+    if (e.key === 'Enter' && locked) el('feedback').querySelector('.btn')?.click();
+    return;
+  }
   if (round[index]?.kind === 'compare' && COMPARE_KEYS[e.key]) {
     handleKey(`cmp:${COMPARE_KEYS[e.key]}`);
     e.preventDefault();
@@ -1294,8 +1492,8 @@ function softRetry(given) {
 /* Grafické vysvětlení pro rozsah do 20: dva řádky po deseti kroužcích.
    Zlom řádku je přesně desítka, takže je vidět přechod přes ni. */
 function tenFrameHTML(ex) {
-  // mřížka a porovnávání mají op:'add' jen zástupně - rámec by byl nesmysl
-  if (ex.kind === 'grid' || ex.kind === 'compare') return '';
+  // mřížka, porovnávání i pexeso mají op:'add' jen zástupně - rámec by byl nesmysl
+  if (ex.kind === 'grid' || ex.kind === 'compare' || ex.kind === 'pexeso') return '';
   // u hádanky jen tehdy, když je poslední řádek prostý součet dvou obrázků
   if (ex.kind === 'riddle' && !ex.simpleSum) return '';
   const relation = ex.kind === 'bond' ? ex.family : ex.op === 'add' || ex.op === 'sub' ? 'add' : null;
@@ -1502,8 +1700,43 @@ function renderGridResult(r) {
     ${listCard('Co zkusit dál', '💡', r.tips, '→')}`;
 }
 
+/* Plocha se vždycky dohraje do konce, takže prstenec s procenty nedává smysl
+   a "nevyšlo" tu neznamená nevyřešeno, ale "s moc chybnými spojeními".
+   Vlastní obrazovka to říká přesně tak. */
+function renderPexesoResult(r) {
+  const ok = r.correct === r.total;
+  const ex = round[0];
+  const misses = attempts[0]?.given ?? 0;
+  const limit = pexAllowance();
+  const recent = [...state.rounds.filter((x) => x.mode === 'pexeso')].slice(0, 5);
+  const done = recent.filter((x) => x.correct === x.total).length;
+
+  const listCard = (title, emoji, items, icon) =>
+    items.length
+      ? `<div class="card">
+          <h2 class="card-title"><span aria-hidden="true">${emoji}</span> ${title}</h2>
+          <ul class="list">${items.map((t) => `<li><span aria-hidden="true">${icon}</span><span>${t}</span></li>`).join('')}</ul>
+        </div>`
+      : '';
+
+  el('resultBody').innerHTML = `
+    <div class="result-head">
+      <div class="result-mascot" aria-hidden="true">${ok ? '🎉' : '🌱'}</div>
+      <p class="result-verdict">${ok ? 'Všechny dvojice máš spojené!' : 'Spojené jsou, ale s chybami'}</p>
+      <div class="grid-verdict" data-ok="${ok}">${ok ? '✓' : '✗'}</div>
+      <p class="score-sub">${!misses ? 'Bez jediné chyby'
+        : ok ? `Špatně spojených: ${misses} – vešla ses do ${limit}`
+          : `Špatně spojených: ${misses} · vejít ses měla do ${limit}`}</p>
+      <p class="score-sub">${ex.pairs} ${ex.pairs <= 4 ? 'dvojice' : 'dvojic'} · čísla do ${config.max}</p>
+      ${r.avgMs ? `<p class="score-sub">Trvalo ti to ${(r.avgMs / 1000).toFixed(1)} s</p>` : ''}
+      ${recent.length > 1 ? `<p class="trend">Z posledních ${recent.length} ploch jsi zvládla ${done}.</p>` : ''}
+    </div>
+    ${listCard('Co zkusit dál', '💡', r.tips, '→')}`;
+}
+
 function renderResult(r) {
   if (isGridMode()) return renderGridResult(r);
+  if (isPexesoMode()) return renderPexesoResult(r);
   const verdict = verdictFor(r.pct);
   const stars = '⭐'.repeat(r.stars) + '☆'.repeat(5 - r.stars);
   const trend =
