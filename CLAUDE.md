@@ -172,6 +172,11 @@ přepnutí režimu obtížnost neztratí. Tabulku popisků vybírá `levelTable(
 Stačí pak: položka v `EXTRA_KINDS`, větev v `makeExercise()`, funkce v `BODY_HTML`,
 větev v `hintFor()` / `explain()` / `exToText()` a popisek v `KIND_LABEL` ve `stats.js`.
 
+**Chystá se:** režim „Počítej přes 10" (rozklad krok za krokem) a „Pexeso" (kartičky
+příklad ↔ výsledek, obsah řídí zapnuté operace). Plán je v
+`~/.claude/plans/dynamic-swimming-sparkle.md`; u pexesa zbývá potvrdit toleranci chybných
+otočení, protože doslovná nula je u paměťové hry nedosažitelná.
+
 ## Obrázkové hádanky — jak se staví
 
 Rovnice se **nelosují a pak neověřují**; staví se jako **žebřík**:
