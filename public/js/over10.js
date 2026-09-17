@@ -1,19 +1,25 @@
-import { rnd } from './random.js';
+import { rnd, shuffle } from './random.js';
 
 /* ============================================================
    Počítej přes 10
 
-   Rozklad krok za krokem, přesně jak se to učí ve škole:
+   Rozklad druhého čísla, nakreslený jako větvička - přesně jak se to
+   učí ve škole:
 
-       8 + 5
-       = 8 + [2] + [3]      2 doplní osmičku do desítky, 3 zbývá
-       = 10 + [3]
-       = [13]
+       ┌───────┐
+       │   8   │  +  5  =  [13]
+       │       │    ╱   ╲
+       │  [2]  │  [2]   [3]
+       └───────┘
+
+   Rámeček říká "osmička a dvojka dají rovnou desítku", pravá větev je
+   zbytek přes desítku. Doplňují se vždycky tatáž tři čísla.
 
    Dvě věci, na kterých to stojí:
 
-   1. OBTÍŽNOST ŘÍDÍ POČET DOPLŇOVANÝCH KROKŮ, ne velikost čísel.
-      Jak velká čísla vyjdou, rozhoduje výhradně rozsah ("do kolika
+   1. OBTÍŽNOST ŘÍDÍ NÁPOVĚDA, ne velikost čísel ani počet políček.
+      Lehká ukáže kroužky i nabídku čísel, střední jen kroužky, těžká
+      nic. Jak velká čísla vyjdou, rozhoduje výhradně rozsah ("do kolika
       počítáme") - dvě nezávislé osy, stejně jako u mřížky a hádanek.
 
    2. ROZKLAD SE POČÍTÁ, NEHÁDÁ. Vylosuje se první číslo, z jeho
@@ -25,22 +31,44 @@ import { rnd } from './random.js';
    `ten = (10 - a % 10) % 10`, `rest = b - ten`.
    ============================================================ */
 
-/* `fields` je zároveň pořadí políček na obrazovce i pořadí hodnot
-   v odpovědi - `app.js` je čte setříděné podle `data-idx`. */
+/* Doplňovaná políčka jsou ve všech obtížnostech stejná - pořadí je zároveň
+   pořadím hodnot v odpovědi; `app.js` je čte setříděné podle `data-idx`. */
+export const OVER10_FIELDS = ['ten', 'rest', 'c'];
+
+/* `hint` řídí, co dostane dítě k ruce:
+     choices - kroužky v desítkovém rámci a k tomu nabídka čísel
+     frame   - jen kroužky
+     none    - nic, počítá zpaměti */
 export const OVER10_LEVELS = {
   easy: {
-    label: 'Lehká', emoji: '🟢', note: 'doplníš jen rozklad druhého čísla',
-    fields: ['ten', 'rest'],
+    label: 'Lehká', emoji: '🟢', note: 'poradí kroužky i nabídka čísel',
+    hint: 'choices',
   },
   medium: {
-    label: 'Střední', emoji: '🟡', note: 'rozklad a k tomu výsledek',
-    fields: ['ten', 'rest', 'c'],
+    label: 'Střední', emoji: '🟡', note: 'poradí jenom kroužky',
+    hint: 'frame',
   },
   hard: {
-    label: 'Těžká', emoji: '🔴', note: 'celý zápis včetně mezisoučtu',
-    fields: ['ten', 'rest', 'sum', 'rest2', 'c'],
+    label: 'Těžká', emoji: '🔴', note: 'bez nápovědy, počítáš sama',
+    hint: 'none',
   },
 };
+
+/* Nabídka pro lehkou úroveň: tři správná čísla a k nim dva věrohodní
+   sousedé, ať se nedá uhodnout podle počtu tlačítek. Vybírá se jen
+   z kladných celých čísel - záporná v aplikaci nejsou. */
+const CHOICE_COUNT = 5;
+
+function over10Choices({ a, b, ten, rest, c }) {
+  /* `ten` a `rest` můžou vyjít stejně (6 + 8 dělí osmičku na 4 a 4); dvakrát
+     tatáž čtyřka na klávesnici vypadá jako chyba, tak se nabídne jednou. */
+  const out = [...new Set([ten, rest, c])];
+  for (const n of shuffle([10, a, b, ten + 1, rest + 1, c - 1, c + 1])) {
+    if (out.length >= CHOICE_COUNT) break;
+    if (n > 0 && !out.includes(n)) out.push(n);
+  }
+  return shuffle(out);
+}
 
 export const OVER10_LEVEL_KEYS = Object.keys(OVER10_LEVELS);
 
@@ -82,15 +110,16 @@ export function makeOver10(max, levelKey = 'easy') {
   const sum = a + ten;
   const c = a + b;
 
-  const parts = { ten, rest, sum, rest2: rest, c };
-  const fields = OVER10_LEVELS[level].fields;
-
-  return {
-    a, b, c, ten, rest, sum, level,
-    hidden: fields.slice(),
-    values: fields.map((f) => parts[f]),
+  const parts = { ten, rest, c };
+  const hint = OVER10_LEVELS[level].hint;
+  const ex = {
+    a, b, c, ten, rest, sum, level, hint,
+    hidden: OVER10_FIELDS.slice(),
+    values: OVER10_FIELDS.map((f) => parts[f]),
     key: `${a}+${b}|${level}`,
   };
+  if (hint === 'choices') ex.numbers = over10Choices(ex);
+  return ex;
 }
 
 /* Vysvětlení po chybě. Mluví se o konkrétní desítce (`sum`), ne obecně -

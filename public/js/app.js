@@ -341,7 +341,7 @@ function renderModeCards() {
     /* Upozornění na malý rozsah patří k rozsahu, ne k operacím - karta
        s operacemi je v tomhle režimu schovaná. */
     maxNote.textContent = over10RangeNote(config.max)
-      || 'Rozsah řídí, jak velká čísla se budou rozkládat. Kolik kroků doplňuješ, si vybíráš výš u obtížnosti.';
+      || 'Rozsah řídí, jak velká čísla se budou rozkládat. Kolik nápovědy dostaneš, si vybíráš výš u obtížnosti.';
     el('levelNote').textContent = `${level.label} – ${level.note}. Čísla do ${config.max}.`;
     return;
   }
@@ -769,7 +769,10 @@ function renderExercise() {
 
 function hintFor(ex) {
   if (ex.kind === 'grid') return 'Doplň čísla tak, aby vyšlo každé počítání doprava i dolů. Pak klepni na ✓.';
-  if (ex.kind === 'over10') return 'Rozlož druhé číslo tak, aby se to první doplnilo do desítky. Pak klepni na ✓.';
+  if (ex.kind === 'over10') {
+    return 'Rozděl druhé číslo na dvě části: do rámečku dej tolik, aby s prvním číslem byla rovná desítka, '
+      + 'vedle zbytek. Nahoře doplň výsledek a klepni na ✓.';
+  }
   if (ex.kind === 'riddle') return 'Zjisti z rovnic, kolik je který obrázek, a dopočítej poslední řádek.';
   if (ex.kind === 'sign') return 'Doplň chybějící znaménko, aby příklad vyšel.';
   if (ex.kind === 'compare') return 'Co je větší? Klepni na správné znaménko – zobáček se otevírá k většímu číslu.';
@@ -926,41 +929,57 @@ function gridHTML(ex) {
   return `<div class="grid" data-size="${size}" data-digits="${String(config.max).length}">${out.join('')}</div>`;
 }
 
-/* Počítej přes 10: řetězec rovnítek pod sebou, ne na jednom řádku - čtyři
-   čísla a tři znaménka by se na 320 px nevešly a písmo by muselo dolů.
+/* Počítej přes 10: příklad na jednom řádku a pod druhým číslem větvička,
+   která ho rozdělí. Levá větev míří do rámečku k prvnímu číslu - spolu dají
+   rovnou desítku; pravá je zbytek přes ni.
 
-   Políčka se berou z `ex.hidden` (pořadí určuje obtížnost) a jejich `data-idx`
+   Políčka jsou ve všech obtížnostech stejná (`ex.hidden`) a jejich `data-idx`
    je pozice v `ex.answer`. `maxlength` musí mít KAŽDÉ z nich: `renderExercise`
    ho nastavuje jen tomu s id="answerInput" a bez atributu vrací `maxLength`
    −1, takže by klávesnice do zbylých nenapsala ani číslici. */
 const O10_LABEL = {
-  ten: 'Kolik chybí do desítky',
-  rest: 'Kolik zbývá přidat',
-  sum: 'Kolik je po doplnění do desítky',
-  rest2: 'Zbytek, který ještě přidáš',
+  ten: 'Kolik chybí prvnímu číslu do desítky',
+  rest: 'Kolik zbývá přidat přes desítku',
   c: 'Výsledek',
 };
 
 function over10HTML(ex) {
   const digits = String(config.max).length;
-  const cell = (key, value) => {
+  const cell = (key) => {
     const idx = ex.hidden.indexOf(key);
-    if (idx < 0) return `<span class="o10-num">${value}</span>`;
     const slotId = idx === 0 ? ' id="answerSlot"' : '';
     const inputId = idx === 0 ? ' id="answerInput"' : '';
-    return `<span class="o10-cell slot"${slotId}><input${inputId} class="o10-input" type="text"
+    return `<span class="o10-cell slot o10b-${key}"${slotId}><input${inputId} class="o10-input" type="text"
       inputmode="none" autocomplete="off" data-idx="${idx}" maxlength="${digits}"
       aria-label="${O10_LABEL[key]}"></span>`;
   };
-  const op = (s) => `<span class="o10-op">${s}</span>`;
-  const num = (n) => `<span class="o10-num">${n}</span>`;
 
-  return `<div class="o10">
-      <div class="o10-line o10-task">${num(ex.a)}${op('+')}${num(ex.b)}</div>
-      <div class="o10-line">${op('=')}${num(ex.a)}${op('+')}${cell('ten', ex.ten)}${op('+')}${cell('rest', ex.rest)}</div>
-      <div class="o10-line">${op('=')}${cell('sum', ex.sum)}${op('+')}${cell('rest2', ex.rest)}</div>
-      <div class="o10-line">${op('=')}${cell('c', ex.c)}</div>
+  return `${over10FrameHTML(ex)}
+    <div class="o10b">
+      <span class="o10b-box" aria-hidden="true"></span>
+      <span class="o10-num o10b-a">${ex.a}</span>
+      <span class="o10-op o10b-plus">+</span>
+      <span class="o10-num o10b-b">${ex.b}</span>
+      <span class="o10-op o10b-eq">=</span>
+      ${cell('c')}
+      <span class="o10b-leg o10b-leg-l" aria-hidden="true"></span>
+      <span class="o10b-leg o10b-leg-r" aria-hidden="true"></span>
+      ${cell('ten')}
+      ${cell('rest')}
     </div>`;
+}
+
+/* Kroužky jako nápověda (lehká a střední úroveň): prvních deset v řadě,
+   zbytek přeteče do druhé - je tak vidět, kde se desítka láme. Nad dvacet
+   se rámec nekreslí, tolik koleček se na řádek nevejde. */
+function over10FrameHTML(ex) {
+  if (ex.hint === 'none' || ex.c > 20) return '';
+  const cells = [];
+  for (let i = 0; i < 20; i++) {
+    const cls = i < ex.a ? 'tf-cell tf-a' : i < ex.c ? 'tf-cell tf-b' : 'tf-cell';
+    cells.push(`<span class="${cls}"></span>`);
+  }
+  return `<div class="tenframe tenframe-hint" aria-hidden="true">${cells.join('')}</div>`;
 }
 
 const BODY_HTML = {
@@ -996,13 +1015,25 @@ function compareKeys() {
   return `<div class="key-ops">${btns}</div>${DEL_KEY}${OK_KEY}`;
 }
 
+/* Nabídka hotových čísel pro lehký rozklad přes desítku. Tlačítko píše celé
+   číslo najednou (`num:`), ne po číslicích - dítě vybírá z možností, nezadává
+   je. Fyzická klávesnice dál funguje beze změny. */
+function numberKeys(ex) {
+  const btns = (ex.numbers || [])
+    .map((n) => `<button type="button" class="key key-num" data-key="num:${n}">${n}</button>`)
+    .join('');
+  return `<div class="key-ops key-nums">${btns}</div>${DEL_KEY}${OK_KEY}`;
+}
+
 const CHOICE_KINDS = new Set(['sign', 'compare']);
 
 function renderKeypad(ex) {
   const keypad = el('keypad');
-  keypad.dataset.mode = CHOICE_KINDS.has(ex.kind) ? 'sign' : 'digits';
+  const numbers = ex.kind === 'over10' && ex.hint === 'choices';
+  keypad.dataset.mode = CHOICE_KINDS.has(ex.kind) || numbers ? 'sign' : 'digits';
   if (ex.kind === 'sign') keypad.innerHTML = signKeys(ex);
   else if (ex.kind === 'compare') keypad.innerHTML = compareKeys();
+  else if (numbers) keypad.innerHTML = numberKeys(ex);
   else keypad.innerHTML = DIGIT_KEYS;
 }
 
@@ -1038,6 +1069,15 @@ function handleKey(key) {
     if (!slot) return;
     slot.dataset.op = key.slice(4);
     slot.value = COMPARES[key.slice(4)].symbol;
+    return;
+  }
+
+  // celé číslo z nabídky - přepíše políčko naráz, ne po číslicích
+  if (key.startsWith('num:')) {
+    const slot = currentField();
+    if (!slot) return;
+    slot.value = key.slice(4);
+    slot.closest('.gcell, .o10-cell')?.classList.remove('is-wrong');
     return;
   }
 
@@ -1209,8 +1249,8 @@ const RETRY_NOTE = {
   },
   over10: (wrong) => {
     const policka = wrong === 1 ? 'políčko ještě nesedí' : wrong <= 4 ? 'políčka ještě nesedí' : 'políček ještě nesedí';
-    return `${wrong} ${policka} (červená). Začni odshora: kolik chybí prvnímu číslu do desítky?
-      Přesně tolik si uber z toho druhého a zbytek napiš vedle.`;
+    return `${wrong} ${policka} (červená). Začni rámečkem: kolik chybí prvnímu číslu do desítky?
+      Přesně tolik si uber z toho druhého a zbytek napiš do pravé větve.`;
   },
 };
 

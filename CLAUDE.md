@@ -277,10 +277,12 @@ Další pravidla:
 ## Počítej přes 10
 
 ```
-6 + 7
-= 6 + [4] + [3]
-= [10] + [3]
-= [13]
+○○○○○ ○○○○○   ○          kroužky jako nápověda (lehká a střední)
+┌───────┐
+│   6   │  +  7  =  [13]
+│       │    ╱   ╲
+│  [4]  │  [4]   [3]
+└───────┘
 ```
 
 Rozklad se **staví, ne hádá**: vylosuje se první číslo, z jeho jednotek plyne, kolik chybí
@@ -288,15 +290,34 @@ do desítky (`ten`), a teprve k tomu se dolosuje zbytek. Druhé číslo tak vžd
 jednociferné a přes desítku se opravdu přejde. Jednotky prvního čísla musí být **aspoň 2** —
 při jedničce by do desítky chybělo 9 a druhé číslo by bylo dvojciferné.
 
-**Obtížnost = kolik kroků dítě doplňuje**, ne jak velká jsou čísla (ta řídí výhradně
-rozsah). Pole `fields` v `OVER10_LEVELS` je zároveň pořadí políček na obrazovce i pořadí
-hodnot v odpovědi:
+Čtyřřádkový zápis rovnic (`= 6 + [4] + [3]` …) tu **byl a nevracej ho** — uživateli
+nebyl srozumitelný. Obrázek s větvičkou říká totéž a dítě z něj hned vidí, proč se
+druhé číslo dělí zrovna takhle.
 
-| úroveň | co je skryté |
-|---|---|
-| lehká | jen rozklad `ten`, `rest` |
-| střední | rozklad a výsledek |
-| těžká | celý zápis včetně mezisoučtu (pět políček) |
+**Obtížnost = kolik nápovědy dítě dostane**, ne kolik políček doplňuje ani jak velká
+jsou čísla (ta řídí výhradně rozsah). Políčka jsou **ve všech úrovních stejná tři** —
+`OVER10_FIELDS` = `ten`, `rest`, `c` — a jejich pořadí je zároveň pořadím hodnot
+v odpovědi. Liší se jen `hint` v `OVER10_LEVELS`:
+
+| úroveň | `hint` | co dítě vidí navíc |
+|---|---|---|
+| lehká | `choices` | kroužky a k tomu klávesnici s pěti čísly na výběr |
+| střední | `frame` | jen kroužky |
+| těžká | `none` | nic, počítá zpaměti |
+
+Nabídka čísel je tři správná plus dva věrohodní sousedé (`over10Choices()`), zamíchané.
+Tlačítko posílá klíč **`num:13`** a `handleKey()` ho zapíše do políčka **celý naráz** —
+ne po číslicích jako běžná klávesnice. Sada se jmenuje `ex.numbers`, ne `choices`:
+tak se jmenuje nabídka operací u „Doplň znaménko" a míchat je dohromady by se vymstilo.
+
+Kroužky v zadání kreslí `over10FrameHTML()` v `app.js` (třída `.tenframe-hint`), což je
+něco jiného než `tenFrameHTML()` ve vysvětlení po chybě. Nad součtem 20 se nekreslí,
+tolik koleček se na dva řádky nevejde.
+
+Větvička je **mřížka 5 × 3** bez jediného obrázku a bez SVG: šikmé čáry jsou pruh
+v `linear-gradient` (CSS vede osu přechodu tak, že pruh padne přesně na úhlopříčku),
+rámeček kolem prvního čísla je samostatný prvek přes celý první sloupec. Odsazení nohou
+o půl políčka (`margin-left`/`margin-right`) posune spodní konec čáry na střed kolečka.
 
 Pár věcí, které se snadno rozbijí:
 
