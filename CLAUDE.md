@@ -570,6 +570,8 @@ Pár věcí, které se snadno rozbijí:
 - Po tažení prohlížeč pošle ještě `click` — `abcNoClick` ho zahodí.
 - Do odměn jde `max: 0` — rozsah čísel by abecedě jinak přidával epického.
 - Text v liště je `25 slov`; `Abeceda · 12` už na 320 px přeteklo (změřeno).
+- Okénko má `min-height`, ne pevnou `height` — kartička je vyšší o padding a rámeček
+  a při pevné výšce zakryla spodní okraj (zelený/červený rámeček chyběl dole).
 
 ## Doplň znaménko
 

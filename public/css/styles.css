@@ -940,7 +940,9 @@ body.is-dark { --pair-task: #93c5fd; --pair-result: #fdba74; }
   grid-template-columns: repeat(var(--abc-cols), minmax(0, 1fr));
 }
 .abc-slot {
-  position: relative; min-width: 0; height: calc(var(--abc-h) + 8px);
+  /* Výška z kartičky + padding + rámeček (až 3 px u obarveného okénka).
+     Pevná výška tu byla o pár px menší a kartička zakryla spodní okraj. */
+  position: relative; min-width: 0; min-height: calc(var(--abc-h) + 14px);
   display: grid; place-items: center; padding: 4px;
   border: 2px dashed var(--line); border-radius: 14px; background: var(--surface-2);
 }

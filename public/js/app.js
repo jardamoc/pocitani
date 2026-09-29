@@ -1526,7 +1526,7 @@ function fitAbc() {
   const width = box.clientWidth;
   const longest = Math.max(...ex.words.map((w) => w.length));
   const gap = 6;
-  const PAD = 18;          // vnitřní okraj a rámeček kartičky
+  const PAD = 26;          // vnitřní okraj a rámeček okénka i kartičky
   const CHAR = 0.6;        // průměrná šířka písmene v em (Baloo 2, tučné)
   const fontFor = (cols) => ((width - (cols - 1) * gap) / cols - PAD) / (longest * CHAR);
   const cols = [5, 4, 3].find((c) => fontFor(c) >= 16) || 3;
