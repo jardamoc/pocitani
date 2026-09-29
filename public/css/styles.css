@@ -404,6 +404,24 @@ h1, h2, h3, .num, .box-value, .key, .score-big { font-family: 'Baloo 2', 'Nunito
 .chips-mode .chip.is-on[data-value="over10"] { background: linear-gradient(135deg, #facc15, #ea580c); }
 .chips-mode .chip.is-on[data-value="pexeso"] { background: linear-gradient(135deg, #f472b6, #7c3aed); }
 .chips-mode .chip.is-on[data-value="bigmul"] { background: linear-gradient(135deg, #60a5fa, #1d4ed8); }
+.chips-mode .chip.is-on[data-value="abc"] { background: linear-gradient(135deg, #f87171, #be123c); }
+
+/* Záložky Matematika / Čeština nad kartami her. `<button>` nedědí barvu
+   textu, proto ji záložka nastavuje sama. */
+.subject-tabs {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+  padding: 5px; margin-bottom: 14px; border-radius: 999px;
+  background: var(--surface-2); box-shadow: inset 0 0 0 3px var(--line);
+}
+.subject-tab {
+  font: inherit; font-weight: 800; font-size: 1rem; cursor: pointer;
+  border: 0; border-radius: 999px; padding: 10px 8px;
+  background: transparent; color: var(--ink-soft); white-space: nowrap;
+  transition: background .18s ease, color .18s ease;
+}
+.subject-tab.is-on { background: var(--card); color: var(--ink); box-shadow: var(--shadow); }
+.subject-tab:focus-visible { outline: 3px solid var(--violet); outline-offset: 2px; }
+.custom-max[hidden] { display: none; }
 
 /* obtížnost hádanek - barvy sedí na kolečka 🟢 🟡 🔴 na chipech */
 .chips .chip.is-on[data-value="easy"] { background: linear-gradient(135deg, #4ade80, #15803d); }
@@ -906,6 +924,69 @@ body.is-dark { --pair-task: #93c5fd; --pair-result: #fdba74; }
 .pex-card.is-miss { border-color: var(--bad); color: var(--bad-dark); }
 
 .pex-status { margin: 14px 0 0; text-align: center; font-weight: 700; color: var(--ink-soft); }
+
+/* ---------- abeceda ----------
+   Nahoře očíslovaná okénka po řádcích, dole hromádka kartiček. Počet
+   sloupců (3 až 5) a velikost písma nastavuje `fitAbc()` v app.js podle
+   nejdelšího slova a skutečné šířky plochy - proměnné `--abc-cols`
+   a `--abc-font`.
+
+   Kartičky mají `touch-action: none`, jinak by prohlížeč tah prstem
+   bral jako posun stránky a kartička by se nepohnula. `<button>` nedědí
+   barvu textu, proto `color: var(--ink)`. */
+.abc { --abc-cols: 4; --abc-font: 18px; --abc-h: calc(var(--abc-font) * 2.4); min-width: 0; }
+.abc-slots {
+  display: grid; gap: 6px;
+  grid-template-columns: repeat(var(--abc-cols), minmax(0, 1fr));
+}
+.abc-slot {
+  position: relative; min-width: 0; height: calc(var(--abc-h) + 8px);
+  display: grid; place-items: center; padding: 4px;
+  border: 2px dashed var(--line); border-radius: 14px; background: var(--surface-2);
+}
+.abc-num {
+  position: absolute; top: 2px; left: 6px;
+  font-weight: 800; font-size: .72rem; color: var(--ink-soft); pointer-events: none;
+}
+.abc-slot:not(:has(.abc-card)) .abc-num { position: static; font-size: 1.15rem; opacity: .7; }
+.abc-slot.is-target { border-style: solid; border-color: var(--violet); }
+/* vsunutí před / za: svislá čárka na okraji okénka */
+.abc-slot.is-before::before, .abc-slot.is-after::after {
+  content: ''; position: absolute; top: 4px; bottom: 4px; width: 5px;
+  border-radius: 3px; background: var(--violet);
+}
+.abc-slot.is-before::before { left: -6px; }
+.abc-slot.is-after::after { right: -6px; }
+/* Barvu nese podklad a rámeček, text zůstává `--ink` - tmavá barva na
+   tintu v tmavém režimu nesvítí. */
+.abc-slot.is-wrong { border: 3px solid var(--bad); background: var(--bad-tint); }
+.abc-slot.is-right { border: 3px solid var(--good); background: var(--good-tint); }
+
+.abc-pool {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
+  margin-top: 16px; padding: 10px; min-height: calc(var(--abc-h) + 24px);
+  border-radius: 16px; border: 2px solid transparent;
+}
+.abc-pool.is-target { border-color: var(--violet); border-style: dashed; }
+.abc-pool.is-empty { min-height: 0; padding: 0; }
+
+.abc-card {
+  font-family: 'Baloo 2', sans-serif; font-weight: 800; font-size: var(--abc-font);
+  line-height: 1; white-space: nowrap; min-width: 0; height: var(--abc-h);
+  padding: 0 8px; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
+  border: 3px solid var(--line); border-radius: 12px;
+  background: var(--card); color: var(--ink); box-shadow: 0 2px 0 var(--line);
+}
+.abc-slot .abc-card { width: 100%; padding: 0 3px; }
+.abc-card.is-picked { border-color: var(--violet); transform: translateY(-3px); box-shadow: var(--shadow); }
+.abc-card.is-dragging { opacity: .3; }
+.abc-ghost {
+  position: fixed; left: 0; top: 0; z-index: 50; margin: 0;
+  pointer-events: none; cursor: grabbing; border-color: var(--violet);
+  box-shadow: var(--shadow); opacity: .95;
+}
+.abc-done { display: block; margin: 14px auto 0; }
+.abc-done:disabled { opacity: .45; cursor: not-allowed; }
 
 /* ---------- velké násobení ----------
    Zápis roste shora dolů: hotový krok je hodnota na zeleném podkladu

@@ -3,6 +3,7 @@ import { makeRiddle, riddleExplain, riddleText } from './riddle.js';
 import { makeGrid, gridExplain, gridText } from './grid.js';
 import { makeOver10, over10Explain, over10Text } from './over10.js';
 import { makePexeso, pexesoExplain, pexesoText } from './pexeso.js';
+import { makeAbc, abcExplain, abcText } from './abc.js';
 import { makeBigmul, bigmulExplain, bigmulText } from './bigmul.js';
 
 export const OPS = {
@@ -135,6 +136,7 @@ export function signature(ex) {
   if (ex.kind === 'grid') return `grid|${ex.key}`;
   // pexeso taky ne - podpisem je otisk všech dvojic na ploše
   if (ex.kind === 'pexeso') return `pexeso|${ex.key}`;
+  if (ex.kind === 'abc') return `abc|${ex.key}`;
   // velké násobení je dané dvojicí činitelů, ne trojicí a, b, c
   if (ex.kind === 'bigmul') return `bigmul|${ex.key}`;
   return `${ex.op}|${ex.kind}|${ex.missing}|${ex.a}|${ex.b}`;
@@ -449,6 +451,24 @@ export function buildPexesoRound(config) {
   return [pexesoExercise(config)];
 }
 
+/* ---------------- abeceda ----------------
+   První hra mimo matematiku. Jedna plocha se slovy je celé kolo a obsluhuje
+   ji vlastní ovladač v app.js, stejně jako pexeso. `op: 'add'` je zase jen
+   zástupná hodnota, ať `OPS[ex.op]` nikde nespadne - nic se tu nepočítá. */
+export function buildAbcRound(config) {
+  const p = makeAbc(config.level, config.abcCount);
+  return [{
+    op: 'add',
+    kind: 'abc',
+    missing: 'c',
+    a: 0, b: 0, c: 0,
+    cross: false,
+    skill: `abc:${p.level}`,
+    answer: '',
+    ...p,
+  }];
+}
+
 /* ---------------- velké násobení ----------------
    `op: 'mul'` je tu POCTIVÉ násobení, ne zástupná hodnota jako u mřížky -
    nemusí se tedy nikde vylučovat z aritmetiky. Odpovědí je ale řetězec
@@ -497,6 +517,7 @@ export function exToText(ex, reveal = false) {
   if (ex.kind === 'grid') return gridText(ex, reveal);
   if (ex.kind === 'over10') return over10Text(ex, reveal);
   if (ex.kind === 'pexeso') return pexesoText(ex, reveal);
+  if (ex.kind === 'abc') return abcText(ex, reveal);
   if (ex.kind === 'bigmul') return bigmulText(ex, reveal);
   if (ex.kind === 'riddle') return riddleText(ex, reveal);
   if (ex.kind === 'sign') {
@@ -554,6 +575,7 @@ export function explain(ex) {
   if (kind === 'grid') return gridExplain(ex);
   if (kind === 'over10') return over10Explain(ex);
   if (kind === 'pexeso') return pexesoExplain(ex);
+  if (kind === 'abc') return abcExplain(ex);
   if (kind === 'bigmul') return bigmulExplain(ex);
   if (kind === 'riddle') return riddleExplain(ex);
 
@@ -682,6 +704,7 @@ export const TAGS = {
   gridPartial: 'část mřížky správně',
   over10Partial: 'část rozkladu správně',
   pexesoMiss: 'moc chybných otočení',
+  abcMiss: 'slova ve špatném pořadí',
   bigmulSplit: 'chyba v rozkladu',
   bigmulProduct: 'ztracená nula v součinu',
   bigmulSum: 'chyba v součtu',
@@ -705,6 +728,9 @@ export function diagnose(ex, given) {
   /* Pexeso musí ven ze stejného důvodu - "odpovědí" je počet chybných
      otočení, ne výsledek příkladu. */
   if (kind === 'pexeso') return 'pexesoMiss';
+
+  /* Abeceda taky - "odpovědí" je počet špatně obsazených okének. */
+  if (kind === 'abc') return 'abcMiss';
 
   /* Velké násobení taky - odpovědí je text vybrané možnosti. Konkrétní tag
      podle kroku si zapisuje ovladač v app.js, tohle je jen pojistka. */

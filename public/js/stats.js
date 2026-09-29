@@ -74,7 +74,7 @@ export function sanitizeState(raw) {
 }
 
 /* Druhy úloh, které se nedají z descriptoru znovu poskládat. */
-const NO_REPEAT = new Set(['riddle', 'grid', 'over10', 'pexeso', 'bigmul']);
+const NO_REPEAT = new Set(['riddle', 'grid', 'over10', 'pexeso', 'bigmul', 'abc']);
 
 const descriptor = (ex) => ({
   op: ex.op,
@@ -149,6 +149,7 @@ const KIND_LABEL = {
   'over10:c': { acc: 'rozklady přes desítku', gen: 'rozkladů přes desítku' },
   'pexeso:c': { acc: 'plochy s dvojicemi', gen: 'ploch s dvojicemi' },
   'bigmul:c': { acc: 'velká násobení', gen: 'velkých násobení' },
+  'abc:c': { acc: 'řady slov', gen: 'řad slov' },
 };
 
 function starsFor(pct) {
@@ -181,7 +182,7 @@ const LEVEL_NAME = { easy: 'Lehké', medium: 'Střední', hard: 'Těžké' };
 
 /* Jak se v rozpadu podle obtížnosti pojmenuje jedna úloha daného režimu.
    Rod i číslo musí sedět na věty "Lehké mřížky ti jdou výborně". */
-const MODE_UNITS = { grid: 'mřížky', riddle: 'hádanky', over10: 'rozklady', pexeso: 'plochy', bigmul: 'příklady' };
+const MODE_UNITS = { grid: 'mřížky', riddle: 'hádanky', over10: 'rozklady', pexeso: 'plochy', bigmul: 'příklady', abc: 'řady slov' };
 
 export function analyze(state, config, attempts) {
   const riddleMode = config.mode === 'riddle';
@@ -189,12 +190,13 @@ export function analyze(state, config, attempts) {
   const over10Mode = config.mode === 'over10';
   const pexesoMode = config.mode === 'pexeso';
   const bigmulMode = config.mode === 'bigmul';
+  const abcMode = config.mode === 'abc';
   /* Režimy, kde se rozpad podle operací nehodí - hádanky, mřížky i pexeso
      mají `op: 'add'` jen jako zástupnou hodnotu a u rozkladu přes desítku je
      sčítání zase úplně všude, takže by "sčítání ti jde" nic neřeklo.
      Ve všech pěti jedeme podle obtížnosti. U velkého násobení je zase
      násobení úplně všude, takže by rozpad podle operací neřekl nic. */
-  const levelMode = riddleMode || gridMode || over10Mode || pexesoMode || bigmulMode;
+  const levelMode = riddleMode || gridMode || over10Mode || pexesoMode || bigmulMode || abcMode;
   const total = attempts.length;
   const correct = attempts.filter((a) => a.correct).length;
   const pct = total ? Math.round((correct / total) * 100) : 0;
@@ -202,7 +204,7 @@ export function analyze(state, config, attempts) {
   /* Porovnávání a pexeso mají `op: 'add'` jen zástupně - do rozpadu podle
      operací ani do přechodu přes desítku nepatří, jinak by "sčítání ti jde"
      stálo z půlky na úlohách, kde se nic nesčítá. */
-  const PLACEHOLDER_OP = new Set(['compare', 'pexeso']);
+  const PLACEHOLDER_OP = new Set(['compare', 'pexeso', 'abc']);
   const scored = attempts.filter((a) => !PLACEHOLDER_OP.has(a.ex.kind));
   const byOp = group(scored, (a) => a.ex.op).sort((x, y) => y.seen - x.seen);
   const byLevel = group(attempts, (a) => a.ex.level || null)
@@ -294,6 +296,16 @@ export function analyze(state, config, attempts) {
       tips.push(harder
         ? `Šlo ti to skvěle – zkus příště ${harder} obtížnost, kartiček bude víc.`
         : 'Šlo ti to skvěle – tohle je největší plocha. Zkus zvýšit rozsah nebo přidat další operaci.');
+    }
+  } else if (abcMode) {
+    if (pct < 100) {
+      tips.push('Když dvě slova začínají stejně, podívej se na druhé písmeno. A když je stejné i to, na třetí.');
+      tips.push('Pozor na písmena s háčkem: č je až za c, š za s a ch je až za h.');
+    } else {
+      const harder = { easy: 'střední', medium: 'těžkou' }[config.level];
+      tips.push(harder
+        ? `Šlo ti to skvěle – zkus příště ${harder} obtížnost, slova budou záludnější.`
+        : 'Šlo ti to skvěle – tohle je nejtěžší abeceda. Zkus si dát víc slov.');
     }
   } else if (bigmulMode) {
     if (pct < 100) {

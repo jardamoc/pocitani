@@ -50,7 +50,11 @@ export const REWARD_RULES = {
      ulohu zvlast, ne az na hotovy prumer - jedna slovni uloha v sade tak
      opravdu prida cas na tri priklady. Drz cela cisla, nasobek se zobrazuje
      v navodu a desetinne cislo do textu pro dite nepatri. */
-  speedKindMultiplier: { equation: 1, word: 3, bond: 2, sign: 2, compare: 1, over10: 2, riddle: 3, grid: 4, pexeso: 6, bigmul: 3 },
+  speedKindMultiplier: { equation: 1, word: 3, bond: 2, sign: 2, compare: 1, over10: 2, riddle: 3, grid: 4, pexeso: 6, bigmul: 3, abc: 1 },
+  /* Druhy, u kterych se nasobek bere ZA KAZDE SLOVO, ne za celou ulohu -
+     plocha s deviti slovy a s petadvaceti se lusti uplne jinak dlouho.
+     Kolik slov na ploše bylo, posila app.js v `kindUnits`. */
+  speedPerUnitKinds: ['abc'],
   speedLevelMultiplier: { easy: 1, medium: 1.3, hard: 1.7 },
 
   /* Rezim "Najdi dvojice" (vnitrni klic `pexeso`): karticky jsou vsechny
@@ -189,7 +193,7 @@ const kindWeight = (kind) => REWARD_RULES.speedKindMultiplier[kind] ?? 1;
 
 /* Druh, kterym nahradime ulohy bez rozpisu - stara ulozena data i souhrn,
    ktery `kindCounts` neposlal. */
-const DEFAULT_KIND_BY_MODE = { riddle: 'riddle', grid: 'grid', over10: 'over10', pexeso: 'pexeso', bigmul: 'bigmul' };
+const DEFAULT_KIND_BY_MODE = { riddle: 'riddle', grid: 'grid', over10: 'over10', pexeso: 'pexeso', bigmul: 'bigmul', abc: 'abc' };
 const defaultKind = (mode) => DEFAULT_KIND_BY_MODE[mode] || 'equation';
 
 /* Casovy rozpocet cele sady v sekundach. Kazda uloha si prispeje vlastnim
@@ -201,11 +205,17 @@ export function speedBudget(summary) {
   const byLevel = REWARD_RULES.speedLevelMultiplier[summary.level] ?? 1;
   const counts = summary.kindCounts && typeof summary.kindCounts === 'object' ? summary.kindCounts : {};
 
+  const units = summary.kindUnits && typeof summary.kindUnits === 'object' ? summary.kindUnits : {};
+  // pocet slov na plose; chybejici nebo nesmyslny udaj se pocita jako jedno
+  const unitsOf = (kind) => (REWARD_RULES.speedPerUnitKinds.includes(kind)
+    ? Math.min(100, Math.max(1, Math.floor(Number(units[kind]) || 1)))
+    : 1);
+
   let zbyva = total;
   let jednotek = 0;
   for (const [kind, pocet] of Object.entries(counts)) {
     const n = Math.min(zbyva, Math.max(0, Math.floor(Number(pocet) || 0)));
-    jednotek += n * kindWeight(kind);
+    jednotek += n * kindWeight(kind) * unitsOf(kind);
     zbyva -= n;
   }
   jednotek += zbyva * kindWeight(defaultKind(summary.mode));
@@ -257,7 +267,7 @@ export function performanceTier(summary, dailyCorrect) {
 }
 
 /* Nazev jedne ulohy podle rezimu - do vety o rychlosti. */
-const UNIT_BY_MODE = { riddle: 'hádanku', grid: 'mřížku', over10: 'rozklad', pexeso: 'celou plochu' };
+const UNIT_BY_MODE = { riddle: 'hádanku', grid: 'mřížku', over10: 'rozklad', pexeso: 'celou plochu', abc: 'celou řadu slov' };
 const unitName = (mode) => UNIT_BY_MODE[mode] || 'příklad';
 
 /* Cesky duvod: rekne presne tu podminku, ktera dumplinga vynesla nejvys. */
@@ -268,6 +278,8 @@ function reasonFor(parts, summary, dailyCorrect) {
   if (parts.fast && parts.bigRange) return `Za sadu bez chyby ${rychle}, a k tomu do ${summary.max}`;
   if (parts.fast && parts.extras) return `Za sadu bez chyby ${rychle}, a k tomu z těžších úloh`;
   if (parts.fast) return `Za sadu bez chyby ${rychle}`;
+  // v abecede se nepocita, "do kolika" tam nic nerika
+  if (summary.mode === 'abc') return 'Za slova seřazená bez jediné chyby';
   return `Za počítání do ${summary.max} bez jediné chyby`;
 }
 
@@ -365,7 +377,8 @@ export function applyRound(data, summary, rng = Math.random) {
   const dateKey = DATE_RE.test(summary.dateKey || '') ? summary.dateKey : localDateKey(nowMs);
   const extras = Math.max(0, Math.floor(Number(summary.extras) || 0));
   const kindCounts = summary.kindCounts && typeof summary.kindCounts === 'object' ? summary.kindCounts : {};
-  const shaped = { mode, level, max, total, correct, extras, kindCounts, solveMs: Number(summary.solveMs) || 0 };
+  const kindUnits = summary.kindUnits && typeof summary.kindUnits === 'object' ? summary.kindUnits : {};
+  const shaped = { mode, level, max, total, correct, extras, kindCounts, kindUnits, solveMs: Number(summary.solveMs) || 0 };
 
   data.totalCorrectAnswers += correct;
   data.completedSets += 1;
@@ -458,6 +471,7 @@ export function howToGet(category) {
     nasobek('grid', 'mřížka'),
     nasobek('pexeso', 'plocha s dvojicemi'),
     nasobek('bigmul', 'velké násobení'),
+    nasobek('abc', 'v abecedě každé slovo'),
   ].join(', ')}.`;
   /* U "Najdi dvojice" je chybou spojeni dvou karticek, ktere k sobe nepatri.
      Jedno prehlednuti se odpousti. Cisla se berou z REWARD_RULES, aby text

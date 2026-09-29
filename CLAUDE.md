@@ -81,6 +81,7 @@ běžel. Vypadalo to jako chyba nasazení, a nebyla.
 | `public/js/over10.js` | generátor rozkladů přes desítku (stejně samostatný jako `grid.js`) |
 | `public/js/pexeso.js` | generátor ploch pro „Najdi dvojice" (stejně samostatný jako `grid.js`) |
 | `public/js/bigmul.js` | generátor velkého násobení — rozklad a tři kroky s dvojí volbou |
+| `public/js/abc.js` | Abeceda: seznam slov, výběr podle obtížnosti, čisté funkce přesunu kartiček |
 | `public/js/stats.js` | rozbor kola, rady, `sanitizeState()` — **na úložiště nesahá** |
 | `public/js/storage.js` | **jediná vrstva nad úložištěm** — načtení, fronta zápisů, mazání, vyměnitelný backend |
 | `public/js/validate.js` | `wholeNumber` / `textList` — sdílené kousky validace, bez DOM |
@@ -110,7 +111,8 @@ na neexistující soubor. Když je tam někdy mít chceš, přidej napřed vlast
 | `package.json` | jen ty tři zkratky a `"type": "module"`; žádné závislosti |
 
 Prosté ES moduly, žádný framework, žádné závislosti. Závislosti jdou jedním směrem:
-`random.js → riddle.js / grid.js / over10.js / pexeso.js / bigmul.js → generator.js → app.js`,
+`random.js → riddle.js / grid.js / over10.js / pexeso.js / bigmul.js / abc.js → generator.js → app.js`
+(`app.js` si z `abc.js` bere navíc funkce přesunu),
 `rewards-data.js → rewards.js → rewards-ui.js → app.js`,
 `validate.js → stats.js / rewards.js → storage.js → app.js` a
 `qr.js / transfer.js → export-ui.js → app.js`. Kruh nezaváděj.
@@ -154,9 +156,13 @@ Co z toho plyne pro psaní kódu:
 - **`mergePayload()` v `transfer.js` neukládá.** Slučování je čistá operace v paměti,
   která vrátí souhrn změn; zapisuje až `acceptIncoming()` v `app.js`.
 
-## Šest režimů hry
+## Sedm režimů hry
 
-Na úvodní obrazovce se vybírá karta **„Co si zahrajeme?"**:
+Na úvodní obrazovce se vybírá karta **„Co si zahrajeme?"**. Nad kartami jsou dvě
+záložky **🔢 Matematika / 📖 Čeština** (`SUBJECTS`, u každého režimu `subject` v `MODES`).
+Otevřená záložka se neukládá, odvodí se z `config.mode`; přepnutí záložky rovnou vybere
+hru (naposledy hranou pod ní, jinak první) — bez toho by dole zůstalo nastavení z druhé
+záložky.
 
 | režim | `config.mode` | co se v nastavení skryje |
 |---|---|---|
@@ -166,12 +172,13 @@ Na úvodní obrazovce se vybírá karta **„Co si zahrajeme?"**:
 | **Mřížka** | `grid` | „něco navíc", **počet příkladů** (jedna mřížka = jedno kolo) |
 | **Najdi dvojice** | `pexeso` | „něco navíc", **počet příkladů** (jedna plocha = jedno kolo) |
 | **Velké násobení** | `bigmul` | operace (je to vždy násobení), „něco navíc" |
+| **Abeceda** (Čeština) | `abc` | operace, „něco navíc", **rozsah „Do kolika"**; počet se vybírá ze slov |
 
 Větve se rozcházejí až v `startRound()`, kde je tabulka builderů. Všechno ostatní —
 klávesnice, vyhodnocení, statistiky — je společné, protože každá úloha má stejný tvar:
 `{ op, kind, missing, a, b, c, answer, skill }`.
 
-`config.level` je **společný pro všech pět režimů s obtížností** (klíče
+`config.level` je **společný pro všech šest režimů s obtížností** (klíče
 `easy`/`medium`/`hard`), takže přepnutí režimu obtížnost neztratí. Hlídá se proti společné
 množině `LEVEL_ALL` v `normalizeConfig()`, ne proti tabulce jednoho režimu. Tabulku
 popisků vybírá `levelTable()` podle režimu.
@@ -526,6 +533,44 @@ Pár věcí, které se snadno rozbijí:
   na 320 px **192 px** proti 243 px místa v tlačítku — rezerva tam je, ale
   při dalším zvětšování mezer si to znovu změř.
 
+## Abeceda
+
+První hra mimo matematiku. Kartičky se slovy se přetahují do očíslovaných okének
+tak, aby šla slova podle abecedy. **Jedna plocha = jedno kolo**, stejně jako mřížka.
+
+**Pravidla přesunu si vyžádal uživatel a jsou to čisté funkce v `abc.js`** (testuje je
+`tests/abc.test.mjs`):
+
+- puštění **na** okénko = výměna, původní slovo spadne dolů mezi ostatní,
+- puštění **mezi** okénka (levá/pravá čtvrtina okénka nebo mezera) = vsunutí; další slova se
+  posunou o jedno dál až k nejbližšímu volnému okénku, a když volné není, poslední spadne dolů,
+- okénka jsou po řádcích a „mezi" platí i přes konec řádku (za 4 = před 5),
+- místo tažení jde i klepnout na kartičku a pak na okénko.
+
+**Pořadí řadí `Intl.Collator('cs')`** — zná CH za H i č/ř/š/ž jako samostatná písmena.
+Vlastní řazení nepiš. Plocha, kde by dvě slova byla stejná v základním porovnání
+(liší se jen čárkou), se zahodí.
+
+**Obtížnost = záludnost slov, počet slov se volí zvlášť** (`config.abcCount`, 9/12/16/20/25,
+vlastní klíč — `config.count` patří příkladům). Lehká: každé slovo jiným písmenem, bez pastí.
+Střední: aspoň čtvrtina slov sdílí první písmeno, rozhoduje druhé. Těžká: navíc pasti
+c/č, r/ř, s/š, z/ž, h/ch. Různých prvních písmen bez pastí je jen 21 (`ABC_SAFE_LETTERS`),
+takže lehká u 25 slov musí opakovat — `abcCountNote()` to napíše pod počet.
+
+**Sloupce (3–5) a písmo počítá `fitAbc()` z nejdelšího slova a skutečné šířky**, ne generátor.
+Slova mají nejvýš 8 písmen, jinak by se na 320 px nevešla ani do tří sloupců.
+
+Pár věcí, které se snadno rozbijí:
+
+- Ovladač je v `app.js` a `submit()` neprochází, záznam do `attempts` zapíše `finishAbc()`
+  (`given` = počet špatných okének). První Hotovo s chybou jen označí okénka červeně,
+  druhé ukáže správné pořadí; oprava napodruhé se počítá jako správně (jako u mřížky).
+- Kartičky mají `touch-action: none`, jinak prst posouvá stránku místo kartičky. U okraje
+  obrazovky se při tažení stránka sama posune (25 slov se na telefon nevejde).
+- Po tažení prohlížeč pošle ještě `click` — `abcNoClick` ho zahodí.
+- Do odměn jde `max: 0` — rozsah čísel by abecedě jinak přidával epického.
+- Text v liště je `25 slov`; `Abeceda · 12` už na 320 px přeteklo (změřeno).
+
 ## Doplň znaménko
 
 `7 __ 3 = 10`. Nabídka tlačítek je přesně ta sada operací, kterou má uživatel zapnutou,
@@ -607,7 +652,8 @@ Pár věcí, které se snadno rozbijí:
   je 15 s na jeden běžný příklad (`REWARD_RULES.fastSeconds`). Každá úloha si do rozpočtu
   přispěje vlastním přídělem podle druhu (`speedKindMultiplier`): běžný příklad 1×, slovní
   úloha 3×, pyramida 2×, doplňování znaménka 2×, rozklad přes desítku 2×, hádanka 3×,
-  mřížka 4×, plocha s dvojicemi 6×, velké násobení 3×. Rozpočet ještě
+  mřížka 4×, plocha s dvojicemi 6×, velké násobení 3×, abeceda 1× **za každé slovo**
+  (`speedPerUnitKinds`; počet slov posílá `app.js` v `kindUnits`). Rozpočet ještě
   násobí obtížnost (`speedLevelMultiplier`: lehká 1, střední 1,3, těžká 1,7). Porovnává se
   součet skutečného času celé sady proti součtu těchhle přídělů (`speedBudget()`).
   Dřív se počítal jeden průměr na celou sadu a roztahoval se jen podle režimu (hádanka ×3,
@@ -620,7 +666,9 @@ Pár věcí, které se snadno rozbijí:
   Když `kindCounts` chybí (stará uložená data), doplní se podle režimu — sada se tím
   nerozbije.
 - **`extras`** v souhrnu kola je počet zapnutých druhů úloh navíc (`config.kinds.length`) —
-  je to podmínka Raritního.
+  je to podmínka Raritního. **Posílá se jen v režimu Počítání**, jinde je 0: karta „něco
+  navíc" je tam schovaná, ale výběr v nastavení zůstává, a ostatní hry z něj dřív dostávaly
+  Raritního zadarmo. Mimo Počítání ho zastoupí těžká úroveň.
 - **Režim „Počítání" nemá `config.level`**, obtížnost se odvozuje z operací a úloh navíc
   (`difficultyOf()`): dělení nebo násobení s úlohami navíc = těžká, násobení nebo samotné
   úlohy navíc = střední, jinak lehká.

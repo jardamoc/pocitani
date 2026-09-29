@@ -1,4 +1,7 @@
-import { OPS, COMPARES, EXTRA_KINDS, MISSING_LABEL, kindOps, buildRound, buildRiddleRound, buildGridRound, buildOver10Round, buildPexesoRound, buildBigmulRound, explain, diagnose } from './generator.js';
+import { OPS, COMPARES, EXTRA_KINDS, MISSING_LABEL, kindOps, buildRound, buildRiddleRound, buildGridRound, buildOver10Round, buildPexesoRound, buildBigmulRound, buildAbcRound, explain, diagnose } from './generator.js';
+import {
+  ABC_LEVELS, ABC_LEVEL_KEYS, ABC_COUNTS, abcCountNote, abcEmptyBoard, abcFull, dropOnSlot, dropBetween, dropToPool, wrongSlots,
+} from './abc.js';
 import { RIDDLE_LEVELS, RIDDLE_LEVEL_KEYS } from './riddle.js';
 import { GRID_LEVELS, GRID_LEVEL_KEYS, gridOpsNote, gridRangeNote } from './grid.js';
 import { OVER10_LEVELS, OVER10_LEVEL_KEYS, over10RangeNote } from './over10.js';
@@ -25,27 +28,44 @@ const MAX_PRESETS = [10, 15, 20, 30, 50, 100];
 /* Režimy hry. Počítání je původní trénink, ostatní tři mají místo výběru
    druhů úloh vlastní obtížnost. Společné zůstává "kolik příkladů" a
    "do kolika" - u mřížky je kolo jediná úloha, tak tam počet odpadá. */
+/* `subject` říká, pod kterou záložkou karta leží (Matematika / Čeština). */
 const MODES = {
-  calc: { label: 'Počítání', icon: '🧮', sub: 'Příklady, slovní úlohy, pyramidy' },
-  over10: { label: 'Počítej přes 10', icon: '🔟', sub: 'Rozlož si příklad krok za krokem' },
-  riddle: { label: 'Obrázkové hádanky', icon: '🧩', sub: 'Zjisti, kolik je který obrázek' },
-  grid: { label: 'Mřížka', icon: '🔳', sub: 'Doplň čísla, ať sedí doprava i dolů' },
+  calc: { subject: 'math', label: 'Počítání', icon: '🧮', sub: 'Příklady, slovní úlohy, pyramidy' },
+  over10: { subject: 'math', label: 'Počítej přes 10', icon: '🔟', sub: 'Rozlož si příklad krok za krokem' },
+  riddle: { subject: 'math', label: 'Obrázkové hádanky', icon: '🧩', sub: 'Zjisti, kolik je který obrázek' },
+  grid: { subject: 'math', label: 'Mřížka', icon: '🔳', sub: 'Doplň čísla, ať sedí doprava i dolů' },
   /* Vnitřní klíč zůstal `pexeso` z doby, kdy kartičky ležely lícem dolů.
      Uživatel si pak vyžádal, aby byly vidět všechny - je z toho spojovačka,
      ne paměťová hra. Klíč se schválně nepřejmenovává: je v uloženém
      nastavení i v historii kol. */
-  pexeso: { label: 'Najdi dvojice', icon: '🔗', sub: 'Spoj příklad s jeho výsledkem' },
-  bigmul: { label: 'Velké násobení', icon: '✖️', sub: 'Rozlož si ho na desítky a jednotky' },
+  pexeso: { subject: 'math', label: 'Najdi dvojice', icon: '🔗', sub: 'Spoj příklad s jeho výsledkem' },
+  bigmul: { subject: 'math', label: 'Velké násobení', icon: '✖️', sub: 'Rozlož si ho na desítky a jednotky' },
+  abc: { subject: 'czech', label: 'Abeceda', icon: '🔤', sub: 'Seřaď slova podle abecedy' },
 };
+
+const SUBJECTS = {
+  math: { label: 'Matematika', icon: '🔢' },
+  czech: { label: 'Čeština', icon: '📖' },
+};
+
+/* Otevřená záložka se neukládá - odvodí se z `config.mode`. Přepnutí
+   záložky vybere hru, kterou dítě pod ní hrálo naposledy (v rámci
+   téhle návštěvy), jinak první. */
+const lastModeBySubject = {};
+
+/* Kolik slov se v abecedě řadí - vlastní volba, `config.count` patří
+   příkladům a má jiné hodnoty. */
+const ABC_COUNT_DEFAULT = ABC_COUNTS[0];
 
 /* Tabulky obtížností podle režimu - klíče (easy/medium/hard) jsou schválně
    společné, takže `config.level` přežije přepnutí režimu. */
 const LEVEL_TABLES = {
   riddle: RIDDLE_LEVELS, grid: GRID_LEVELS, over10: OVER10_LEVELS, pexeso: PEXESO_LEVELS, bigmul: BIGMUL_LEVELS,
+  abc: ABC_LEVELS,
 };
 const LEVEL_KEYS = {
   riddle: RIDDLE_LEVEL_KEYS, grid: GRID_LEVEL_KEYS, over10: OVER10_LEVEL_KEYS, pexeso: PEXESO_LEVEL_KEYS,
-  bigmul: BIGMUL_LEVEL_KEYS,
+  bigmul: BIGMUL_LEVEL_KEYS, abc: ABC_LEVEL_KEYS,
 };
 
 /* Společná množina klíčů obtížnosti. Tabulky výš ji musí mít všechny stejnou,
@@ -155,7 +175,7 @@ const SCENERY = {
 /* Vychozi nastaveni na jednom miste - pouziva ho start aplikace i mazani. */
 const VYCHOZI_CONFIG = () => ({
   mode: 'calc', level: 'easy', ops: ['add', 'sub'], over10Ops: ['add'],
-  kinds: ['word', 'bond'], count: 10, max: 20,
+  kinds: ['word', 'bond'], count: 10, max: 20, abcCount: ABC_COUNT_DEFAULT,
 });
 
 /* Stav se jen deklaruje. Naplni ho `boot()` na konci souboru, protoze
@@ -217,6 +237,8 @@ function normalizeConfig(raw) {
     kinds,
     count: clamp(Number(raw.count) || 10, 3, 60),
     max: clamp(Number(raw.max) || 20, 5, 1000),
+    // starší uložené nastavení abecedu nezná
+    abcCount: ABC_COUNTS.includes(Number(raw.abcCount)) ? Number(raw.abcCount) : ABC_COUNT_DEFAULT,
   };
 }
 
@@ -234,6 +256,7 @@ const isGridMode = () => config.mode === 'grid';
 const isOver10Mode = () => config.mode === 'over10';
 const isPexesoMode = () => config.mode === 'pexeso';
 const isBigmulMode = () => config.mode === 'bigmul';
+const isAbcMode = () => config.mode === 'abc';
 /* Režimy, které mají obtížnost místo výběru druhů úloh. */
 const usesLevel = () => config.mode !== 'calc';
 const levelTable = () => LEVEL_TABLES[config.mode] || RIDDLE_LEVELS;
@@ -351,22 +374,39 @@ function renderModeCards() {
   const bigmul = isBigmulMode();
   /* Velké násobení je vždycky násobení - výběr operací by tam nedával smysl.
      Rozklad přes desítku kartu má, ale jen se sčítáním a odčítáním. */
-  el('card-ops').hidden = isRiddleMode() || bigmul;
+  const abc = isAbcMode();
+  el('card-ops').hidden = isRiddleMode() || bigmul || abc;
   el('card-kinds').hidden = usesLevel();
   el('card-level').hidden = !usesLevel();
   // jedna mřížka i jedna plocha pexesa jsou celé kolo - počet příkladů odpadá
   el('card-count').hidden = grid || pexeso;
+  // v abecedě se nepočítá, rozsah čísel tam nic neříká
+  el('card-max').hidden = abc;
+  // u abecedy se vybírá jen z pevných počtů slov
+  el('countCustomWrap').hidden = abc;
   el('countTitle').innerHTML = isRiddleMode()
     ? '<span aria-hidden="true">🔢</span> Kolik hádanek?'
-    : '<span aria-hidden="true">🔢</span> Kolik příkladů?';
+    : abc
+      ? '<span aria-hidden="true">🔢</span> Kolik slov?'
+      : '<span aria-hidden="true">🔢</span> Kolik příkladů?';
 
   const maxNote = el('maxNote');
   const opsNote = el('opsNote');
+  const countNote = el('countNote');
   opsNote.hidden = true;
+  countNote.hidden = true;
   maxNote.hidden = !usesLevel();
   if (!usesLevel()) return;
 
   const level = levelTable()[config.level];
+
+  if (abc) {
+    el('levelNote').textContent = `${level.label} – ${level.note}.`;
+    const note = abcCountNote(config.level, config.abcCount);
+    countNote.textContent = note;
+    countNote.hidden = !note;
+    return;
+  }
 
   if (over10) {
     /* Upozornění na malý rozsah patří k rozsahu, ne k operacím - u operací
@@ -425,7 +465,16 @@ function renderModeCards() {
 
 function renderConfigScreen() {
   updateBadge(rewardData);
+  const subject = MODES[config.mode].subject;
+  el('subjectTabs').innerHTML = Object.entries(SUBJECTS)
+    .map(([key, s]) => {
+      const on = key === subject;
+      return `<button type="button" class="subject-tab${on ? ' is-on' : ''}" role="tab" data-value="${key}"
+          aria-selected="${on}"><span aria-hidden="true">${s.icon}</span> ${s.label}</button>`;
+    })
+    .join('');
   el('modeChips').innerHTML = Object.entries(MODES)
+    .filter(([, mode]) => mode.subject === subject)
     .map(([key, mode]) => {
       const on = key === config.mode;
       return `<button type="button" class="chip chip-mode${on ? ' is-on' : ''}" data-value="${key}" aria-pressed="${on}">
@@ -462,9 +511,9 @@ function renderConfigScreen() {
     .map(([key, kind]) => chipHTML(key, `${kind.emoji} ${kind.label}`, config.kinds.includes(key)))
     .join('');
 
-  el('countChips').innerHTML = COUNT_PRESETS
-    .map((n) => chipHTML(n, `${n} příkladů`, config.count === n))
-    .join('');
+  el('countChips').innerHTML = isAbcMode()
+    ? ABC_COUNTS.map((n) => chipHTML(n, `${n} slov`, config.abcCount === n)).join('')
+    : COUNT_PRESETS.map((n) => chipHTML(n, `${n} příkladů`, config.count === n)).join('');
 
   el('maxChips').innerHTML = MAX_PRESETS
     .map((n) => chipHTML(n, `do ${n}`, config.max === n))
@@ -519,6 +568,15 @@ function renderLastHint() {
     hint.hidden = true;
     return;
   }
+  if (isAbcMode()) {
+    const recent = state.rounds.filter((r) => r.mode === 'abc').slice(0, 5);
+    const done = recent.filter((r) => r.correct === r.total).length;
+    hint.textContent = recent.length === 1
+      ? `Minulou řadu slov jsi ${done ? 'seřadila správně' : 'ještě neseřadila'}.`
+      : `Z posledních ${recent.length} řad slov jsi správně seřadila ${done}.`;
+    hint.hidden = false;
+    return;
+  }
   /* U mřížky i u pexesa je kolo jediná úloha, takže procenta nic neřeknou -
      zajímavější je série z posledních kol. */
   if (isGridMode() || isPexesoMode()) {
@@ -560,6 +618,21 @@ el('modeChips').addEventListener('click', (e) => {
   const chip = e.target.closest('.chip');
   if (!chip) return;
   config.mode = chip.dataset.value;
+  lastModeBySubject[MODES[config.mode].subject] = config.mode;
+  saveConfig();
+  renderConfigScreen();
+});
+
+/* Záložka Matematika / Čeština. Samotný seznam her bez vybrané hry by
+   nechal dole nastavení z druhé záložky, proto přepnutí rovnou vybere
+   hru - naposledy hranou pod touhle záložkou, jinak první. */
+el('subjectTabs').addEventListener('click', (e) => {
+  const tab = e.target.closest('.subject-tab');
+  if (!tab || tab.dataset.value === MODES[config.mode].subject) return;
+  lastModeBySubject[MODES[config.mode].subject] = config.mode;
+  const subject = tab.dataset.value;
+  config.mode = lastModeBySubject[subject]
+    || Object.keys(MODES).find((k) => MODES[k].subject === subject);
   saveConfig();
   renderConfigScreen();
 });
@@ -616,7 +689,8 @@ el('kindChips').addEventListener('click', (e) => {
 el('countChips').addEventListener('click', (e) => {
   const chip = e.target.closest('.chip');
   if (!chip) return;
-  config.count = Number(chip.dataset.value);
+  if (isAbcMode()) config.abcCount = Number(chip.dataset.value);
+  else config.count = Number(chip.dataset.value);
   saveConfig();
   renderConfigScreen();
 });
@@ -759,6 +833,7 @@ function startRound() {
     over10: () => buildOver10Round(config),
     pexeso: () => buildPexesoRound(config), // jedna plocha je celé kolo
     bigmul: () => buildBigmulRound(config),
+    abc: () => buildAbcRound(config),     // jedna řada slov je celé kolo
   };
   round = (build[config.mode] || build.calc)();
   index = 0;
@@ -822,25 +897,32 @@ function renderExercise() {
        delší, než se do horní lišty vejde, a roztáhlo by stránku. */
     : ex.kind === 'pexeso'
       ? `Dvojice ${ex.cols}×${ex.rows}`
-      : `${index + 1} / ${round.length}`;
+      /* Krátce - "Abeceda · 12" už se na 320 px do lišty nevešlo. */
+      : ex.kind === 'abc'
+        ? `${ex.words.length} slov`
+        : `${index + 1} / ${round.length}`;
   el('dots').querySelectorAll('.dot').forEach((dot, i) => dot.classList.toggle('is-current', i === index));
   el('exerciseHint').textContent = hintFor(ex);
   /* Zápis velkého násobení roste podle toho, kolik kroků je za námi -
      stav se proto musí vynulovat dřív, než se tělo úlohy vykreslí. */
   if (ex.kind === 'bigmul') resetBigmul();
+  // plocha abecedy se kreslí ze stavu, ten musí být nový dřív než HTML
+  if (ex.kind === 'abc') resetAbc(ex);
   el('exerciseBody').innerHTML = (BODY_HTML[ex.kind] || equationHTML)(ex);
   /* Mřížka 5×5 a plocha pexesa o čtyřech sloupcích jsou nejširší, co
      aplikace kreslí. Na úzkém telefonu jim uvolníme okraje, ať nemusíme
      zmenšovat kolečka a kartičky pod dotykový cíl. */
   document.body.classList.toggle(
     'is-wide-grid',
-    (ex.kind === 'grid' && ex.size >= 5) || (ex.kind === 'pexeso' && ex.cols >= 4),
+    (ex.kind === 'grid' && ex.size >= 5) || (ex.kind === 'pexeso' && ex.cols >= 4) || ex.kind === 'abc',
   );
+  // sloupce abecedy se řídí skutečnou šířkou plochy, ta je známá až teď
+  if (ex.kind === 'abc') fitAbc();
   el('feedback').hidden = true;
   el('feedback').innerHTML = '';
   /* Pexeso i velké násobení se ovládají klepáním, žádná klávesnice u nich
      není. */
-  const tapOnly = ex.kind === 'pexeso' || ex.kind === 'bigmul';
+  const tapOnly = ex.kind === 'pexeso' || ex.kind === 'bigmul' || ex.kind === 'abc';
   el('keypad').hidden = tapOnly;
   if (!tapOnly) renderKeypad(ex);
   el('keypad').dataset.disabled = 'false';
@@ -873,6 +955,10 @@ function hintFor(ex) {
   if (ex.kind === 'pexeso') {
     return 'Ke každému příkladu najdi jeho výsledek a klepni na obě kartičky. '
       + 'Když k sobě patří, spojí se. Takhle najdi všechny dvojice.';
+  }
+  if (ex.kind === 'abc') {
+    return 'Přetáhni slova do okének tak, aby šla podle abecedy. Když slovo pustíš mezi dvě okénka, '
+      + 'ostatní se posunou. Nakonec klepni na Hotovo.';
   }
   if (ex.kind === 'bigmul') {
     return 'Rozlož si násobení na desítky a jednotky. V každém kroku klepni na tu možnost, která je správně.';
@@ -1152,7 +1238,7 @@ function bigmulHTML(ex) {
 
 const BODY_HTML = {
   bond: bondHTML, word: wordHTML, riddle: riddleHTML, sign: signHTML, grid: gridHTML,
-  compare: compareHTML, over10: over10HTML, pexeso: pexesoHTML, bigmul: bigmulHTML,
+  compare: compareHTML, over10: over10HTML, pexeso: pexesoHTML, bigmul: bigmulHTML, abc: abcHTML,
 };
 
 /* ---------------- ovladač velkého násobení ----------------
@@ -1262,6 +1348,10 @@ function renderPexStatus(ex) {
 }
 
 el('exerciseBody').addEventListener('click', (e) => {
+  if (round[index]?.kind === 'abc') {
+    abcTap(e.target);
+    return;
+  }
   const card = e.target.closest('.pex-card');
   if (card) {
     pexTap(card);
@@ -1345,6 +1435,306 @@ function finishPexeso(ex) {
     : `<div class="fb-badge"><span aria-hidden="true">🤔</span> Dvojice máš, ale s chybami</div>
        <p class="fb-retry-note">Špatně spojených bylo ${pexMiss}, vejít ses měla do ${limit}.
          Spočítej si příklad celý, než klepneš na výsledek.</p>
+       <button type="button" class="btn btn-primary">Rozumím <span aria-hidden="true">➜</span></button>`;
+  fb.hidden = false;
+  fb.querySelector('.btn').addEventListener('click', next);
+  beep(correct ? 'correct' : 'wrong');
+  if (correct) confetti();
+}
+
+/* ---------------- ovladač abecedy ----------------
+   Kartičky se slovy se přetahují do očíslovaných okének. Pravidla přesunu
+   (výměna / vsunutí s posunem) jsou čisté funkce v abc.js, tady je jen
+   ovládání prstem a myší a vykreslení.
+
+   - puštění NA okénko: výměna, původní slovo spadne dolů mezi ostatní,
+   - puštění na levý nebo pravý okraj okénka (nebo do mezery): vsunutí,
+   - puštění dolů mezi slova: kartička se vrátí z okénka,
+   - místo tažení jde i klepnout na kartičku a pak na okénko.
+
+   Hotovo jde stisknout až s plnými okénky. První kontrola jen označí
+   špatná okénka červeně, dítě je smí opravit; až druhá chyba ukáže
+   správné pořadí. Stejně jako u pexesa se úloha neodpovídá políčkem,
+   takže záznam do `attempts` si zapisuje ovladač sám. */
+let abcBoard = null;       // { slots, pool } - viz abc.js
+let abcPicked = null;      // kartička vybraná klepnutím
+let abcChecks = 0;         // kolikrát už se kontrolovalo
+let abcMarked = new Map(); // okénko -> slovo, které v něm při kontrole nesedělo
+let abcReveal = false;     // po vyhodnocení: zelená / červená u všech okének
+let abcDrag = null;        // rozjeté tažení
+let abcNoClick = false;    // po tažení prohlížeč pošle ještě klik - ten se zahodí
+
+/* Kolik prstu musí ujet, než se klepnutí změní v tažení. */
+const ABC_DRAG_PX = 6;
+/* Jaká část okénka u okraje znamená "vsunout před / za". */
+const ABC_EDGE = 0.25;
+
+function resetAbc(ex) {
+  abcBoard = abcEmptyBoard(ex);
+  abcPicked = null;
+  abcChecks = 0;
+  abcMarked = new Map();
+  abcReveal = false;
+  abcDrag = null;
+}
+
+function abcCardHTML(ex, id) {
+  const picked = abcPicked === id ? ' is-picked' : '';
+  return `<button type="button" class="abc-card${picked}" data-id="${id}">${ex.words[id]}</button>`;
+}
+
+function abcHTML(ex) {
+  const b = abcBoard;
+  const slots = b.slots
+    .map((id, i) => {
+      let cls = 'abc-slot';
+      if (abcReveal) cls += id === ex.order[i] ? ' is-right' : ' is-wrong';
+      else if (id !== null && abcMarked.get(i) === id) cls += ' is-wrong';
+      return `<div class="${cls}" data-slot="${i}" aria-label="Okénko ${i + 1}">
+          <span class="abc-num" aria-hidden="true">${i + 1}</span>
+          ${id === null ? '' : abcCardHTML(ex, id)}
+        </div>`;
+    })
+    .join('');
+  const pool = b.pool.map((id) => abcCardHTML(ex, id)).join('');
+  const full = abcFull(b);
+  return `<div class="abc">
+      <div class="abc-slots">${slots}</div>
+      <div class="abc-pool${b.pool.length ? '' : ' is-empty'}">${pool}</div>
+      <p id="abcStatus" class="pex-status" aria-live="polite">${abcStatusText(ex)}</p>
+      ${locked ? '' : `<button type="button" class="btn btn-primary abc-done"${full ? '' : ' disabled'}>Hotovo <span aria-hidden="true">✓</span></button>`}
+    </div>`;
+}
+
+function abcStatusText(ex) {
+  if (abcReveal) return '';
+  const placed = abcBoard.slots.filter((s) => s !== null).length;
+  const n = ex.words.length;
+  if (abcMarked.size && [...abcMarked].some(([i, id]) => abcBoard.slots[i] === id)) {
+    return 'Červená okénka nesedí. Oprav je a klepni znovu na Hotovo.';
+  }
+  if (placed < n) return `Rozmístěno ${placed} z ${n}`;
+  return 'Všechna okénka jsou plná – klepni na Hotovo.';
+}
+
+/* Počet sloupců podle nejdelšího slova a skutečné šířky plochy: 5, 4, nebo
+   3. Písmo se zmenší jen tehdy, když se slovo nevejde ani do tří. */
+function fitAbc() {
+  const ex = round[index];
+  const box = el('exerciseBody').querySelector('.abc');
+  if (!box || ex?.kind !== 'abc') return;
+  const width = box.clientWidth;
+  const longest = Math.max(...ex.words.map((w) => w.length));
+  const gap = 6;
+  const PAD = 18;          // vnitřní okraj a rámeček kartičky
+  const CHAR = 0.6;        // průměrná šířka písmene v em (Baloo 2, tučné)
+  const fontFor = (cols) => ((width - (cols - 1) * gap) / cols - PAD) / (longest * CHAR);
+  const cols = [5, 4, 3].find((c) => fontFor(c) >= 16) || 3;
+  const font = Math.max(11, Math.min(20, fontFor(cols)));
+  box.style.setProperty('--abc-cols', String(cols));
+  box.style.setProperty('--abc-font', `${font.toFixed(1)}px`);
+}
+
+window.addEventListener('resize', () => {
+  if (screens.quiz.classList.contains('is-active') && round[index]?.kind === 'abc') fitAbc();
+});
+
+function renderAbc() {
+  const ex = round[index];
+  el('exerciseBody').innerHTML = abcHTML(ex);
+  fitAbc();
+}
+
+/* Změna na ploše - vybraná kartička se tím odloží. */
+function abcApply(next) {
+  abcBoard = next;
+  abcPicked = null;
+  renderAbc();
+}
+
+/* Kam by kartička spadla, kdyby se teď pustila. Mezera mezi okénky se
+   bere podle nejbližšího okénka v témž řádku - vsunutí před / za. */
+function abcZoneAt(x, y) {
+  const hit = document.elementFromPoint(x, y);
+  if (!hit) return null;
+  if (hit.closest('.abc-pool')) return { type: 'pool' };
+  const body = el('exerciseBody');
+  const slots = [...body.querySelectorAll('.abc-slot')];
+  let slot = hit.closest('.abc-slot');
+  if (!slot && hit.closest('.abc-slots')) {
+    let best = Infinity;
+    for (const s of slots) {
+      const r = s.getBoundingClientRect();
+      if (y < r.top || y > r.bottom) continue;
+      const d = Math.abs(x - (r.left + r.width / 2));
+      if (d < best) {
+        best = d;
+        slot = s;
+      }
+    }
+  }
+  if (!slot) return null;
+  const i = Number(slot.dataset.slot);
+  // do prázdného okénka se jen vkládá, okraj tam nic neznamená
+  if (abcBoard.slots[i] === null) return { type: 'slot', i, slot };
+  const r = slot.getBoundingClientRect();
+  const f = (x - r.left) / r.width;
+  if (f < ABC_EDGE) return { type: 'between', pos: i, slot, side: 'before' };
+  if (f > 1 - ABC_EDGE) return { type: 'between', pos: i + 1, slot, side: 'after' };
+  return { type: 'slot', i, slot };
+}
+
+function abcClearHints() {
+  el('exerciseBody').querySelectorAll('.abc-slot.is-target, .abc-slot.is-before, .abc-slot.is-after, .abc-pool.is-target')
+    .forEach((n) => n.classList.remove('is-target', 'is-before', 'is-after'));
+}
+
+function abcShowHint(zone) {
+  abcClearHints();
+  if (!zone) return;
+  if (zone.type === 'pool') el('exerciseBody').querySelector('.abc-pool')?.classList.add('is-target');
+  else if (zone.type === 'slot') zone.slot.classList.add('is-target');
+  else zone.slot.classList.add(zone.side === 'before' ? 'is-before' : 'is-after');
+}
+
+el('exerciseBody').addEventListener('pointerdown', (e) => {
+  abcNoClick = false;
+  const card = e.target.closest('.abc-card');
+  if (!card || locked || round[index]?.kind !== 'abc') return;
+  if (e.button !== undefined && e.button !== 0) return;
+  abcDrag = {
+    id: Number(card.dataset.id), card, pointerId: e.pointerId,
+    x0: e.clientX, y0: e.clientY, ghost: null, zone: null,
+  };
+});
+
+document.addEventListener('pointermove', (e) => {
+  const d = abcDrag;
+  if (!d || e.pointerId !== d.pointerId) return;
+  if (!d.ghost) {
+    if (Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < ABC_DRAG_PX) return;
+    // tažení začalo: kopie kartičky jede pod prstem, originál zprůhlední
+    const r = d.card.getBoundingClientRect();
+    d.ghost = d.card.cloneNode(true);
+    d.ghost.classList.add('abc-ghost');
+    d.ghost.classList.remove('is-picked');
+    d.ghost.style.width = `${r.width}px`;
+    d.ghost.style.height = `${r.height}px`;
+    d.ghost.style.fontSize = getComputedStyle(d.card).fontSize;
+    d.dx = d.x0 - r.left;
+    d.dy = d.y0 - r.top;
+    document.body.append(d.ghost);
+    d.card.classList.add('is-dragging');
+  }
+  e.preventDefault();
+  d.ghost.style.transform = `translate(${e.clientX - d.dx}px, ${e.clientY - d.dy}px)`;
+  d.zone = abcZoneAt(e.clientX, e.clientY);
+  abcShowHint(d.zone);
+  // u 25 slov se plocha na telefon nevejde - u okraje obrazovky se posune
+  const EDGE = 60;
+  if (e.clientY < EDGE) window.scrollBy(0, -12);
+  else if (e.clientY > window.innerHeight - EDGE) window.scrollBy(0, 12);
+}, { passive: false });
+
+function abcEndDrag(e, cancel) {
+  const d = abcDrag;
+  if (!d || e.pointerId !== d.pointerId) return;
+  abcDrag = null;
+  if (!d.ghost) return; // jen klepnutí - vyřeší ho klik
+  d.ghost.remove();
+  abcClearHints();
+  abcNoClick = true;
+  const zone = cancel ? null : abcZoneAt(e.clientX, e.clientY);
+  if (!zone) {
+    d.card.classList.remove('is-dragging');
+    return;
+  }
+  const next = zone.type === 'pool'
+    ? dropToPool(abcBoard, d.id)
+    : zone.type === 'slot'
+      ? dropOnSlot(abcBoard, d.id, zone.i)
+      : dropBetween(abcBoard, d.id, zone.pos);
+  abcApply(next);
+}
+
+document.addEventListener('pointerup', (e) => abcEndDrag(e, false));
+document.addEventListener('pointercancel', (e) => abcEndDrag(e, true));
+
+/* Klepání: vybrat kartičku a pak klepnout na okénko (nebo na obsazené
+   okénko, tedy na kartičku v něm). Druhé klepnutí na vybranou výběr zruší. */
+function abcTap(target) {
+  const ex = round[index];
+  if (locked || ex?.kind !== 'abc') return;
+  if (abcNoClick) {
+    abcNoClick = false;
+    return;
+  }
+  if (target.closest('.abc-done')) {
+    abcCheck(ex);
+    return;
+  }
+  const card = target.closest('.abc-card');
+  const slot = target.closest('.abc-slot');
+  if (card) {
+    const id = Number(card.dataset.id);
+    const inSlot = abcBoard.slots.indexOf(id);
+    if (abcPicked === id) abcPicked = null;
+    else if (abcPicked !== null && inSlot >= 0) return abcApply(dropOnSlot(abcBoard, abcPicked, inSlot));
+    else abcPicked = id;
+    renderAbc();
+    return;
+  }
+  if (abcPicked === null) return;
+  if (slot) abcApply(dropOnSlot(abcBoard, abcPicked, Number(slot.dataset.slot)));
+  else if (target.closest('.abc-pool') && abcBoard.slots.includes(abcPicked)) abcApply(dropToPool(abcBoard, abcPicked));
+}
+
+function abcCheck(ex) {
+  if (!abcFull(abcBoard)) return;
+  const wrong = wrongSlots(abcBoard, ex.order);
+  if (!wrong.length) {
+    finishAbc(ex, 0);
+    return;
+  }
+  if (abcChecks === 0) {
+    abcChecks = 1;
+    abcMarked = new Map(wrong.map((i) => [i, abcBoard.slots[i]]));
+    abcPicked = null;
+    beep('wrong');
+    renderAbc();
+    return;
+  }
+  finishAbc(ex, wrong.length);
+}
+
+function finishAbc(ex, wrongCount) {
+  locked = true;
+  stopClock();
+  const correct = wrongCount === 0;
+  const retried = abcChecks > 0;
+
+  attempts.push({
+    ex,
+    given: wrongCount,
+    correct,
+    retried,
+    ms: Date.now() - shownAt,
+    tag: correct ? null : diagnose(ex, wrongCount),
+  });
+
+  abcReveal = true;
+  abcPicked = null;
+  renderAbc();
+
+  const order = ex.order.map((id) => ex.words[id]).join(', ');
+  const fb = el('feedback');
+  fb.dataset.state = correct ? 'correct' : 'wrong';
+  fb.innerHTML = correct
+    ? `<div class="fb-badge"><span aria-hidden="true">🎉</span> Všechna slova jsou správně!</div>
+       <p class="fb-retry-note">${retried ? 'Napodruhé – a to se počítá.' : 'Seřadila jsi je bez jediné chyby.'}</p>
+       <button type="button" class="btn btn-primary">Hotovo <span aria-hidden="true">➜</span></button>`
+    : `<div class="fb-badge"><span aria-hidden="true">🤔</span> Tohle ještě nesedí</div>
+       <p class="fb-retry-note">Podle abecedy to jde takhle: ${order}.</p>
        <button type="button" class="btn btn-primary">Rozumím <span aria-hidden="true">➜</span></button>`;
   fb.hidden = false;
   fb.querySelector('.btn').addEventListener('click', next);
@@ -1486,9 +1876,13 @@ document.addEventListener('keydown', (e) => {
      ve vyhodnocení, takže se tu jen odejde. */
   /* Velké násobení je na tom stejně - žádné políčko na odpověď. Navíc se
      obě možnosti dají vybrat klávesou 1 a 2. */
-  if (round[index]?.kind === 'pexeso' || round[index]?.kind === 'bigmul') {
+  /* Abeceda taky - Enter tam potvrdí plnou plochu (tlačítko Hotovo). */
+  if (['pexeso', 'bigmul', 'abc'].includes(round[index]?.kind)) {
     if (e.key === 'Enter' && locked) {
       el('feedback').querySelector('.btn')?.click();
+    } else if (e.key === 'Enter' && round[index].kind === 'abc') {
+      el('exerciseBody').querySelector('.abc-done:not([disabled])')?.click();
+      e.preventDefault();
     } else if (!locked && round[index].kind === 'bigmul' && (e.key === '1' || e.key === '2')) {
       el('exerciseBody').querySelectorAll('.bm-opt')[Number(e.key) - 1]?.click();
       e.preventDefault();
@@ -1821,13 +2215,21 @@ function grantRewards(report) {
     acc[kind] = (acc[kind] || 0) + 1;
     return acc;
   }, {});
+  // u abecedy se čas počítá za každé slovo, ne za celou plochu
+  const abcEx = attempts.find((at) => at.ex?.kind === 'abc')?.ex;
+  const kindUnits = abcEx ? { abc: abcEx.words.length } : {};
   const granted = rewards.applyRound(rewardData, {
     gameId,
     mode: config.mode,
     level: rewards.difficultyOf(config),
-    max: config.max,
+    // v abecedě se nepočítá - rozsah čísel by jí jinak přidal epického
+    max: isAbcMode() ? 0 : config.max,
+    kindUnits,
     // druhy navic (slovni ulohy, pyramidy, znamenka) - podminka raritniho
-    extras: Array.isArray(config.kinds) ? config.kinds.length : 0,
+    /* "Neco navic" existuje jen v rezimu Pocitani. Jinde karta schovana, ale
+       vyber v nastaveni zustava - bez teto podminky by z nej ostatni hry
+       dostavaly raritniho zadarmo. Tam ho zastoupi tezka uroven. */
+    extras: config.mode === 'calc' && Array.isArray(config.kinds) ? config.kinds.length : 0,
     kindCounts,
     total: report.total,
     correct: report.correct,
@@ -1919,9 +2321,39 @@ function renderPexesoResult(r) {
     ${listCard('Co zkusit dál', '💡', r.tips, '→')}`;
 }
 
+/* Abeceda je jedna plocha za kolo - vyšla, nebo nevyšla, jako mřížka. */
+function renderAbcResult(r) {
+  const ok = r.correct === r.total;
+  const at = attempts[0];
+  const ex = round[0];
+  const level = ABC_LEVELS[ex.level];
+  const recent = [...state.rounds.filter((x) => x.mode === 'abc')].slice(0, 5);
+  const done = recent.filter((x) => x.correct === x.total).length;
+  const tips = r.tips.length
+    ? `<div class="card">
+        <h2 class="card-title"><span aria-hidden="true">💡</span> Co zkusit dál</h2>
+        <ul class="list">${r.tips.map((t) => `<li><span aria-hidden="true">→</span><span>${t}</span></li>`).join('')}</ul>
+      </div>`
+    : '';
+
+  el('resultBody').innerHTML = `
+    <div class="result-head">
+      <div class="result-mascot" aria-hidden="true">${ok ? '🎉' : '🌱'}</div>
+      <p class="result-verdict">${ok ? 'Seřadila jsi je!' : 'Tahle řada nevyšla'}</p>
+      <div class="grid-verdict" data-ok="${ok}">${ok ? '✓' : '✗'}</div>
+      ${ok && at?.retried ? '<p class="score-sub">Napodruhé – a to se počítá.</p>' : ''}
+      ${!ok ? `<p class="score-sub">Na špatném místě ${at.given === 1 ? 'bylo 1 slovo' : at.given <= 4 ? `byla ${at.given} slova` : `bylo ${at.given} slov`}</p>` : ''}
+      <p class="score-sub">${ex.words.length} slov · ${level.label.toLowerCase()} obtížnost</p>
+      ${at?.ms > 0 ? `<p class="score-sub">Trvalo ti to ${Math.round(at.ms / 1000)} s</p>` : ''}
+      ${recent.length > 1 ? `<p class="trend">Z posledních ${recent.length} řad slov jsi správně seřadila ${done}.</p>` : ''}
+    </div>
+    ${tips}`;
+}
+
 function renderResult(r) {
   if (isGridMode()) return renderGridResult(r);
   if (isPexesoMode()) return renderPexesoResult(r);
+  if (isAbcMode()) return renderAbcResult(r);
   const verdict = verdictFor(r.pct);
   const stars = '⭐'.repeat(r.stars) + '☆'.repeat(5 - r.stars);
   const trend =

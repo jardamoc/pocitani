@@ -53,6 +53,7 @@
 
     <div class="card">
       <h2 class="card-title"><span aria-hidden="true">🕹️</span> Co si zahrajeme?</h2>
+      <div id="subjectTabs" class="subject-tabs" role="tablist" aria-label="Předmět"></div>
       <div id="modeChips" class="chips chips-mode"></div>
     </div>
 
@@ -78,13 +79,14 @@
     <div id="card-count" class="card">
       <h2 id="countTitle" class="card-title"><span aria-hidden="true">🔢</span> Kolik příkladů?</h2>
       <div id="countChips" class="chips"></div>
-      <label class="custom-max">
+      <label id="countCustomWrap" class="custom-max">
         <span>Nebo vlastní počet:</span>
         <input id="countCustom" type="number" min="3" max="60" step="1" inputmode="numeric" aria-label="Vlastní počet příkladů">
       </label>
+      <p id="countNote" class="field-note" hidden></p>
     </div>
 
-    <div class="card">
+    <div id="card-max" class="card">
       <h2 class="card-title"><span aria-hidden="true">📏</span> Do kolika počítáme?</h2>
       <div id="maxChips" class="chips"></div>
       <label class="custom-max">
