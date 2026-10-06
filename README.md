@@ -19,9 +19,10 @@ v zenskem rode a nikde se neobjevi zaporne ani desetinne cislo.
 | **Najdi dvojice** | karticky s priklady a vysledky, dite je spojuje; co je na nich, ridi zapnute operace (jen × = nasobilka) |
 | **Velke nasobeni** | rozklad `85 × 5` na desitky a jednotky ve trech krocich, v kazdem se vybira ze dvou moznosti |
 | **Abeceda** (Cestina) | 9 az 25 slov se pretahuje do ocislovanych okenek podle abecedy; tezka uroven prida pasti c/č, h/ch a spol. |
+| **Slovni druhy** (Cestina) | ve vete se klepe na vsechna slovesa nebo podstatna jmena; vety jsou rucne sepsane a urcene, tezka uroven prida pasti jako „chce jít" nebo „plavání" |
 
 Rozsah cisel (do 10 az do 100), pocet prikladu i druhy uloh se vybiraji na uvodni
-obrazovce; obtiznost je u sesti rezimu samostatna osa, nezavisla na rozsahu.
+obrazovce; obtiznost je u sedmi rezimu samostatna osa, nezavisla na rozsahu.
 
 **Sbirka dumplingu.** Za bezchybne kolo padne jedna sberatelska postavicka z 40
 v peti kategoriich. Vzacnost se ridi tim, jak rychle a jak tezke kolo bylo;
@@ -66,6 +67,7 @@ public/
     pexeso.js       plochy pro "Najdi dvojice"
     bigmul.js       velke nasobeni - rozklad na desitky a jednotky
     abc.js          abeceda - slova a pravidla presouvani karticek
+    pos.js          slovni druhy - rucne urcene vety a vyhodnoceni
     stats.js        rozbor kola a rady
     storage.js      jedina vrstva nad ulozistem
     rewards*.js     pravidla odmen, data sprite sheetu, vykresleni

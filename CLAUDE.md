@@ -14,7 +14,8 @@ Nikdy neutrální ani mužský tvar, nikdy podtržítkové dvojtvary typu „Zvl
 
 **2. Žádná záporná ani desetinná čísla.** Nikde — ani v zadání, ani v mezivýsledku, ani ve
 vysvětlení po chybě. Když nějaká varianta vyjde záporně, popiš to slovy
-(„to nejde, odčítá se větší číslo"), nevypisuj `-12`.
+(„to nejde, odčítá se větší číslo"), nevypisuj `-12`. Platí to i pro časy na výsledkové
+obrazovce — sekundy se zaokrouhlují na celé (dřív tam bylo „6.9 s").
 
 ## Spuštění a nasazení
 
@@ -82,6 +83,7 @@ běžel. Vypadalo to jako chyba nasazení, a nebyla.
 | `public/js/pexeso.js` | generátor ploch pro „Najdi dvojice" (stejně samostatný jako `grid.js`) |
 | `public/js/bigmul.js` | generátor velkého násobení — rozklad a tři kroky s dvojí volbou |
 | `public/js/abc.js` | Abeceda: seznam slov, výběr podle obtížnosti, čisté funkce přesunu kartiček |
+| `public/js/pos.js` | Slovní druhy: ručně určené věty podle obtížnosti, výběr kola, vyhodnocení a vysvětlení |
 | `public/js/stats.js` | rozbor kola, rady, `sanitizeState()` — **na úložiště nesahá** |
 | `public/js/storage.js` | **jediná vrstva nad úložištěm** — načtení, fronta zápisů, mazání, vyměnitelný backend |
 | `public/js/validate.js` | `wholeNumber` / `textList` — sdílené kousky validace, bez DOM |
@@ -111,8 +113,8 @@ na neexistující soubor. Když je tam někdy mít chceš, přidej napřed vlast
 | `package.json` | jen ty tři zkratky a `"type": "module"`; žádné závislosti |
 
 Prosté ES moduly, žádný framework, žádné závislosti. Závislosti jdou jedním směrem:
-`random.js → riddle.js / grid.js / over10.js / pexeso.js / bigmul.js / abc.js → generator.js → app.js`
-(`app.js` si z `abc.js` bere navíc funkce přesunu),
+`random.js → riddle.js / grid.js / over10.js / pexeso.js / bigmul.js / abc.js / pos.js → generator.js → app.js`
+(`app.js` si z `abc.js` bere navíc funkce přesunu a z `pos.js` tabulky a `posCheck` / `posTag`),
 `rewards-data.js → rewards.js → rewards-ui.js → app.js`,
 `validate.js → stats.js / rewards.js → storage.js → app.js` a
 `qr.js / transfer.js → export-ui.js → app.js`. Kruh nezaváděj.
@@ -156,7 +158,7 @@ Co z toho plyne pro psaní kódu:
 - **`mergePayload()` v `transfer.js` neukládá.** Slučování je čistá operace v paměti,
   která vrátí souhrn změn; zapisuje až `acceptIncoming()` v `app.js`.
 
-## Sedm režimů hry
+## Osm režimů hry
 
 Na úvodní obrazovce se vybírá karta **„Co si zahrajeme?"**. Nad kartami jsou dvě
 záložky **🔢 Matematika / 📖 Čeština** (`SUBJECTS`, u každého režimu `subject` v `MODES`).
@@ -173,6 +175,7 @@ záložky.
 | **Najdi dvojice** | `pexeso` | „něco navíc", **počet příkladů** (jedna plocha = jedno kolo) |
 | **Velké násobení** | `bigmul` | operace (je to vždy násobení), „něco navíc" |
 | **Abeceda** (Čeština) | `abc` | operace, „něco navíc", **rozsah „Do kolika"**; počet se vybírá ze slov |
+| **Slovní druhy** (Čeština) | `pos` | „něco navíc", **rozsah**; karta s operacemi vybírá, co se hledá; počet = počet vět |
 
 Větve se rozcházejí až v `startRound()`, kde je tabulka builderů. Všechno ostatní —
 klávesnice, vyhodnocení, statistiky — je společné, protože každá úloha má stejný tvar:
@@ -572,6 +575,45 @@ Pár věcí, které se snadno rozbijí:
 - Text v liště je `25 slov`; `Abeceda · 12` už na 320 px přeteklo (změřeno).
 - Okénko má `min-height`, ne pevnou `height` — kartička je vyšší o padding a rámeček
   a při pevné výšce zakryla spodní okraj (zelený/červený rámeček chyběl dole).
+
+## Slovní druhy
+
+Druhá hra pod záložkou Čeština (`config.mode` = `pos`). Ukáže se věta a dítě v ní klepne
+na **všechna slovesa**, nebo na **všechna podstatná jména**, a dá Hotovo. Předlohou byly
+„Rozbory – určování sloves / podstatných jmen" na umimecesky.cz. **Co věta, to úloha**
+(na rozdíl od abecedy) — kolo má 5 / 10 / 15 vět (`config.posCount`, vlastní klíč).
+
+**Věty jsou ručně sepsané a ručně určené** v `pos.js` (asi 60 na každou úroveň). Uživatel
+zvolil tuhle cestu místo skládání vět ze šablon (kostrbatá čeština) i místo jazykového
+nástroje (běží na serveru a plete se). Zápis: `'*Kočka ^pije *mléko.'` — `*` podstatné
+jméno, `^` sloveso. Každá věta má určené **oba** druhy, aby šla použít na kterýkoli.
+
+Při doplňování vět **se vyhni** tomu, o čem by se dalo s učitelkou přít: zvratným
+slovesům (`se`, `si`), minulému času v 1. a 2. osobě (`jsem šla`), podmiňovacímu způsobu
+(`by`) a slovům, která jsou podle věty podstatné jméno i příslovce (`ráno`, `večer`,
+`doma`). **Složené tvary mají slovesa obě slova** (`chce jít`, `budeme stavět`).
+
+**Co se hledá, vybírá karta „Co budeme hledat?"** — je to karta s operacemi (`#card-ops`)
+s jiným nadpisem a chipy z `POS_TYPES`. Hodnota je ve vlastním klíči `config.posTypes`,
+**do `config.ops` nepatří** (stejný důvod jako u `over10Ops`). Když jsou zapnuté oba druhy,
+rozdělí se věty v kole půl na půl a zamíchají; nad větou je barevně napsané, co hledat.
+
+**Obtížnost = záludnost slov:** lehká krátké věty v přítomném čase, střední delší věty
+a minulý čas, těžká pasti (neurčitek, `bude` + neurčitek, podstatná jména činnosti jako
+`plavání` a `zpěv`, a `ráda`, které sloveso není).
+
+Pár věcí, které se snadno rozbijí:
+
+- Ovladač je v `app.js` (`posTap` / `posSubmit` / `finishPos`) a `submit()` neprochází.
+  První Hotovo s chybou jen obarví červeně slova navíc a napíše, jestli nějaké chybí;
+  druhé ukáže řešení (zelená = správně, přerušovaný rámeček = přehlédnuté, červená = navíc).
+  Oprava napodruhé se počítá jako správně, stejně jako u abecedy.
+- `ex.missing` nese hledaný druh (`noun` / `verb`), takže `KIND_LABEL` ve `stats.js` má
+  klíče `pos:noun` a `pos:verb` a výsledek umí říct „Nejvíc chyb máš u sloves".
+- Tag chyby počítá `posTag()`: `posSwap` (vybrala druhý druh), `posExtra`, `posMissed`.
+- Do odměn jde `max: 0` jako u abecedy; čas jsou 2 běžné příklady na větu
+  (`speedKindMultiplier.pos`).
+- Klávesnice se schová, Enter potvrdí Hotovo.
 
 ## Doplň znaménko
 

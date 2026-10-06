@@ -4,6 +4,7 @@ import { makeGrid, gridExplain, gridText } from './grid.js';
 import { makeOver10, over10Explain, over10Text } from './over10.js';
 import { makePexeso, pexesoExplain, pexesoText } from './pexeso.js';
 import { makeAbc, abcExplain, abcText } from './abc.js';
+import { makePosRound, posAnswer, posExplain, posText } from './pos.js';
 import { makeBigmul, bigmulExplain, bigmulText } from './bigmul.js';
 
 export const OPS = {
@@ -137,6 +138,7 @@ export function signature(ex) {
   // pexeso taky ne - podpisem je otisk všech dvojic na ploše
   if (ex.kind === 'pexeso') return `pexeso|${ex.key}`;
   if (ex.kind === 'abc') return `abc|${ex.key}`;
+  if (ex.kind === 'pos') return `pos|${ex.key}`;
   // velké násobení je dané dvojicí činitelů, ne trojicí a, b, c
   if (ex.kind === 'bigmul') return `bigmul|${ex.key}`;
   return `${ex.op}|${ex.kind}|${ex.missing}|${ex.a}|${ex.b}`;
@@ -469,6 +471,24 @@ export function buildAbcRound(config) {
   }];
 }
 
+/* ---------------- slovní druhy ----------------
+   Každá věta je jedna úloha, kolo má tolik vět, kolik si dítě vybralo.
+   Ovladač klepání je v app.js. `op: 'add'` je jen zástupná hodnota, ať
+   `OPS[ex.op]` nikde nespadne. `missing` nese hledaný druh, aby se ve
+   statistice daly rozlišit slovesa a podstatná jména (`pos:verb`). */
+export function buildPosRound(config) {
+  return makePosRound(config.level, config.posTypes, config.posCount).map((p) => ({
+    op: 'add',
+    kind: 'pos',
+    missing: p.target,
+    a: 0, b: 0, c: 0,
+    cross: false,
+    skill: `pos:${p.target}`,
+    answer: posAnswer(p),
+    ...p,
+  }));
+}
+
 /* ---------------- velké násobení ----------------
    `op: 'mul'` je tu POCTIVÉ násobení, ne zástupná hodnota jako u mřížky -
    nemusí se tedy nikde vylučovat z aritmetiky. Odpovědí je ale řetězec
@@ -518,6 +538,7 @@ export function exToText(ex, reveal = false) {
   if (ex.kind === 'over10') return over10Text(ex, reveal);
   if (ex.kind === 'pexeso') return pexesoText(ex, reveal);
   if (ex.kind === 'abc') return abcText(ex, reveal);
+  if (ex.kind === 'pos') return posText(ex, reveal);
   if (ex.kind === 'bigmul') return bigmulText(ex, reveal);
   if (ex.kind === 'riddle') return riddleText(ex, reveal);
   if (ex.kind === 'sign') {
@@ -576,6 +597,7 @@ export function explain(ex) {
   if (kind === 'over10') return over10Explain(ex);
   if (kind === 'pexeso') return pexesoExplain(ex);
   if (kind === 'abc') return abcExplain(ex);
+  if (kind === 'pos') return posExplain(ex);
   if (kind === 'bigmul') return bigmulExplain(ex);
   if (kind === 'riddle') return riddleExplain(ex);
 
@@ -705,6 +727,9 @@ export const TAGS = {
   over10Partial: 'část rozkladu správně',
   pexesoMiss: 'moc chybných otočení',
   abcMiss: 'slova ve špatném pořadí',
+  posSwap: 'záměna podstatného jména a slovesa',
+  posExtra: 'označené slovo navíc',
+  posMissed: 'přehlédnuté slovo',
   bigmulSplit: 'chyba v rozkladu',
   bigmulProduct: 'ztracená nula v součinu',
   bigmulSum: 'chyba v součtu',
@@ -731,6 +756,10 @@ export function diagnose(ex, given) {
 
   /* Abeceda taky - "odpovědí" je počet špatně obsazených okének. */
   if (kind === 'abc') return 'abcMiss';
+
+  /* Slovní druhy taky - odpovědí jsou slova, ne číslo. Přesný tag podle
+     označených slov si spočítá ovladač (`posTag()`), tohle je pojistka. */
+  if (kind === 'pos') return 'posMissed';
 
   /* Velké násobení taky - odpovědí je text vybrané možnosti. Konkrétní tag
      podle kroku si zapisuje ovladač v app.js, tohle je jen pojistka. */

@@ -405,6 +405,7 @@ h1, h2, h3, .num, .box-value, .key, .score-big { font-family: 'Baloo 2', 'Nunito
 .chips-mode .chip.is-on[data-value="pexeso"] { background: linear-gradient(135deg, #f472b6, #7c3aed); }
 .chips-mode .chip.is-on[data-value="bigmul"] { background: linear-gradient(135deg, #60a5fa, #1d4ed8); }
 .chips-mode .chip.is-on[data-value="abc"] { background: linear-gradient(135deg, #f87171, #be123c); }
+.chips-mode .chip.is-on[data-value="pos"] { background: linear-gradient(135deg, #a78bfa, #6d28d9); }
 
 /* Záložky Matematika / Čeština nad kartami her. `<button>` nedědí barvu
    textu, proto ji záložka nastavuje sama. */
@@ -989,6 +990,33 @@ body.is-dark { --pair-task: #93c5fd; --pair-result: #fdba74; }
 }
 .abc-done { display: block; margin: 14px auto 0; }
 .abc-done:disabled { opacity: .45; cursor: not-allowed; }
+
+/* ---------- slovní druhy ----------
+   Věta je řada tlačítek, jedno na slovo, a zalamuje se jako běžný text.
+   Barvu nese podklad a rámeček, text zůstává `--ink` - tmavá barva na
+   tintu v tmavém režimu nesvítí. `<button>` nedědí barvu textu. */
+.pos-ask {
+  margin: 0 0 12px; text-align: center;
+  font-family: 'Baloo 2', sans-serif; font-weight: 800; font-size: 1.35rem;
+}
+.pos[data-target="noun"] .pos-ask { color: var(--pair-task); }
+.pos[data-target="verb"] .pos-ask { color: var(--pair-result); }
+.pos-sentence {
+  margin: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 4px;
+}
+.pos-word {
+  font-family: 'Baloo 2', sans-serif; font-weight: 700; font-size: 1.6rem; line-height: 1.2;
+  min-height: 44px; padding: 2px 8px; cursor: pointer;
+  border: 3px solid transparent; border-radius: 12px;
+  background: var(--surface-2); color: var(--ink);
+}
+.pos-word:focus-visible { outline: 3px solid var(--violet); outline-offset: 2px; }
+.pos-word.is-picked { border-color: var(--violet); background: var(--card); box-shadow: var(--shadow); }
+.pos-word.is-wrong { border-color: var(--bad); background: var(--bad-tint); }
+.pos-word.is-right { border-color: var(--good); background: var(--good-tint); }
+.pos-word.is-missed { border: 3px dashed var(--good); }
+.pos-done { display: block; margin: 14px auto 0; }
+.pos-done:disabled { opacity: .45; cursor: not-allowed; }
 
 /* ---------- velké násobení ----------
    Zápis roste shora dolů: hotový krok je hodnota na zeleném podkladu

@@ -1,4 +1,5 @@
-import { OPS, COMPARES, EXTRA_KINDS, MISSING_LABEL, kindOps, buildRound, buildRiddleRound, buildGridRound, buildOver10Round, buildPexesoRound, buildBigmulRound, buildAbcRound, explain, diagnose } from './generator.js';
+import { OPS, COMPARES, EXTRA_KINDS, MISSING_LABEL, kindOps, buildRound, buildRiddleRound, buildGridRound, buildOver10Round, buildPexesoRound, buildBigmulRound, buildAbcRound, buildPosRound, explain, diagnose } from './generator.js';
+import { POS_TYPES, POS_TYPE_KEYS, POS_COUNTS, POS_LEVELS, POS_LEVEL_KEYS, posCheck, posTag } from './pos.js';
 import {
   ABC_LEVELS, ABC_LEVEL_KEYS, ABC_COUNTS, abcCountNote, abcEmptyBoard, abcFull, dropOnSlot, dropBetween, dropToPool, wrongSlots,
 } from './abc.js';
@@ -41,6 +42,7 @@ const MODES = {
   pexeso: { subject: 'math', label: 'Najdi dvojice', icon: '🔗', sub: 'Spoj příklad s jeho výsledkem' },
   bigmul: { subject: 'math', label: 'Velké násobení', icon: '✖️', sub: 'Rozlož si ho na desítky a jednotky' },
   abc: { subject: 'czech', label: 'Abeceda', icon: '🔤', sub: 'Seřaď slova podle abecedy' },
+  pos: { subject: 'czech', label: 'Slovní druhy', icon: '🔍', sub: 'Najdi ve větě slovesa nebo podstatná jména' },
 };
 
 const SUBJECTS = {
@@ -57,15 +59,19 @@ const lastModeBySubject = {};
    příkladům a má jiné hodnoty. */
 const ABC_COUNT_DEFAULT = ABC_COUNTS[0];
 
+/* Slovní druhy: co se hledá a kolik vět - zase vlastní klíče. Do
+   `config.ops` hledaný druh nepatří, tam jsou operace režimu Počítání. */
+const POS_COUNT_DEFAULT = 10;
+
 /* Tabulky obtížností podle režimu - klíče (easy/medium/hard) jsou schválně
    společné, takže `config.level` přežije přepnutí režimu. */
 const LEVEL_TABLES = {
   riddle: RIDDLE_LEVELS, grid: GRID_LEVELS, over10: OVER10_LEVELS, pexeso: PEXESO_LEVELS, bigmul: BIGMUL_LEVELS,
-  abc: ABC_LEVELS,
+  abc: ABC_LEVELS, pos: POS_LEVELS,
 };
 const LEVEL_KEYS = {
   riddle: RIDDLE_LEVEL_KEYS, grid: GRID_LEVEL_KEYS, over10: OVER10_LEVEL_KEYS, pexeso: PEXESO_LEVEL_KEYS,
-  bigmul: BIGMUL_LEVEL_KEYS, abc: ABC_LEVEL_KEYS,
+  bigmul: BIGMUL_LEVEL_KEYS, abc: ABC_LEVEL_KEYS, pos: POS_LEVEL_KEYS,
 };
 
 /* Společná množina klíčů obtížnosti. Tabulky výš ji musí mít všechny stejnou,
@@ -176,6 +182,7 @@ const SCENERY = {
 const VYCHOZI_CONFIG = () => ({
   mode: 'calc', level: 'easy', ops: ['add', 'sub'], over10Ops: ['add'],
   kinds: ['word', 'bond'], count: 10, max: 20, abcCount: ABC_COUNT_DEFAULT,
+  posTypes: ['noun', 'verb'], posCount: POS_COUNT_DEFAULT,
 });
 
 /* Stav se jen deklaruje. Naplni ho `boot()` na konci souboru, protoze
@@ -226,6 +233,7 @@ function normalizeConfig(raw) {
   const kinds = Array.isArray(raw.kinds)
     ? raw.kinds.filter((k) => k in EXTRA_KINDS)
     : Object.keys(EXTRA_KINDS);
+  const posTypes = Array.isArray(raw.posTypes) ? raw.posTypes.filter((t) => POS_TYPE_KEYS.includes(t)) : [];
   return {
     // starší uložené nastavení režim nezná a bylo vždycky "počítání"
     mode: raw.mode in MODES ? raw.mode : 'calc',
@@ -239,6 +247,9 @@ function normalizeConfig(raw) {
     max: clamp(Number(raw.max) || 20, 5, 1000),
     // starší uložené nastavení abecedu nezná
     abcCount: ABC_COUNTS.includes(Number(raw.abcCount)) ? Number(raw.abcCount) : ABC_COUNT_DEFAULT,
+    // starší uložené nastavení slovní druhy nezná - prázdný výběr = oba
+    posTypes: posTypes.length ? posTypes : ['noun', 'verb'],
+    posCount: POS_COUNTS.includes(Number(raw.posCount)) ? Number(raw.posCount) : POS_COUNT_DEFAULT,
   };
 }
 
@@ -257,6 +268,7 @@ const isOver10Mode = () => config.mode === 'over10';
 const isPexesoMode = () => config.mode === 'pexeso';
 const isBigmulMode = () => config.mode === 'bigmul';
 const isAbcMode = () => config.mode === 'abc';
+const isPosMode = () => config.mode === 'pos';
 /* Režimy, které mají obtížnost místo výběru druhů úloh. */
 const usesLevel = () => config.mode !== 'calc';
 const levelTable = () => LEVEL_TABLES[config.mode] || RIDDLE_LEVELS;
@@ -375,20 +387,28 @@ function renderModeCards() {
   /* Velké násobení je vždycky násobení - výběr operací by tam nedával smysl.
      Rozklad přes desítku kartu má, ale jen se sčítáním a odčítáním. */
   const abc = isAbcMode();
+  const pos = isPosMode();
   el('card-ops').hidden = isRiddleMode() || bigmul || abc;
   el('card-kinds').hidden = usesLevel();
   el('card-level').hidden = !usesLevel();
   // jedna mřížka i jedna plocha pexesa jsou celé kolo - počet příkladů odpadá
   el('card-count').hidden = grid || pexeso;
-  // v abecedě se nepočítá, rozsah čísel tam nic neříká
-  el('card-max').hidden = abc;
-  // u abecedy se vybírá jen z pevných počtů slov
-  el('countCustomWrap').hidden = abc;
+  // v abecedě ani ve slovních druzích se nepočítá, rozsah čísel tam nic neříká
+  el('card-max').hidden = abc || pos;
+  // u češtiny se vybírá jen z pevných počtů slov / vět
+  el('countCustomWrap').hidden = abc || pos;
+  /* Ve slovních druzích karta s operacemi zůstává, jen se v ní místo
+     operací vybírá, co se ve větách hledá. */
+  el('opsTitle').innerHTML = pos
+    ? '<span aria-hidden="true">🎯</span> Co budeme hledat?'
+    : '<span aria-hidden="true">🎯</span> Co budeme počítat?';
   el('countTitle').innerHTML = isRiddleMode()
     ? '<span aria-hidden="true">🔢</span> Kolik hádanek?'
     : abc
       ? '<span aria-hidden="true">🔢</span> Kolik slov?'
-      : '<span aria-hidden="true">🔢</span> Kolik příkladů?';
+      : pos
+        ? '<span aria-hidden="true">🔢</span> Kolik vět?'
+        : '<span aria-hidden="true">🔢</span> Kolik příkladů?';
 
   const maxNote = el('maxNote');
   const opsNote = el('opsNote');
@@ -405,6 +425,15 @@ function renderModeCards() {
     const note = abcCountNote(config.level, config.abcCount);
     countNote.textContent = note;
     countNote.hidden = !note;
+    return;
+  }
+
+  if (pos) {
+    el('levelNote').textContent = `${level.label} – ${level.note}.`;
+    opsNote.textContent = config.posTypes.length > 1
+      ? 'Každá věta řekne nahoře, co v ní máš hledat – jednou slovesa, jindy podstatná jména.'
+      : 'Můžeš si zapnout obojí naráz, věty se pak střídají.';
+    opsNote.hidden = false;
     return;
   }
 
@@ -503,9 +532,15 @@ function renderConfigScreen() {
      se z vlastního klíče `over10Ops`; jinde je to celá nabídka operací. */
   const opKeys = isOver10Mode() ? OVER10_OPS : Object.keys(OPS);
   const opOn = isOver10Mode() ? config.over10Ops : config.ops;
-  el('opChips').innerHTML = opKeys
-    .map((key) => chipHTML(key, `${OPS[key].emoji} ${OPS[key].label}`, opOn.includes(key)))
-    .join('');
+  /* Ve slovních druzích se v téže kartě vybírá, co se hledá - z vlastního
+     klíče `posTypes`. */
+  el('opChips').innerHTML = isPosMode()
+    ? POS_TYPE_KEYS
+      .map((key) => chipHTML(key, `${POS_TYPES[key].emoji} ${POS_TYPES[key].label}`, config.posTypes.includes(key)))
+      .join('')
+    : opKeys
+      .map((key) => chipHTML(key, `${OPS[key].emoji} ${OPS[key].label}`, opOn.includes(key)))
+      .join('');
 
   el('kindChips').innerHTML = Object.entries(EXTRA_KINDS)
     .map(([key, kind]) => chipHTML(key, `${kind.emoji} ${kind.label}`, config.kinds.includes(key)))
@@ -513,7 +548,9 @@ function renderConfigScreen() {
 
   el('countChips').innerHTML = isAbcMode()
     ? ABC_COUNTS.map((n) => chipHTML(n, `${n} slov`, config.abcCount === n)).join('')
-    : COUNT_PRESETS.map((n) => chipHTML(n, `${n} příkladů`, config.count === n)).join('');
+    : isPosMode()
+      ? POS_COUNTS.map((n) => chipHTML(n, `${n} vět`, config.posCount === n)).join('')
+      : COUNT_PRESETS.map((n) => chipHTML(n, `${n} příkladů`, config.count === n)).join('');
 
   el('maxChips').innerHTML = MAX_PRESETS
     .map((n) => chipHTML(n, `do ${n}`, config.max === n))
@@ -592,9 +629,11 @@ function renderLastHint() {
   }
 
   const pct = Math.round((last.correct / last.total) * 100);
-  const what = isRiddleMode() ? 'hádanek' : isOver10Mode() ? 'rozkladů' : 'příkladů';
+  const what = isRiddleMode() ? 'hádanek' : isOver10Mode() ? 'rozkladů' : isPosMode() ? 'vět' : 'příkladů';
   const focus = isRiddleMode()
     ? ' Každá hádanka je pokaždé nová.'
+    : isPosMode()
+      ? ' Věty se pokaždé vylosují jiné.'
     : isOver10Mode()
       ? ' Každý rozklad je pokaždé nový.'
       : isBigmulMode()
@@ -659,7 +698,8 @@ el('opChips').addEventListener('click', (e) => {
   if (!chip) return;
   const value = chip.dataset.value;
   const over10 = isOver10Mode();
-  const current = over10 ? config.over10Ops : config.ops;
+  const pos = isPosMode();
+  const current = pos ? config.posTypes : over10 ? config.over10Ops : config.ops;
   const next = current.includes(value) ? current.filter((o) => o !== value) : [...current, value];
   if (!next.length) {
     const err = el('opsError');
@@ -667,7 +707,8 @@ el('opChips').addEventListener('click', (e) => {
     setTimeout(() => { err.hidden = true; }, 2200);
     return;
   }
-  if (over10) config.over10Ops = next;
+  if (pos) config.posTypes = next;
+  else if (over10) config.over10Ops = next;
   else config.ops = next;
   saveConfig();
   renderConfigScreen();
@@ -690,6 +731,7 @@ el('countChips').addEventListener('click', (e) => {
   const chip = e.target.closest('.chip');
   if (!chip) return;
   if (isAbcMode()) config.abcCount = Number(chip.dataset.value);
+  else if (isPosMode()) config.posCount = Number(chip.dataset.value);
   else config.count = Number(chip.dataset.value);
   saveConfig();
   renderConfigScreen();
@@ -834,6 +876,7 @@ function startRound() {
     pexeso: () => buildPexesoRound(config), // jedna plocha je celé kolo
     bigmul: () => buildBigmulRound(config),
     abc: () => buildAbcRound(config),     // jedna řada slov je celé kolo
+    pos: () => buildPosRound(config),     // co věta, to úloha
   };
   round = (build[config.mode] || build.calc)();
   index = 0;
@@ -908,6 +951,8 @@ function renderExercise() {
   if (ex.kind === 'bigmul') resetBigmul();
   // plocha abecedy se kreslí ze stavu, ten musí být nový dřív než HTML
   if (ex.kind === 'abc') resetAbc(ex);
+  // u věty taky - označená slova jsou stav, ze kterého se kreslí
+  if (ex.kind === 'pos') resetPos();
   el('exerciseBody').innerHTML = (BODY_HTML[ex.kind] || equationHTML)(ex);
   /* Mřížka 5×5 a plocha pexesa o čtyřech sloupcích jsou nejširší, co
      aplikace kreslí. Na úzkém telefonu jim uvolníme okraje, ať nemusíme
@@ -922,7 +967,7 @@ function renderExercise() {
   el('feedback').innerHTML = '';
   /* Pexeso i velké násobení se ovládají klepáním, žádná klávesnice u nich
      není. */
-  const tapOnly = ex.kind === 'pexeso' || ex.kind === 'bigmul' || ex.kind === 'abc';
+  const tapOnly = ['pexeso', 'bigmul', 'abc', 'pos'].includes(ex.kind);
   el('keypad').hidden = tapOnly;
   if (!tapOnly) renderKeypad(ex);
   el('keypad').dataset.disabled = 'false';
@@ -959,6 +1004,11 @@ function hintFor(ex) {
   if (ex.kind === 'abc') {
     return 'Přetáhni slova do okének tak, aby šla podle abecedy. Když slovo pustíš mezi dvě okénka, '
       + 'ostatní se posunou. Nakonec klepni na Hotovo.';
+  }
+  if (ex.kind === 'pos') {
+    return ex.target === 'verb'
+      ? 'Klepni na všechna slovesa – slova, která říkají, co kdo dělá. Pak klepni na Hotovo.'
+      : 'Klepni na všechna podstatná jména – před ně jde říct ten, ta, to. Pak klepni na Hotovo.';
   }
   if (ex.kind === 'bigmul') {
     return 'Rozlož si násobení na desítky a jednotky. V každém kroku klepni na tu možnost, která je správně.';
@@ -1239,6 +1289,7 @@ function bigmulHTML(ex) {
 const BODY_HTML = {
   bond: bondHTML, word: wordHTML, riddle: riddleHTML, sign: signHTML, grid: gridHTML,
   compare: compareHTML, over10: over10HTML, pexeso: pexesoHTML, bigmul: bigmulHTML, abc: abcHTML,
+  pos: posHTML,
 };
 
 /* ---------------- ovladač velkého násobení ----------------
@@ -1350,6 +1401,10 @@ function renderPexStatus(ex) {
 el('exerciseBody').addEventListener('click', (e) => {
   if (round[index]?.kind === 'abc') {
     abcTap(e.target);
+    return;
+  }
+  if (round[index]?.kind === 'pos') {
+    posTap(e.target);
     return;
   }
   const card = e.target.closest('.pex-card');
@@ -1742,6 +1797,155 @@ function finishAbc(ex, wrongCount) {
   if (correct) confetti();
 }
 
+/* ---------------- ovladač slovních druhů ----------------
+   Věta je řada tlačítek, jedno na slovo. Dítě klepnutím slova označí
+   (druhé klepnutí označení zruší) a potvrdí je tlačítkem Hotovo.
+
+   Stejně jako u abecedy má dítě jednu opravu: první kontrola jen obarví
+   červeně slova, která tam nepatří, a řekne, jestli nějaké chybí. Až druhá
+   chyba ukáže řešení. Oprava napodruhé se počítá jako správně.
+   Úloha se neodpovídá políčkem, takže záznam do `attempts` zapisuje
+   ovladač sám (`finishPos`). */
+let posPicked = new Set(); // indexy označených slov
+let posChecks = 0;         // kolikrát už se kontrolovalo
+let posWrong = new Set();  // slova, která při první kontrole nepatřila
+let posNote = '';          // co říct pod větou po první kontrole
+let posReveal = false;     // po vyhodnocení: zelená / přehlédnutá / červená
+
+function resetPos() {
+  posPicked = new Set();
+  posChecks = 0;
+  posWrong = new Set();
+  posNote = '';
+  posReveal = false;
+}
+
+function posWordClass(ex, i) {
+  let cls = 'pos-word';
+  const want = ex.marks.includes(i);
+  const have = posPicked.has(i);
+  if (posReveal) {
+    if (want && have) cls += ' is-right';
+    else if (want) cls += ' is-missed';
+    else if (have) cls += ' is-wrong';
+  } else if (posWrong.has(i)) cls += ' is-wrong';
+  else if (have) cls += ' is-picked';
+  return cls;
+}
+
+function posHTML(ex) {
+  const type = POS_TYPES[ex.target];
+  const words = ex.words
+    .map((w, i) => `<button type="button" class="${posWordClass(ex, i)}" data-i="${i}"
+        aria-pressed="${posPicked.has(i)}">${w}</button>`)
+    .join(' ');
+  return `<div class="pos" data-target="${ex.target}">
+      <p class="pos-ask"><span aria-hidden="true">${type.emoji}</span> ${type.find}</p>
+      <p class="pos-sentence">${words}</p>
+      <p id="posStatus" class="pex-status" aria-live="polite">${posReveal ? '' : posNote}</p>
+      ${locked ? '' : `<button type="button" class="btn btn-primary pos-done"${posPicked.size ? '' : ' disabled'}>Hotovo <span aria-hidden="true">✓</span></button>`}
+    </div>`;
+}
+
+function renderPos() {
+  el('exerciseBody').innerHTML = posHTML(round[index]);
+}
+
+function posTap(target) {
+  const ex = round[index];
+  if (locked || ex?.kind !== 'pos') return;
+  if (target.closest('.pos-done')) {
+    posSubmit(ex);
+    return;
+  }
+  const word = target.closest('.pos-word');
+  if (!word) return;
+  const i = Number(word.dataset.i);
+  if (posPicked.has(i)) posPicked.delete(i);
+  else posPicked.add(i);
+  // na červené slovo se sahá, takže hláška pod větou už neplatí
+  if (posWrong.delete(i)) posNote = '';
+  renderPos();
+}
+
+/* "Červené slovo není sloveso." × "Červená slova nejsou slovesa." */
+function posRedText(ex, n) {
+  const type = POS_TYPES[ex.target];
+  return n === 1 ? `Červené slovo není ${type.one}.` : `Červená slova nejsou ${type.acc}.`;
+}
+
+function posSubmit(ex) {
+  if (!posPicked.size) return;
+  const { extra, missed } = posCheck(ex, [...posPicked]);
+  if (!extra.length && !missed.length) {
+    finishPos(ex, true);
+    return;
+  }
+  if (posChecks === 0) {
+    posChecks = 1;
+    posWrong = new Set(extra);
+    const red = posRedText(ex, extra.length);
+    posNote = extra.length && missed.length
+      ? `${red} A ještě nějaké chybí. Oprav to a klepni znovu na Hotovo.`
+      : extra.length
+        ? `${red} Oprav to a klepni znovu na Hotovo.`
+        : `Ještě ti nějaké chybí. Najdi ${missed.length === 1 ? 'ho' : 'je'} a klepni znovu na Hotovo.`;
+    beep('wrong');
+    renderPos();
+    return;
+  }
+  finishPos(ex, false);
+}
+
+function finishPos(ex, correct) {
+  locked = true;
+  stopClock();
+  const picked = [...posPicked].sort((x, y) => x - y);
+  const { extra, missed } = posCheck(ex, picked);
+
+  attempts.push({
+    ex,
+    // do výpisu chyb jdou označená slova; nic označeno být nemůže, Hotovo je pak vypnuté
+    given: picked.map((i) => ex.words[i].replace(/[.,!?;:]+$/, '')).join(', '),
+    correct,
+    retried: posChecks > 0,
+    ms: Date.now() - shownAt,
+    tag: correct ? null : posTag(ex, picked) || 'posMissed',
+  });
+
+  el('dots').querySelectorAll('.dot')[index]?.classList.add(correct ? 'is-correct' : 'is-wrong');
+  el('quizScore').textContent = String(attempts.filter((a) => a.correct).length);
+
+  posReveal = true;
+  renderPos();
+
+  if (correct) {
+    renderFeedback(ex, null, true);
+    beep('correct');
+    confetti();
+    return;
+  }
+
+  /* Legenda jen k tomu, co na větě opravdu je - u věty bez přehlédnutého
+     slova by věta o přerušovaném rámečku mátla. */
+  const legend = [];
+  if (picked.length > extra.length) legend.push('Zelená slova máš správně.');
+  if (missed.length) legend.push('Slova v přerušovaném rámečku jsi přehlédla.');
+  if (extra.length) legend.push(posRedText(ex, extra.length));
+  const steps = explain(ex).map((s) => `<li>${s.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')}</li>`).join('');
+  const fb = el('feedback');
+  fb.dataset.state = 'wrong';
+  fb.innerHTML = `
+    <div class="fb-badge"><span aria-hidden="true">🤔</span> Tentokrát ne</div>
+    <p class="fb-retry-note">${legend.join(' ')}</p>
+    <p class="fb-steps-title">Jak na to:</p>
+    <ul class="fb-steps">${steps}</ul>
+    <button type="button" class="btn btn-primary">Rozumím, další <span aria-hidden="true">➜</span></button>`;
+  fb.hidden = false;
+  fb.querySelector('.btn').addEventListener('click', next);
+  beep('wrong');
+}
+
 /* klávesnice - číselná, nebo se znaménky u úlohy "doplň znaménko" */
 const DEL_KEY = '<button type="button" class="key key-del" data-key="del" aria-label="Smazat">⌫</button>';
 const OK_KEY = '<button type="button" class="key key-ok" data-key="ok" aria-label="Potvrdit">✓</button>';
@@ -1877,11 +2081,12 @@ document.addEventListener('keydown', (e) => {
   /* Velké násobení je na tom stejně - žádné políčko na odpověď. Navíc se
      obě možnosti dají vybrat klávesou 1 a 2. */
   /* Abeceda taky - Enter tam potvrdí plnou plochu (tlačítko Hotovo). */
-  if (['pexeso', 'bigmul', 'abc'].includes(round[index]?.kind)) {
+  /* Slovní druhy stejně - Enter tam potvrdí označená slova. */
+  if (['pexeso', 'bigmul', 'abc', 'pos'].includes(round[index]?.kind)) {
     if (e.key === 'Enter' && locked) {
       el('feedback').querySelector('.btn')?.click();
-    } else if (e.key === 'Enter' && round[index].kind === 'abc') {
-      el('exerciseBody').querySelector('.abc-done:not([disabled])')?.click();
+    } else if (e.key === 'Enter' && (round[index].kind === 'abc' || round[index].kind === 'pos')) {
+      el('exerciseBody').querySelector('.abc-done:not([disabled]), .pos-done:not([disabled])')?.click();
       e.preventDefault();
     } else if (!locked && round[index].kind === 'bigmul' && (e.key === '1' || e.key === '2')) {
       el('exerciseBody').querySelectorAll('.bm-opt')[Number(e.key) - 1]?.click();
@@ -2223,7 +2428,7 @@ function grantRewards(report) {
     mode: config.mode,
     level: rewards.difficultyOf(config),
     // v abecedě se nepočítá - rozsah čísel by jí jinak přidal epického
-    max: isAbcMode() ? 0 : config.max,
+    max: isAbcMode() || isPosMode() ? 0 : config.max,
     kindUnits,
     // druhy navic (slovni ulohy, pyramidy, znamenka) - podminka raritniho
     /* "Neco navic" existuje jen v rezimu Pocitani. Jinde karta schovana, ale
@@ -2281,7 +2486,7 @@ function renderGridResult(r) {
       <div class="grid-verdict" data-ok="${ok}">${ok ? '✓' : '✗'}</div>
       ${solved ? '<p class="score-sub">Napodruhé – a to se počítá.</p>' : ''}
       <p class="score-sub">Mřížka ${ex.size}×${ex.size} · ${ex.family === 'mul' ? 'násobení a dělení' : 'sčítání a odčítání'} · čísla do ${config.max}</p>
-      ${r.avgMs ? `<p class="score-sub">Trvalo ti to ${(r.avgMs / 1000).toFixed(1)} s</p>` : ''}
+      ${r.avgMs ? `<p class="score-sub">Trvalo ti to ${Math.max(1, Math.round(r.avgMs / 1000))} s</p>` : ''}
       ${recent.length > 1 ? `<p class="trend">Z posledních ${recent.length} mřížek jsi zvládla ${done}.</p>` : ''}
     </div>
     ${listCard('Co zkusit dál', '💡', r.tips, '→')}`;
@@ -2315,7 +2520,7 @@ function renderPexesoResult(r) {
         : ok ? `Špatně spojených: ${misses} – vešla ses do ${limit}`
           : `Špatně spojených: ${misses} · vejít ses měla do ${limit}`}</p>
       <p class="score-sub">${ex.pairs} ${ex.pairs <= 4 ? 'dvojice' : 'dvojic'} · čísla do ${config.max}</p>
-      ${r.avgMs ? `<p class="score-sub">Trvalo ti to ${(r.avgMs / 1000).toFixed(1)} s</p>` : ''}
+      ${r.avgMs ? `<p class="score-sub">Trvalo ti to ${Math.max(1, Math.round(r.avgMs / 1000))} s</p>` : ''}
       ${recent.length > 1 ? `<p class="trend">Z posledních ${recent.length} ploch jsi zvládla ${done}.</p>` : ''}
     </div>
     ${listCard('Co zkusit dál', '💡', r.tips, '→')}`;
@@ -2394,7 +2599,9 @@ function renderResult(r) {
       ? 'Příště přijdou nové příklady na rozklad.'
       : isBigmulMode()
         ? 'Příště přijdou nová čísla.'
-        : 'Podobné příklady se objeví v dalším kole.';
+        : isPosMode()
+          ? 'Příště se vylosují jiné věty.'
+          : 'Podobné příklady se objeví v dalším kole.';
 
   const retry = r.missedList.length
     ? `<div class="card">
@@ -2412,9 +2619,9 @@ function renderResult(r) {
     : `<div class="card"><h2 class="card-title"><span aria-hidden="true">✨</span> Bez jediné chyby!</h2>
         <p style="margin:0;font-weight:700;color:var(--ink-soft)">Nic k procvičení – tohle byla čistá práce.</p></div>`;
 
-  const jednotka = riddle ? 'hádanku' : isOver10Mode() ? 'rozklad' : 'příklad';
+  const jednotka = riddle ? 'hádanku' : isOver10Mode() ? 'rozklad' : isPosMode() ? 'větu' : 'příklad';
   const avg = r.avgMs
-    ? `<p class="score-sub">Průměrně ${(r.avgMs / 1000).toFixed(1)} s na ${jednotka}</p>`
+    ? `<p class="score-sub">Průměrně ${Math.max(1, Math.round(r.avgMs / 1000))} s na ${jednotka}</p>`
     : '';
 
   el('resultBody').innerHTML = `
