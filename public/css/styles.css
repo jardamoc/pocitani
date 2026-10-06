@@ -1001,6 +1001,9 @@ body.is-dark { --pair-task: #93c5fd; --pair-result: #fdba74; }
 }
 .pos[data-target="noun"] .pos-ask { color: var(--pair-task); }
 .pos[data-target="verb"] .pos-ask { color: var(--pair-result); }
+/* upozornění "hledáme něco jiného" - nadpis jednou zatřese */
+.pos-ask.is-alert { animation: shake .45s ease; }
+@media (prefers-reduced-motion: reduce) { .pos-ask.is-alert { animation: none; } }
 .pos-sentence {
   margin: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 4px;
 }

@@ -608,6 +608,10 @@ Pár věcí, které se snadno rozbijí:
   První Hotovo s chybou jen obarví červeně slova navíc a napíše, jestli nějaké chybí;
   druhé ukáže řešení (zelená = správně, přerušovaný rámeček = přehlédnuté, červená = navíc).
   Oprava napodruhé se počítá jako správně, stejně jako u abecedy.
+- **Označí-li přesně všechna slova opačného druhu** (místo sloves všechna podstatná
+  jména), jednou za větu dostane jen upozornění „Našla jsi správně … – jenže tady hledáme
+  …", označení se smaže a nadpis zatřese. Opravu to nespotřebuje a chybou to není —
+  uživatel si to tak vyžádal, druhy přece poznala.
 - `ex.missing` nese hledaný druh (`noun` / `verb`), takže `KIND_LABEL` ve `stats.js` má
   klíče `pos:noun` a `pos:verb` a výsledek umí říct „Nejvíc chyb máš u sloves".
 - Tag chyby počítá `posTag()`: `posSwap` (vybrala druhý druh), `posExtra`, `posMissed`.

@@ -1811,6 +1811,8 @@ let posChecks = 0;         // kolikrát už se kontrolovalo
 let posWrong = new Set();  // slova, která při první kontrole nepatřila
 let posNote = '';          // co říct pod větou po první kontrole
 let posReveal = false;     // po vyhodnocení: zelená / přehlédnutá / červená
+let posSwapWarned = false; // už jsme upozornili, že označila opačný druh
+let posAskAlert = false;   // zatřást nadpisem "Najdi ..." při tom upozornění
 
 function resetPos() {
   posPicked = new Set();
@@ -1818,6 +1820,8 @@ function resetPos() {
   posWrong = new Set();
   posNote = '';
   posReveal = false;
+  posSwapWarned = false;
+  posAskAlert = false;
 }
 
 function posWordClass(ex, i) {
@@ -1840,7 +1844,7 @@ function posHTML(ex) {
         aria-pressed="${posPicked.has(i)}">${w}</button>`)
     .join(' ');
   return `<div class="pos" data-target="${ex.target}">
-      <p class="pos-ask"><span aria-hidden="true">${type.emoji}</span> ${type.find}</p>
+      <p class="pos-ask${posAskAlert ? ' is-alert' : ''}"><span aria-hidden="true">${type.emoji}</span> ${type.find}</p>
       <p class="pos-sentence">${words}</p>
       <p id="posStatus" class="pex-status" aria-live="polite">${posReveal ? '' : posNote}</p>
       ${locked ? '' : `<button type="button" class="btn btn-primary pos-done"${posPicked.size ? '' : ' disabled'}>Hotovo <span aria-hidden="true">✓</span></button>`}
@@ -1861,6 +1865,8 @@ function posTap(target) {
   const word = target.closest('.pos-word');
   if (!word) return;
   const i = Number(word.dataset.i);
+  // nadpis se překresluje s každým klepnutím - zatřást má jen jednou
+  posAskAlert = false;
   if (posPicked.has(i)) posPicked.delete(i);
   else posPicked.add(i);
   // na červené slovo se sahá, takže hláška pod větou už neplatí
@@ -1879,6 +1885,20 @@ function posSubmit(ex) {
   const { extra, missed } = posCheck(ex, [...posPicked]);
   if (!extra.length && !missed.length) {
     finishPos(ex, true);
+    return;
+  }
+  /* Přesně všechna slova DRUHÉHO druhu: dítě slovní druhy poznalo, jen
+     přehlédlo, co se hledá. Jednou za větu na to jen upozorníme, opravu
+     to nespotřebuje a chybou to není (uživatel si to tak vyžádal). */
+  const other = ex.target === 'verb' ? ex.noun : ex.verb;
+  if (!posSwapWarned && other.length === posPicked.size && other.every((i) => posPicked.has(i))) {
+    posSwapWarned = true;
+    posAskAlert = true;
+    const was = POS_TYPES[ex.target === 'verb' ? 'noun' : 'verb'];
+    const found = other.length === 1 ? was.one : `všechna ${was.acc}`;
+    posNote = `Našla jsi správně ${found} – jenže tady hledáme ${POS_TYPES[ex.target].acc}. Zkus to znovu.`;
+    posPicked = new Set();
+    renderPos();
     return;
   }
   if (posChecks === 0) {
