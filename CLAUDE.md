@@ -84,6 +84,7 @@ běžel. Vypadalo to jako chyba nasazení, a nebyla.
 | `public/js/bigmul.js` | generátor velkého násobení — rozklad a tři kroky s dvojí volbou |
 | `public/js/abc.js` | Abeceda: seznam slov, výběr podle obtížnosti, čisté funkce přesunu kartiček |
 | `public/js/pos.js` | Slovní druhy: ručně určené věty podle obtížnosti, výběr kola, vyhodnocení a vysvětlení |
+| `public/js/vety.js` | Druhy vět: ručně sepsané věty, výběr kola, možnosti k otázce a vysvětlení |
 | `public/js/stats.js` | rozbor kola, rady, `sanitizeState()` — **na úložiště nesahá** |
 | `public/js/storage.js` | **jediná vrstva nad úložištěm** — načtení, fronta zápisů, mazání, vyměnitelný backend |
 | `public/js/validate.js` | `wholeNumber` / `textList` — sdílené kousky validace, bez DOM |
@@ -113,7 +114,7 @@ na neexistující soubor. Když je tam někdy mít chceš, přidej napřed vlast
 | `package.json` | jen ty tři zkratky a `"type": "module"`; žádné závislosti |
 
 Prosté ES moduly, žádný framework, žádné závislosti. Závislosti jdou jedním směrem:
-`random.js → riddle.js / grid.js / over10.js / pexeso.js / bigmul.js / abc.js / pos.js → generator.js → app.js`
+`random.js → riddle.js / grid.js / over10.js / pexeso.js / bigmul.js / abc.js / pos.js / vety.js → generator.js → app.js`
 (`app.js` si z `abc.js` bere navíc funkce přesunu a z `pos.js` tabulky a `posCheck` / `posTag`),
 `rewards-data.js → rewards.js → rewards-ui.js → app.js`,
 `validate.js → stats.js / rewards.js → storage.js → app.js` a
@@ -158,7 +159,7 @@ Co z toho plyne pro psaní kódu:
 - **`mergePayload()` v `transfer.js` neukládá.** Slučování je čistá operace v paměti,
   která vrátí souhrn změn; zapisuje až `acceptIncoming()` v `app.js`.
 
-## Osm režimů hry
+## Devět režimů hry
 
 Na úvodní obrazovce se vybírá karta **„Co si zahrajeme?"**. Nad kartami jsou dvě
 záložky **🔢 Matematika / 📖 Čeština** (`SUBJECTS`, u každého režimu `subject` v `MODES`).
@@ -176,6 +177,7 @@ záložky.
 | **Velké násobení** | `bigmul` | operace (je to vždy násobení), „něco navíc" |
 | **Abeceda** (Čeština) | `abc` | operace, „něco navíc", **rozsah „Do kolika"**; počet se vybírá ze slov |
 | **Slovní druhy** (Čeština) | `pos` | „něco navíc", **rozsah**; karta s operacemi vybírá, co se hledá; počet = počet vět |
+| **Druhy vět** (Čeština) | `vety` | „něco navíc", **rozsah**; karta s operacemi vybírá úlohu; počet = počet vět |
 
 Větve se rozcházejí až v `startRound()`, kde je tabulka builderů. Všechno ostatní —
 klávesnice, vyhodnocení, statistiky — je společné, protože každá úloha má stejný tvar:
@@ -618,6 +620,48 @@ Pár věcí, které se snadno rozbijí:
 - Do odměn jde `max: 0` jako u abecedy; čas jsou 2 běžné příklady na větu
   (`speedKindMultiplier.pos`).
 - Klávesnice se schová, Enter potvrdí Hotovo.
+
+## Druhy vět
+
+Třetí hra pod záložkou Čeština (`config.mode` = `vety`). Dvě úlohy, vybírají se na kartě
+s operacemi (nadpis „Co budeme dělat?", vlastní klíč `config.vetyTasks`, **do `config.ops`
+nepatří**); když jsou zapnuté obě, kolo se rozdělí půl na půl. Počet vět 5 / 10 / 15
+(`config.vetyCount`). Co věta, to úloha.
+
+- **Urči druh věty** (`task: 'type'`) — čtyři školní druhy: oznamovací, tázací,
+  rozkazovací, přací. **Zvolací tam není**, uživatel zvolil čtyři. Tlačítka mají pevné
+  pořadí, druhy se v kole rozdělí rovnoměrně.
+- **Udělej otázku** (`task: 'ask'`) — oznamovací věta a hotové věty na výběr. Uživatel
+  zvolil **výběr**, ne skládání ze slov ani psaní. Špatné možnosti jsou typické chyby
+  (`ASK_WRONG`): zapomenutý otazník (`vetyMark`), rozkaz (`vetyType`), otázka na něco
+  jiného (`vetyChange`). Lehká má 3 možnosti, střední 3 záludnější, těžká 4.
+
+**Věty jsou ručně sepsané** v `vety.js`. Řádek `ASK` je čtveřice
+`oznamovací | tázací | rozkazovací | otázka na něco jiného` a slouží oběma úlohám;
+`base` hlídá, aby v jednom kole nepadla dvě věty z téže čtveřice. Přací věty, otázky
+s tázacím slovem a pasti těžké úrovně jsou v `EXTRA` (za `|` je poznámka do vysvětlení).
+
+Na co si dát při doplňování pozor:
+
+- **„Petr jde domů?" je taky správná otázka** (jen otazník, slova stejně). Mezi špatné
+  možnosti proto nesmí přijít nic, co končí otazníkem a říká totéž.
+- **„Ať" + třetí osoba je rozkaz** („Ať přijde!"). Přací věta s `Ať` / `Kéž` jen tam, kde
+  jde o přání, které rozkazem splnit nejde („Ať se ti daří!").
+- „Přeju ti hodně zdraví." a „Chtěla bych, aby…" tam schválně nejsou — učebnice je řadí
+  různě.
+
+Pár věcí, které se snadno rozbijí:
+
+- Ovladač je v `app.js` (`vetyHTML` / `vetyTap`), `submit()` neprochází. **Jedno klepnutí
+  rozhoduje**, druhý pokus není — ze dvou až čtyř možností by to bylo tipování. Po chybě
+  zčervená zvolená možnost, zezelená správná a pod tím je vysvětlení.
+- Pořadí možností u otázky se losuje **v generátoru** (`ex.options`), ne při vykreslení —
+  po klepnutí se plocha překresluje.
+- U druhu věty je `ex.answer` i `given` **klíč** (`ozn`); `asShown()` ve `stats.js` ho
+  do výpisu chyb přeloží na název.
+- Klávesnice se schová, klávesy `1` až `4` vyberou možnost.
+- Do odměn jde `max: 0` jako u ostatní češtiny; čas jsou 2 běžné příklady na větu
+  (`speedKindMultiplier.vety`).
 
 ## Doplň znaménko
 

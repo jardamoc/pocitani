@@ -389,6 +389,12 @@ h1, h2, h3, .num, .box-value, .key, .score-big { font-family: 'Baloo 2', 'Nunito
 .chips .chip.is-on[data-value="bond"] { background: linear-gradient(135deg, #2dd4bf, #0d9488); }
 .chips .chip.is-on[data-value="sign"] { background: linear-gradient(135deg, #f87171, #b91c1c); }
 .chips .chip.is-on[data-value="compare"] { background: linear-gradient(135deg, #a78bfa, #6d28d9); }
+/* Cestina pouziva kartu s operacemi pro vlastni volby. Zapnuty chip ma bily
+   text, takze bez vlastniho podkladu splynul s kartou a nebyl videt. */
+.chips .chip.is-on[data-value="noun"] { background: linear-gradient(135deg, #60a5fa, #2563eb); }
+.chips .chip.is-on[data-value="verb"] { background: linear-gradient(135deg, #fb923c, #ea580c); }
+.chips .chip.is-on[data-value="type"] { background: linear-gradient(135deg, #34d399, #0f766e); }
+.chips .chip.is-on[data-value="ask"] { background: linear-gradient(135deg, #c084fc, #7c3aed); }
 /* Volba hry - dvě velké dlaždice vedle sebe, na úzkém displeji pod sebou. */
 .chips-mode { display: grid; grid-template-columns: repeat(auto-fit, minmax(158px, 1fr)); gap: 10px; }
 .chip-mode {
@@ -406,6 +412,7 @@ h1, h2, h3, .num, .box-value, .key, .score-big { font-family: 'Baloo 2', 'Nunito
 .chips-mode .chip.is-on[data-value="bigmul"] { background: linear-gradient(135deg, #60a5fa, #1d4ed8); }
 .chips-mode .chip.is-on[data-value="abc"] { background: linear-gradient(135deg, #f87171, #be123c); }
 .chips-mode .chip.is-on[data-value="pos"] { background: linear-gradient(135deg, #a78bfa, #6d28d9); }
+.chips-mode .chip.is-on[data-value="vety"] { background: linear-gradient(135deg, #34d399, #0f766e); }
 
 /* Záložky Matematika / Čeština nad kartami her. `<button>` nedědí barvu
    textu, proto ji záložka nastavuje sama. */
@@ -1021,6 +1028,32 @@ body.is-dark { --pair-task: #93c5fd; --pair-result: #fdba74; }
 .pos-done { display: block; margin: 14px auto 0; }
 .pos-done:disabled { opacity: .45; cursor: not-allowed; }
 
+/* ---------- druhy vět ----------
+   Věta nahoře, pod ní možnosti. Druhy vět jsou mřížka 2 × 2, hotové věty
+   u otázky pod sebou přes celou šířku. Barvu nese podklad a rámeček, text
+   zůstává `--ink` (tmavá barva na tintu v tmavém režimu nesvítí);
+   `<button>` nedědí barvu textu. */
+.vt-ask {
+  margin: 0 0 10px; text-align: center; color: var(--ink-soft);
+  font-family: 'Baloo 2', sans-serif; font-weight: 800; font-size: 1.15rem;
+}
+.vt-sentence {
+  margin: 0 0 16px; text-align: center; color: var(--ink);
+  font-family: 'Baloo 2', sans-serif; font-weight: 700; font-size: 1.7rem; line-height: 1.25;
+}
+.vt-opts { display: grid; gap: 10px; }
+.vt[data-task="type"] .vt-opts { grid-template-columns: 1fr 1fr; }
+.vt-opt {
+  font-family: 'Baloo 2', sans-serif; font-weight: 700; font-size: 1.25rem; line-height: 1.2;
+  min-height: 52px; padding: 8px 12px; cursor: pointer; text-align: center;
+  border: 3px solid transparent; border-radius: 14px;
+  background: var(--surface-2); color: var(--ink);
+}
+.vt-opt:focus-visible { outline: 3px solid var(--violet); outline-offset: 2px; }
+.vt-opt:disabled { cursor: default; }
+.vt-opt.is-right { border-color: var(--good); background: var(--good-tint); }
+.vt-opt.is-wrong { border-color: var(--bad); background: var(--bad-tint); }
+
 /* ---------- velké násobení ----------
    Zápis roste shora dolů: hotový krok je hodnota na zeleném podkladu
    a pod ní popisek na šedém - jako v sešitě. Volba jsou dvě tlačítka
@@ -1128,6 +1161,10 @@ body.is-dark { --pair-task: #93c5fd; --pair-result: #fdba74; }
 
 /* ---------- klávesnice ---------- */
 .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+/* `display: grid` prebije atribut hidden - bez tohohle zustavala u her
+   ovladanych klepanim (dvojice, velke nasobeni, cestina) videt klavesnice
+   z predchoziho kola. */
+.keypad[hidden] { display: none; }
 .key {
   font-size: 1.45rem; font-weight: 800; cursor: pointer; border: 0;
   padding: 12px 0; border-radius: 18px; background: var(--card); color: var(--ink);

@@ -20,6 +20,7 @@ v zenskem rode a nikde se neobjevi zaporne ani desetinne cislo.
 | **Velke nasobeni** | rozklad `85 × 5` na desitky a jednotky ve trech krocich, v kazdem se vybira ze dvou moznosti |
 | **Abeceda** (Cestina) | 9 az 25 slov se pretahuje do ocislovanych okenek podle abecedy; tezka uroven prida pasti c/č, h/ch a spol. |
 | **Slovni druhy** (Cestina) | ve vete se klepe na vsechna slovesa nebo podstatna jmena; vety jsou rucne sepsane a urcene, tezka uroven prida pasti jako „chce jít" nebo „plavání" |
+| **Druhy vet** (Cestina) | urcit druh vety (oznamovaci, tazaci, rozkazovaci, praci) a vybrat, jak z vety udelat otazku; vety jsou rucne sepsane |
 
 Rozsah cisel (do 10 az do 100), pocet prikladu i druhy uloh se vybiraji na uvodni
 obrazovce; obtiznost je u sedmi rezimu samostatna osa, nezavisla na rozsahu.
@@ -68,6 +69,7 @@ public/
     bigmul.js       velke nasobeni - rozklad na desitky a jednotky
     abc.js          abeceda - slova a pravidla presouvani karticek
     pos.js          slovni druhy - rucne urcene vety a vyhodnoceni
+    vety.js         druhy vet - rucne sepsane vety, moznosti k otazce
     stats.js        rozbor kola a rady
     storage.js      jedina vrstva nad ulozistem
     rewards*.js     pravidla odmen, data sprite sheetu, vykresleni

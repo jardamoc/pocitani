@@ -1,5 +1,6 @@
 import { OPS, COMPARES, signature, exToText, TAGS } from './generator.js';
 import { wholeNumber, textList } from './validate.js';
+import { VETY_TYPES } from './vety.js';
 
 export const KEY = 'pocitani.v1';
 
@@ -74,7 +75,7 @@ export function sanitizeState(raw) {
 }
 
 /* Druhy úloh, které se nedají z descriptoru znovu poskládat. */
-const NO_REPEAT = new Set(['riddle', 'grid', 'over10', 'pexeso', 'bigmul', 'abc', 'pos']);
+const NO_REPEAT = new Set(['riddle', 'grid', 'over10', 'pexeso', 'bigmul', 'abc', 'pos', 'vety']);
 
 const descriptor = (ex) => ({
   op: ex.op,
@@ -152,6 +153,8 @@ const KIND_LABEL = {
   'abc:c': { acc: 'řady slov', gen: 'řad slov' },
   'pos:noun': { all: 'všechna', acc: 'podstatná jména', gen: 'podstatných jmen' },
   'pos:verb': { all: 'všechna', acc: 'slovesa', gen: 'sloves' },
+  'vety:type': { acc: 'druhy vět', gen: 'druhů vět' },
+  'vety:ask': { acc: 'otázky', gen: 'otázek' },
 };
 
 function starsFor(pct) {
@@ -184,7 +187,7 @@ const LEVEL_NAME = { easy: 'Lehké', medium: 'Střední', hard: 'Těžké' };
 
 /* Jak se v rozpadu podle obtížnosti pojmenuje jedna úloha daného režimu.
    Rod i číslo musí sedět na věty "Lehké mřížky ti jdou výborně". */
-const MODE_UNITS = { grid: 'mřížky', riddle: 'hádanky', over10: 'rozklady', pexeso: 'plochy', bigmul: 'příklady', abc: 'řady slov', pos: 'věty' };
+const MODE_UNITS = { grid: 'mřížky', riddle: 'hádanky', over10: 'rozklady', pexeso: 'plochy', bigmul: 'příklady', abc: 'řady slov', pos: 'věty', vety: 'věty' };
 
 export function analyze(state, config, attempts) {
   const riddleMode = config.mode === 'riddle';
@@ -194,12 +197,13 @@ export function analyze(state, config, attempts) {
   const bigmulMode = config.mode === 'bigmul';
   const abcMode = config.mode === 'abc';
   const posMode = config.mode === 'pos';
+  const vetyMode = config.mode === 'vety';
   /* Režimy, kde se rozpad podle operací nehodí - hádanky, mřížky i pexeso
      mají `op: 'add'` jen jako zástupnou hodnotu a u rozkladu přes desítku je
      sčítání zase úplně všude, takže by "sčítání ti jde" nic neřeklo.
      Ve všech pěti jedeme podle obtížnosti. U velkého násobení je zase
      násobení úplně všude, takže by rozpad podle operací neřekl nic. */
-  const levelMode = riddleMode || gridMode || over10Mode || pexesoMode || bigmulMode || abcMode || posMode;
+  const levelMode = riddleMode || gridMode || over10Mode || pexesoMode || bigmulMode || abcMode || posMode || vetyMode;
   const total = attempts.length;
   const correct = attempts.filter((a) => a.correct).length;
   const pct = total ? Math.round((correct / total) * 100) : 0;
@@ -207,7 +211,7 @@ export function analyze(state, config, attempts) {
   /* Porovnávání a pexeso mají `op: 'add'` jen zástupně - do rozpadu podle
      operací ani do přechodu přes desítku nepatří, jinak by "sčítání ti jde"
      stálo z půlky na úlohách, kde se nic nesčítá. */
-  const PLACEHOLDER_OP = new Set(['compare', 'pexeso', 'abc', 'pos']);
+  const PLACEHOLDER_OP = new Set(['compare', 'pexeso', 'abc', 'pos', 'vety']);
   const scored = attempts.filter((a) => !PLACEHOLDER_OP.has(a.ex.kind));
   const byOp = group(scored, (a) => a.ex.op).sort((x, y) => y.seen - x.seen);
   const byLevel = group(attempts, (a) => a.ex.level || null)
@@ -250,7 +254,7 @@ export function analyze(state, config, attempts) {
     if (cross.pct >= 85) strengths.push(`Přechod přes desítku ti jde (${cross.correct} z ${cross.seen}). To je ta nejtěžší část!`);
     else if (cross.pct < 65) watchOuts.push(`Přechod přes desítku dělá potíže – ${cross.correct} z ${cross.seen}.`);
   }
-  if (!posMode && pct >= 80 && avgMs > 0 && avgMs < 7000) strengths.push('Počítáš rychle a přesně zároveň.');
+  if (!posMode && !vetyMode && pct >= 80 && avgMs > 0 && avgMs < 7000) strengths.push('Počítáš rychle a přesně zároveň.');
 
   if (tags.get('offOne') >= 2) watchOuts.push('Několikrát ti výsledek utekl jen o jedničku – vyplatí se na konci zkontrolovat.');
   if (tags.get('riddleSymbol') >= 1) watchOuts.push('U hádanky se občas napsalo, kolik je jeden obrázek. Poslední řádek chce součet celého řádku.');
@@ -323,6 +327,22 @@ export function analyze(state, config, attempts) {
         ? `Šlo ti to skvěle – zkus příště ${harder} obtížnost, věty budou delší.`
         : 'Šlo ti to skvěle – tohle jsou nejtěžší věty. Zkus hledat podstatná jména i slovesa naráz.');
     }
+  } else if (vetyMode) {
+    if (tags.get('vetyType')) {
+      tips.push('Podívej se nejdřív na znaménko na konci. Otazník má jen tázací věta – u ostatních se zeptej: oznamuje, přikazuje, nebo přeje?');
+    }
+    if (tags.get('vetyMark')) {
+      tips.push('Tázací věta má na konci vždycky otazník. Než klepneš, zkontroluj si poslední znaménko.');
+    }
+    if (tags.get('vetyChange')) {
+      tips.push('Otázka se ptá na totéž, co říká věta. Porovnej si slova – žádné se nemá změnit.');
+    }
+    if (pct >= 90) {
+      const harder = { easy: 'střední', medium: 'těžkou' }[config.level];
+      tips.push(harder
+        ? `Šlo ti to skvěle – zkus příště ${harder} obtížnost, věty budou záludnější.`
+        : 'Šlo ti to skvěle – tohle jsou nejtěžší věty. Zkus si dát víc vět v kole.');
+    }
   } else if (bigmulMode) {
     if (pct < 100) {
       tips.push('Hlídej si nuly: 8 × 50 není 40, ale 400. Nejdřív vynásob číslice a pak přidej tolik nul, kolik jich v čísle bylo.');
@@ -372,6 +392,8 @@ export function analyze(state, config, attempts) {
   const asShown = (ex, value) => {
     if (ex.kind === 'sign') return OPS[value]?.symbol ?? '?';
     if (ex.kind === 'compare') return COMPARES[value]?.symbol ?? '?';
+    // u druhu věty je odpovědí klíč druhu, dítěti patří jeho název
+    if (ex.kind === 'vety' && ex.task === 'type') return VETY_TYPES[value]?.label ?? value;
     return value;
   };
   const missedList = attempts.filter((a) => !a.correct).map((a) => ({
