@@ -1,4 +1,4 @@
-import { CATEGORIES, CATEGORY_ORDER, ITEM_BY_ID, SPRITE, UNKNOWN_NAME } from './rewards-data.js';
+import { CATEGORIES, CATEGORY_ORDER, ITEM_BY_ID, UNKNOWN_NAME, headerSrc } from './rewards-data.js';
 import { collectionSummary, howToGet, newCount, plural } from './rewards.js';
 
 /* Vykresleni odmen. Tenhle modul se stara o DOM a animace, zadne pravidlo
@@ -18,44 +18,21 @@ const esc = (text) => String(text).replace(/[&<>"']/g, (ch) => (
 
 const pieces = (n) => `${n} ${plural(n, 'kus', 'kusy', 'kusů')}`;
 
-/* ---------------- sprite ----------------
- * Cely obrazek je jeden sprite sheet. Pri zmene velikosti se musi prepocitat
- * najednou rozmer prvku, background-position i background-size, jinak by se
- * vyrez rozjel. Pomer stran 1254x1254 zustava 1:1. */
+/* ---------------- obrazky ----------------
+ * Kazda postavicka je samostatny ctvercovy obrazek s pruhlednym pozadim,
+ * vepise se do ctverce `box`. alt je prazdny schvalne: popisek nese tlacitko
+ * kolem a u neobjevene postavicky se jmeno nesmi objevit nikde. */
 
-const px = (n) => `${Math.round(n * 100) / 100}px`;
-
-/* Postavicky na sprite sheetu se dotykaji, takze pri zmenseni na necele
-   pixely prohlizec pri vyhlazovani natahne i prvni sloupec souseda - u
-   kolecka to bylo videt jako barevny prouzek u hrany. Zobrazeny vyrez proto
-   o pixel z kazde strany orizneme. Souradnice v rewards-data.js se NEMENI,
-   tohle je ciste zobrazovaci pojistka. */
-const TRIM = 1;
-
-function spriteVars(rect, scale) {
-  return [
-    `--sw:${px(Math.max(1, rect.width * scale - 2 * TRIM))}`,
-    `--sh:${px(Math.max(1, rect.height * scale - 2 * TRIM))}`,
-    `--bx:${px(-(rect.x * scale + TRIM))}`,
-    `--by:${px(-(rect.y * scale + TRIM))}`,
-    `--bs:${px(SPRITE.width * scale)}`,
-  ].join(';');
-}
-
-/* Postavicka se vepise do ctverce `box` - meritko urcuje delsi strana vyrezu,
-   aby vysoke i siroke postavicky vysly opticky stejne velke. */
 export function dumplingHTML(id, box, locked) {
   const item = ITEM_BY_ID.get(id);
   if (!item) return '';
-  const scale = box / Math.max(item.width, item.height);
-  return `<span class="dumpling-box" style="--box:${box}px"><span class="dumpling" data-locked="${locked ? 'true' : 'false'}" style="${spriteVars(item, scale)}"></span></span>`;
+  return `<span class="dumpling-box" style="--box:${box}px"><img class="dumpling" src="${esc(item.src)}" alt="" draggable="false" decoding="async" data-locked="${locked ? 'true' : 'false'}"></span>`;
 }
 
-/* Graficky nadpis kategorie - stejny sprite sheet, meritko podle vysky. */
-function headerHTML(key, height) {
-  const rect = CATEGORIES[key].header;
-  const scale = height / rect.height;
-  return `<span class="dumpling-header" role="img" aria-label="${esc(CATEGORIES[key].label)}" style="${spriteVars(rect, scale)}"></span>`;
+/* Graficky nadpis kategorie. Obrazek ma kolem cedulky hodne prazdna,
+   CSS ho proto o kus zaporne odsazuje. */
+function headerHTML(key) {
+  return `<img class="dumpling-header" src="${esc(headerSrc(key))}" alt="${esc(CATEGORIES[key].label)}" draggable="false" decoding="async">`;
 }
 
 /* ---------------- odznak u tlacitka ---------------- */
@@ -126,7 +103,7 @@ function categoryCardHTML(key, data) {
 
   return `<div class="card rew-cat" data-cat="${key}">
     <div class="rew-cat-head">
-      ${headerHTML(key, 40)}
+      ${headerHTML(key)}
       <p class="rew-cat-sub">${esc(cat.label)} · ${owned} z ${cat.items.length}</p>
     </div>
     <div class="rew-grid">${slots}</div>

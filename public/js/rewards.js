@@ -153,7 +153,7 @@ export function sanitize(raw) {
   data.legendaryDaysUsed = textList(raw.legendaryDaysUsed, (x) => DATE_RE.test(x), 120).sort();
   data.processedGameIds = textList(raw.processedGameIds, (x) => x.length > 0 && x.length <= 64, 50);
   data.completedMilestones = textList(raw.completedMilestones, (x) => x.length > 0 && x.length <= 64, 400);
-  data.newRewardIds = textList(raw.newRewardIds, (x) => ITEM_BY_ID.has(x), 40);
+  data.newRewardIds = textList(raw.newRewardIds, (x) => ITEM_BY_ID.has(x), ALL_IDS.length);
 
   data.lastUpdated = typeof raw.lastUpdated === 'string' ? raw.lastUpdated : null;
   data.lastUpdatedMs = wholeNumber(raw.lastUpdatedMs);

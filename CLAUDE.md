@@ -22,7 +22,7 @@ obrazovce — sekundy se zaokrouhlují na celé (dřív tam bylo „6.9 s").
 ```powershell
 npm run dev                     # http://localhost:8000
 npm run publish                 # git push + nasazení + ověření
-npm test                        # testy odměn a sprite sheetu
+npm test                        # testy odměn a obrázků
 npm run publish -- --dry-run    # jen kontroly, nic se neodešle
 ```
 
@@ -89,14 +89,14 @@ běžel. Vypadalo to jako chyba nasazení, a nebyla.
 | `public/js/storage.js` | **jediná vrstva nad úložištěm** — načtení, fronta zápisů, mazání, vyměnitelný backend |
 | `public/js/validate.js` | `wholeNumber` / `textList` — sdílené kousky validace, bez DOM |
 | `public/js/random.js` | `rnd` / `pick` / `chance` / `shuffle` / `range` |
-| `public/js/rewards-data.js` | souřadnice sprite sheetu a česká jména 40 dumplingů — čistá data |
+| `public/js/rewards-data.js` | soubory obrázků, česká jména a pevná ID 40 dumplingů, pořadí pro QR — čistá data |
 | `public/js/rewards.js` | pravidla odměn, vyhodnocení kola, výběr postavičky — **bez DOM a bez úložiště** |
-| `public/js/rewards-ui.js` | vykreslení odměn: sprite, sbírka, závěrečné okno, animace |
+| `public/js/rewards-ui.js` | vykreslení odměn: obrázky, sbírka, závěrečné okno, animace |
 | `public/js/version.js` | razítko posledního nasazení (datum + pořadí v rámci dne) — **přepisuje ho `publish.mjs`**, ručně se needituje |
 | `public/js/qr.js` | generátor QR kódu podle normy — bez knihovny |
 | `public/js/transfer.js` | přenos postupu mezi zařízeními: zabalení, adresa, slučování |
 | `public/js/export-ui.js` | dialog „Export" — heslo, QR kód, tři mazací tlačítka |
-| `public/img/dumplings.png` | jeden sprite sheet 1254×1254 se všemi 40 postavičkami i 5 nadpisy |
+| `public/img/odmeny/dumplings/` | 40 postaviček (`.webp`, složka podle kategorie) a 5 nadpisů v `_category_titles/` |
 | `public/css/styles.css` | vše včetně devíti barevných témat, tmavého režimu a odměn |
 | `server.mjs` | vývojový server (`npm run dev`) — mimo `public/`, nenasazuje se |
 | `publish.mjs` | nasazení i s kontrolami a ověřením (`npm run publish`) |
@@ -106,9 +106,8 @@ běžel. Vypadalo to jako chyba nasazení, a nebyla.
 | `README.md` | popis projektu pro GitHub; podrobná pravidla zůstávají tady |
 
 **Obrázky v repozitáři jsou vypnuté.** `.gitignore` vyřazuje `*.jpeg`, `*.jpg` i `*.png` —
-jsou to lokální podklady (fotky zadání), ne obsah aplikace. Jediná výjimka je
-`!public/img/*.png` kvůli sprite sheetu s dumplingy; bez ní by nasazení přišlo o všech
-40 postaviček. **Do README proto nedávej snímky obrazovky**, odkaz by na GitHubu ukazoval
+jsou to lokální podklady (fotky zadání), ne obsah aplikace. Obrázky odměn jsou `.webp`,
+na ty se pravidlo nevztahuje. **Do README proto nedávej snímky obrazovky**, odkaz by na GitHubu ukazoval
 na neexistující soubor. Když je tam někdy mít chceš, přidej napřed vlastní výjimku
 (např. `!docs/*.png`) a obrázky ukládej tam.
 | `package.json` | jen ty tři zkratky a `"type": "module"`; žádné závislosti |
@@ -698,8 +697,8 @@ zbytek dodají náhodné shody při malém rozsahu.
 ## Odměny — sbírka dumplingů
 
 Za dokončené kolo může Alžběta získat sběratelskou postavičku. Je jich 40 v pěti
-kategoriích (Základní / Neobvyklé / Raritní / Epické / Legendární) a všechny se kreslí
-z **jednoho** sprite sheetu `public/img/dumplings.png`.
+kategoriích (Základní / Neobvyklé / Raritní / Epické / Legendární), každá je samostatný
+obrázek `.webp` (viz *Obrázky odměn*).
 
 **Za jedno kolo padne nejvýš JEDEN dumpling.** Nerozhoduje se o počtu kusů, ale o tom,
 jak vzácný ten jeden bude. Uživatel to takhle výslovně chtěl — šest dumplingů za kolo
@@ -790,21 +789,28 @@ samo na sebe, tak se skrývá. Kliknutí na kolečko otevře popup s návodem, n
 napíše podrobnost do řádku pod mřížkou — ten je v normálním toku, takže nemůže roztáhnout
 stránku do šířky. **Plovoucí bublinu tam nevracej**, na 320 px přetékala.
 
-### Sprite sheet
+### Obrázky odměn
 
-Souřadnice v `rewards-data.js` jsou převzaté doslova ze zadání a **neodhaduj je znovu**.
-Postavičky se na plátně dotýkají, takže se výřez při vykreslení ořezává o pixel z každé
-strany (`TRIM` v `rewards-ui.js`) — bez toho prohlížeč při zmenšení natáhl i první sloupec
-souseda a u kolečka byl vidět barevný proužek. Ořez je **zobrazovací pojistka**, souřadnice
-se kvůli němu nemění.
+Od 15. 10. 2026 je **každá postavička samostatný `.webp`** s průhledným pozadím
+(dřív jeden sprite sheet `dumplings.png`; stav před změnou je v tagu
+`zaloha-pred-webp-2026-10-15`). Cesta je
+`public/img/odmeny/<sbírka>/<kategorie>/<soubor>.webp`, nadpisy kategorií
+v `…/_category_titles/<kategorie>.webp`. Zdrojové originály leží v `Odmeny/`
+(mimo git), aplikace bere kopie z `public/`.
 
-Při změně velikosti se musí přepočítat **najednou** rozměr prvku, `background-position`
-i `background-size`, jinak se výřez rozjede. Poměr stran 1254×1254 zůstává 1:1.
+**ID (`basic_01` …) jsou to, co si sbírka dítěte ukládá — nikdy je neměň ani
+nepřečíslovávej.** Obrázek i jméno se k ID vyměnit dají kdykoli; tak proběhla i výměna
+na webp a dětem žádná odměna nezmizela.
 
-Dva výřezy mají na levém okraji plný sloupec a `tests/sprite.test.mjs` je vede jako známé,
-posouzené odchylky (`ZNAME_ODCHYLKY`): `rare_07` přichází asi o 8 px vlastního levého okraje,
-`epic_03` má v sobě asi 6 px sousední postavičky. Je to pod 6 % šířky výřezu a na zobrazené
-velikosti to není poznat. Pokud to někdy budeš ladit, **posuň souřadnice, nezměkčuj test.**
+**Nová postavička** = soubor do složky kategorie + řádek v `items` v `rewards-data.js`
+s dalším volným ID + to ID **na konec `TRANSFER_ORDER`**. QR přenos posílá sbírku jako
+pole čísel v tomhle pořadí; vložení doprostřed by starším kódům přiřadilo počty jiným
+postavičkám. `tests/images.test.mjs` hlídá existenci souborů, průhlednost (bez ní by
+neobjevená postavička byla černý čtverec místo siluety), původní pořadí 40 ID
+a i to, že ve složce neleží obrázek bez řádku v datech.
+
+Další sbírka (např. auta) by dostala vlastní složku vedle `dumplings/`; `COLLECTION`
+v `rewards-data.js` je na to připravené, výběr sbírky v UI zatím není.
 
 ## Nastavení, export a přenos na druhé zařízení
 
@@ -868,7 +874,7 @@ a invertovaný kód spousta telefonů nepřečte.
 
 ## Testy
 
-Externí testovací framework tu není a nepřibude. Testy má logika odměn, sprite sheet a
+Externí testovací framework tu není a nepřibude. Testy má logika odměn, obrázky odměn a
 ukládací vrstva (`storage.test.mjs`: fronta zápisů, sanitizace, tři rozsahy mazání,
 výměna backendu) — všechno ve vestavěném běhu Node, bez jediné závislosti:
 

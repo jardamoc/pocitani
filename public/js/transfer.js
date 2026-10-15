@@ -1,4 +1,4 @@
-import { ALL_IDS } from './rewards-data.js';
+import { ALL_IDS, TRANSFER_ORDER } from './rewards-data.js';
 
 /* Prenos progresu mezi zarizenimi.
  *
@@ -86,15 +86,17 @@ export async function decodePayload(text) {
 
 const dayMs = 86400000;
 
-/* Inventar se posila jako pole cisel v poradi ALL_IDS, ne jako objekt -
-   usetri to ctyricet klicu, ktere by jinak zabraly vic nez sama data. */
+/* Inventar se posila jako pole cisel v poradi TRANSFER_ORDER, ne jako objekt -
+   usetri to ctyricet klicu, ktere by jinak zabraly vic nez sama data.
+   Poradi je pevne a nove postavicky se pridavaji jen na konec, takze starsi
+   kod s kratsim polem se precte spravne (chybejici = 0). */
 function packInventory(inventory) {
-  return ALL_IDS.map((id) => inventory[id] || 0);
+  return TRANSFER_ORDER.map((id) => inventory[id] || 0);
 }
 
 function unpackInventory(list) {
   const out = {};
-  ALL_IDS.forEach((id, i) => {
+  TRANSFER_ORDER.forEach((id, i) => {
     const n = Number(Array.isArray(list) ? list[i] : 0);
     out[id] = Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
   });

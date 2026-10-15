@@ -6,10 +6,13 @@ node_modules/
 *.jpg
 *.png
 
-# obrazky, ktere aplikace opravdu potrebuje - sprite sheet s dumplingy.
-# Bez teto vyjimky by ho pravidlo *.png vyradilo a nasazeni by prislo o
-# vsech 40 postavicek odmen.
-!public/img/*.png
+# obrazky odmen jsou .webp v public/img/odmeny/ - na ty se pravidla vyse
+# nevztahuji. Kdyby nekdy pribyl .png, ktery aplikace potrebuje, patri sem
+# vyjimka (napr. !public/img/**/*.png).
+
+# zdrojove podklady odmen (originaly, zip) - aplikace bere kopie z public/
+/Odmeny/
+/dumplings/
 
 # dovednosti nainstalovane pres `npx skills add` - cizi kod, patri jen
 # na tenhle stroj, ne do repozitare s aplikaci

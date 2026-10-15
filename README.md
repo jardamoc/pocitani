@@ -43,7 +43,7 @@ neinstaluji**, `npm install` neni potreba.
 
 ```powershell
 npm run dev     # http://localhost:8000
-npm test        # testy odmen, sprite sheetu a ukladaci vrstvy
+npm test        # testy odmen, obrazku odmen a ukladaci vrstvy
 npm run publish # git push + nasazeni na Cloudflare + overeni ziveho webu
 ```
 
@@ -72,7 +72,7 @@ public/
     vety.js         druhy vet - rucne sepsane vety, moznosti k otazce
     stats.js        rozbor kola a rady
     storage.js      jedina vrstva nad ulozistem
-    rewards*.js     pravidla odmen, data sprite sheetu, vykresleni
+    rewards*.js     pravidla odmen, seznam obrazku odmen, vykresleni
     qr.js           generator QR kodu podle normy, bez knihovny
     transfer.js     zabaleni a slouceni postupu
 server.mjs          vyvojovy server (node:http)
