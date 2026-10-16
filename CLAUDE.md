@@ -968,6 +968,11 @@ tlačítko potřebuje vlastní `color`. Ve světlém režimu si toho nikdo nevš
 z toho černý text na tmavém podkladu. Přesně takhle se rozbila jména dumplingů ve sbírce
 (`.rew-slot`). `.chip` i `.btn` si proto barvu nastavují samy — drž se toho.
 
+**Každá nová volba na kartě s operacemi (`#card-ops`) potřebuje vlastní barvu zapnutého
+stavu** (`.chips .chip.is-on[data-value="…"]` ve `styles.css`). Zapnutý chip má bílé písmo
+a obecný modrý podklad na tuhle kartu nedosáhne (`.chips:not(.chips-ops)`). Bez vlastní
+barvy volba splyne s kartou — stalo se to u Slovních druhů i u Významu slov.
+
 **`--on-bg` není `--ink`.** `--on-bg` je barva textu na kulise, `--ink` barva textu na
 kartě. Cokoli s `background: var(--card)` musí mít i `color: var(--ink)`, jinak si to
 zdědí `--on-bg` z `body`. U většiny témat to projde náhodou, ale téma **Hudba** má tmavou
