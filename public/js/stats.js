@@ -1,6 +1,7 @@
 import { OPS, COMPARES, signature, exToText, TAGS } from './generator.js';
 import { wholeNumber, textList } from './validate.js';
 import { VETY_TYPES } from './vety.js';
+import { VYZNAM_RELS } from './vyznam.js';
 
 export const KEY = 'pocitani.v1';
 
@@ -75,7 +76,7 @@ export function sanitizeState(raw) {
 }
 
 /* Druhy úloh, které se nedají z descriptoru znovu poskládat. */
-const NO_REPEAT = new Set(['riddle', 'grid', 'over10', 'pexeso', 'bigmul', 'abc', 'pos', 'vety']);
+const NO_REPEAT = new Set(['riddle', 'grid', 'over10', 'pexeso', 'bigmul', 'abc', 'pos', 'vety', 'vyznam', 'slova']);
 
 const descriptor = (ex) => ({
   op: ex.op,
@@ -155,6 +156,8 @@ const KIND_LABEL = {
   'pos:verb': { all: 'všechna', acc: 'slovesa', gen: 'sloves' },
   'vety:type': { acc: 'druhy vět', gen: 'druhů vět' },
   'vety:ask': { acc: 'otázky', gen: 'otázek' },
+  'vyznam:vztah': { acc: 'vztahy mezi slovy', gen: 'vztahů mezi slovy' },
+  'vyznam:nad': { all: 'všechna', acc: 'slova nadřazená', gen: 'slov nadřazených' },
 };
 
 function starsFor(pct) {
@@ -187,7 +190,7 @@ const LEVEL_NAME = { easy: 'Lehké', medium: 'Střední', hard: 'Těžké' };
 
 /* Jak se v rozpadu podle obtížnosti pojmenuje jedna úloha daného režimu.
    Rod i číslo musí sedět na věty "Lehké mřížky ti jdou výborně". */
-const MODE_UNITS = { grid: 'mřížky', riddle: 'hádanky', over10: 'rozklady', pexeso: 'plochy', bigmul: 'příklady', abc: 'řady slov', pos: 'věty', vety: 'věty' };
+const MODE_UNITS = { grid: 'mřížky', riddle: 'hádanky', over10: 'rozklady', pexeso: 'plochy', bigmul: 'příklady', abc: 'řady slov', pos: 'věty', vety: 'věty', vyznam: 'úlohy' };
 
 export function analyze(state, config, attempts) {
   const riddleMode = config.mode === 'riddle';
@@ -198,12 +201,13 @@ export function analyze(state, config, attempts) {
   const abcMode = config.mode === 'abc';
   const posMode = config.mode === 'pos';
   const vetyMode = config.mode === 'vety';
+  const vyznamMode = config.mode === 'vyznam';
   /* Režimy, kde se rozpad podle operací nehodí - hádanky, mřížky i pexeso
      mají `op: 'add'` jen jako zástupnou hodnotu a u rozkladu přes desítku je
      sčítání zase úplně všude, takže by "sčítání ti jde" nic neřeklo.
      Ve všech pěti jedeme podle obtížnosti. U velkého násobení je zase
      násobení úplně všude, takže by rozpad podle operací neřekl nic. */
-  const levelMode = riddleMode || gridMode || over10Mode || pexesoMode || bigmulMode || abcMode || posMode || vetyMode;
+  const levelMode = riddleMode || gridMode || over10Mode || pexesoMode || bigmulMode || abcMode || posMode || vetyMode || vyznamMode;
   const total = attempts.length;
   const correct = attempts.filter((a) => a.correct).length;
   const pct = total ? Math.round((correct / total) * 100) : 0;
@@ -211,7 +215,7 @@ export function analyze(state, config, attempts) {
   /* Porovnávání a pexeso mají `op: 'add'` jen zástupně - do rozpadu podle
      operací ani do přechodu přes desítku nepatří, jinak by "sčítání ti jde"
      stálo z půlky na úlohách, kde se nic nesčítá. */
-  const PLACEHOLDER_OP = new Set(['compare', 'pexeso', 'abc', 'pos', 'vety']);
+  const PLACEHOLDER_OP = new Set(['compare', 'pexeso', 'abc', 'pos', 'vety', 'vyznam', 'slova']);
   const scored = attempts.filter((a) => !PLACEHOLDER_OP.has(a.ex.kind));
   const byOp = group(scored, (a) => a.ex.op).sort((x, y) => y.seen - x.seen);
   const byLevel = group(attempts, (a) => a.ex.level || null)
@@ -254,7 +258,7 @@ export function analyze(state, config, attempts) {
     if (cross.pct >= 85) strengths.push(`Přechod přes desítku ti jde (${cross.correct} z ${cross.seen}). To je ta nejtěžší část!`);
     else if (cross.pct < 65) watchOuts.push(`Přechod přes desítku dělá potíže – ${cross.correct} z ${cross.seen}.`);
   }
-  if (!posMode && !vetyMode && pct >= 80 && avgMs > 0 && avgMs < 7000) strengths.push('Počítáš rychle a přesně zároveň.');
+  if (!posMode && !vetyMode && !vyznamMode && pct >= 80 && avgMs > 0 && avgMs < 7000) strengths.push('Počítáš rychle a přesně zároveň.');
 
   if (tags.get('offOne') >= 2) watchOuts.push('Několikrát ti výsledek utekl jen o jedničku – vyplatí se na konci zkontrolovat.');
   if (tags.get('riddleSymbol') >= 1) watchOuts.push('U hádanky se občas napsalo, kolik je jeden obrázek. Poslední řádek chce součet celého řádku.');
@@ -343,6 +347,25 @@ export function analyze(state, config, attempts) {
         ? `Šlo ti to skvěle – zkus příště ${harder} obtížnost, věty budou záludnější.`
         : 'Šlo ti to skvěle – tohle jsou nejtěžší věty. Zkus si dát víc vět v kole.');
     }
+  } else if (vyznamMode) {
+    if (tags.get('vyznamSynAnt')) {
+      tips.push('Souznačná slova znamenají totéž (hezký – pěkný), protikladná opak (malý – velký). Zkus si říct: dá se jedno slovo vyměnit za druhé?');
+    }
+    if (tags.get('vyznamDir')) {
+      tips.push('Nadřazené je to širší slovo – pod ovoce patří jablko i hruška. Zeptej se: je to druh toho druhého slova?');
+    }
+    if (tags.get('vyznamSour')) {
+      tips.push('Slovo nadřazené je název celé skupiny (měsíce), ne další slovo ze skupiny (červen).');
+    }
+    if (tags.get('slovaMiss')) {
+      tips.push('Při spojování si u každého slova řekni, do jaké skupiny patří. Pak hledej druhé slovo z téže skupiny.');
+    }
+    if (pct >= 90) {
+      const harder = { easy: 'střední', medium: 'těžkou' }[config.level];
+      tips.push(harder
+        ? `Šlo ti to skvěle – zkus příště ${harder} obtížnost, přibudou další druhy slov.`
+        : 'Šlo ti to skvěle – tohle je nejtěžší úroveň. Zkus si dát víc úloh v kole.');
+    }
   } else if (bigmulMode) {
     if (pct < 100) {
       tips.push('Hlídej si nuly: 8 × 50 není 40, ale 400. Nejdřív vynásob číslice a pak přidej tolik nul, kolik jich v čísle bylo.');
@@ -394,6 +417,10 @@ export function analyze(state, config, attempts) {
     if (ex.kind === 'compare') return COMPARES[value]?.symbol ?? '?';
     // u druhu věty je odpovědí klíč druhu, dítěti patří jeho název
     if (ex.kind === 'vety' && ex.task === 'type') return VETY_TYPES[value]?.label ?? value;
+    // u vztahu taky - klíč `pod` se ukáže jako „podřazené“
+    if (ex.kind === 'vyznam' && ex.task === 'vztah') return VYZNAM_RELS[value]?.label ?? value;
+    // u plochy je "odpovědí" počet chybných spojení, žádné slovo
+    if (ex.kind === 'slova') return value ? `${value}× vedle` : 'vše spojeno';
     return value;
   };
   const missedList = attempts.filter((a) => !a.correct).map((a) => ({

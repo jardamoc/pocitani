@@ -1,6 +1,9 @@
-import { OPS, COMPARES, EXTRA_KINDS, MISSING_LABEL, kindOps, buildRound, buildRiddleRound, buildGridRound, buildOver10Round, buildPexesoRound, buildBigmulRound, buildAbcRound, buildPosRound, buildVetyRound, explain, diagnose } from './generator.js';
+import { OPS, COMPARES, EXTRA_KINDS, MISSING_LABEL, kindOps, buildRound, buildRiddleRound, buildGridRound, buildOver10Round, buildPexesoRound, buildBigmulRound, buildAbcRound, buildPosRound, buildVetyRound, buildVyznamRound, explain, diagnose } from './generator.js';
 import { POS_TYPES, POS_TYPE_KEYS, POS_COUNTS, POS_LEVELS, POS_LEVEL_KEYS, posCheck, posTag } from './pos.js';
 import { VETY_TYPES, VETY_TASKS, VETY_TASK_KEYS, VETY_COUNTS, VETY_LEVELS, VETY_LEVEL_KEYS } from './vety.js';
+import {
+  VYZNAM_TASKS, VYZNAM_TASK_KEYS, VYZNAM_RELS, VYZNAM_COUNTS, VYZNAM_LEVELS, VYZNAM_LEVEL_KEYS,
+} from './vyznam.js';
 import {
   ABC_LEVELS, ABC_LEVEL_KEYS, ABC_COUNTS, abcCountNote, abcEmptyBoard, abcFull, dropOnSlot, dropBetween, dropToPool, wrongSlots,
 } from './abc.js';
@@ -45,6 +48,7 @@ const MODES = {
   abc: { subject: 'czech', label: 'Abeceda', icon: '🔤', sub: 'Seřaď slova podle abecedy' },
   pos: { subject: 'czech', label: 'Slovní druhy', icon: '🔍', sub: 'Najdi ve větě slovesa nebo podstatná jména' },
   vety: { subject: 'czech', label: 'Druhy vět', icon: '💬', sub: 'Urči, jaká je věta, a udělej z ní otázku' },
+  vyznam: { subject: 'czech', label: 'Význam slov', icon: '💡', sub: 'Slova souznačná, protikladná, nadřazená…' },
 };
 
 const SUBJECTS = {
@@ -68,15 +72,19 @@ const POS_COUNT_DEFAULT = 10;
 /* Druhy vět: které úlohy (určit druh / udělat otázku) a kolik vět. */
 const VETY_COUNT_DEFAULT = 10;
 
+/* Význam slov: které úlohy a kolik jich v kole je. */
+const VYZNAM_COUNT_DEFAULT = 10;
+
 /* Tabulky obtížností podle režimu - klíče (easy/medium/hard) jsou schválně
    společné, takže `config.level` přežije přepnutí režimu. */
 const LEVEL_TABLES = {
   riddle: RIDDLE_LEVELS, grid: GRID_LEVELS, over10: OVER10_LEVELS, pexeso: PEXESO_LEVELS, bigmul: BIGMUL_LEVELS,
-  abc: ABC_LEVELS, pos: POS_LEVELS, vety: VETY_LEVELS,
+  abc: ABC_LEVELS, pos: POS_LEVELS, vety: VETY_LEVELS, vyznam: VYZNAM_LEVELS,
 };
 const LEVEL_KEYS = {
   riddle: RIDDLE_LEVEL_KEYS, grid: GRID_LEVEL_KEYS, over10: OVER10_LEVEL_KEYS, pexeso: PEXESO_LEVEL_KEYS,
   bigmul: BIGMUL_LEVEL_KEYS, abc: ABC_LEVEL_KEYS, pos: POS_LEVEL_KEYS, vety: VETY_LEVEL_KEYS,
+  vyznam: VYZNAM_LEVEL_KEYS,
 };
 
 /* Společná množina klíčů obtížnosti. Tabulky výš ji musí mít všechny stejnou,
@@ -189,6 +197,7 @@ const VYCHOZI_CONFIG = () => ({
   kinds: ['word', 'bond'], count: 10, max: 20, abcCount: ABC_COUNT_DEFAULT,
   posTypes: ['noun', 'verb'], posCount: POS_COUNT_DEFAULT,
   vetyTasks: ['type', 'ask'], vetyCount: VETY_COUNT_DEFAULT,
+  vyznamTasks: [...VYZNAM_TASK_KEYS], vyznamCount: VYZNAM_COUNT_DEFAULT,
 });
 
 /* Stav se jen deklaruje. Naplni ho `boot()` na konci souboru, protoze
@@ -241,6 +250,7 @@ function normalizeConfig(raw) {
     : Object.keys(EXTRA_KINDS);
   const posTypes = Array.isArray(raw.posTypes) ? raw.posTypes.filter((t) => POS_TYPE_KEYS.includes(t)) : [];
   const vetyTasks = Array.isArray(raw.vetyTasks) ? raw.vetyTasks.filter((t) => VETY_TASK_KEYS.includes(t)) : [];
+  const vyznamTasks = Array.isArray(raw.vyznamTasks) ? raw.vyznamTasks.filter((t) => VYZNAM_TASK_KEYS.includes(t)) : [];
   return {
     // starší uložené nastavení režim nezná a bylo vždycky "počítání"
     mode: raw.mode in MODES ? raw.mode : 'calc',
@@ -260,6 +270,9 @@ function normalizeConfig(raw) {
     // starší uložené nastavení druhy vět nezná - prázdný výběr = obě úlohy
     vetyTasks: vetyTasks.length ? vetyTasks : ['type', 'ask'],
     vetyCount: VETY_COUNTS.includes(Number(raw.vetyCount)) ? Number(raw.vetyCount) : VETY_COUNT_DEFAULT,
+    // starší uložené nastavení význam slov nezná - prázdný výběr = všechny úlohy
+    vyznamTasks: vyznamTasks.length ? vyznamTasks : [...VYZNAM_TASK_KEYS],
+    vyznamCount: VYZNAM_COUNTS.includes(Number(raw.vyznamCount)) ? Number(raw.vyznamCount) : VYZNAM_COUNT_DEFAULT,
   };
 }
 
@@ -280,6 +293,9 @@ const isBigmulMode = () => config.mode === 'bigmul';
 const isAbcMode = () => config.mode === 'abc';
 const isPosMode = () => config.mode === 'pos';
 const isVetyMode = () => config.mode === 'vety';
+const isVyznamMode = () => config.mode === 'vyznam';
+/* Význam slov se samotným spojováním je jedna plocha - počet úloh odpadá. */
+const isVyznamBoardOnly = () => isVyznamMode() && config.vyznamTasks.every((t) => t === 'spoj');
 /* Režimy, které mají obtížnost místo výběru druhů úloh. */
 const usesLevel = () => config.mode !== 'calc';
 const levelTable = () => LEVEL_TABLES[config.mode] || RIDDLE_LEVELS;
@@ -400,20 +416,21 @@ function renderModeCards() {
   const abc = isAbcMode();
   const pos = isPosMode();
   const vety = isVetyMode();
+  const vyznam = isVyznamMode();
   el('card-ops').hidden = isRiddleMode() || bigmul || abc;
   el('card-kinds').hidden = usesLevel();
   el('card-level').hidden = !usesLevel();
   // jedna mřížka i jedna plocha pexesa jsou celé kolo - počet příkladů odpadá
-  el('card-count').hidden = grid || pexeso;
+  el('card-count').hidden = grid || pexeso || isVyznamBoardOnly();
   // v abecedě ani ve slovních druzích se nepočítá, rozsah čísel tam nic neříká
-  el('card-max').hidden = abc || pos || vety;
+  el('card-max').hidden = abc || pos || vety || vyznam;
   // u češtiny se vybírá jen z pevných počtů slov / vět
-  el('countCustomWrap').hidden = abc || pos || vety;
+  el('countCustomWrap').hidden = abc || pos || vety || vyznam;
   /* Ve slovních druzích karta s operacemi zůstává, jen se v ní místo
      operací vybírá, co se ve větách hledá. */
   el('opsTitle').innerHTML = pos
     ? '<span aria-hidden="true">🎯</span> Co budeme hledat?'
-    : vety
+    : vety || vyznam
     ? '<span aria-hidden="true">🎯</span> Co budeme dělat?'
     : '<span aria-hidden="true">🎯</span> Co budeme počítat?';
   el('countTitle').innerHTML = isRiddleMode()
@@ -422,7 +439,9 @@ function renderModeCards() {
       ? '<span aria-hidden="true">🔢</span> Kolik slov?'
       : pos || vety
         ? '<span aria-hidden="true">🔢</span> Kolik vět?'
-        : '<span aria-hidden="true">🔢</span> Kolik příkladů?';
+        : vyznam
+          ? '<span aria-hidden="true">🔢</span> Kolik úloh?'
+          : '<span aria-hidden="true">🔢</span> Kolik příkladů?';
 
   const maxNote = el('maxNote');
   const opsNote = el('opsNote');
@@ -456,6 +475,19 @@ function renderModeCards() {
     opsNote.textContent = config.vetyTasks.length > 1
       ? 'Úlohy se budou v kole střídat – nad každou větou je napsané, co s ní máš udělat.'
       : 'Můžeš si zapnout obojí naráz, úlohy se pak střídají.';
+    opsNote.hidden = false;
+    return;
+  }
+
+  if (vyznam) {
+    el('levelNote').textContent = `${level.label} – ${level.note}.`;
+    opsNote.textContent = isVyznamBoardOnly()
+      ? 'Zahraješ si jednu plochu se spojováním slov.'
+      : config.vyznamTasks.includes('spoj')
+        ? 'Kolo začne plochou se spojováním slov, pak se úlohy budou střídat.'
+        : config.vyznamTasks.length > 1
+          ? 'Úlohy se budou v kole střídat.'
+          : 'Můžeš si zapnout víc úloh naráz, pak se budou střídat.';
     opsNote.hidden = false;
     return;
   }
@@ -565,6 +597,10 @@ function renderConfigScreen() {
     ? VETY_TASK_KEYS
       .map((key) => chipHTML(key, `${VETY_TASKS[key].emoji} ${VETY_TASKS[key].label}`, config.vetyTasks.includes(key)))
       .join('')
+    : isVyznamMode()
+    ? VYZNAM_TASK_KEYS
+      .map((key) => chipHTML(key, `${VYZNAM_TASKS[key].emoji} ${VYZNAM_TASKS[key].label}`, config.vyznamTasks.includes(key)))
+      .join('')
     : opKeys
       .map((key) => chipHTML(key, `${OPS[key].emoji} ${OPS[key].label}`, opOn.includes(key)))
       .join('');
@@ -579,6 +615,8 @@ function renderConfigScreen() {
       ? POS_COUNTS.map((n) => chipHTML(n, `${n} vět`, config.posCount === n)).join('')
       : isVetyMode()
       ? VETY_COUNTS.map((n) => chipHTML(n, `${n} vět`, config.vetyCount === n)).join('')
+      : isVyznamMode()
+      ? VYZNAM_COUNTS.map((n) => chipHTML(n, `${n} úloh`, config.vyznamCount === n)).join('')
       : COUNT_PRESETS.map((n) => chipHTML(n, `${n} příkladů`, config.count === n)).join('');
 
   el('maxChips').innerHTML = MAX_PRESETS
@@ -658,11 +696,14 @@ function renderLastHint() {
   }
 
   const pct = Math.round((last.correct / last.total) * 100);
-  const what = isRiddleMode() ? 'hádanek' : isOver10Mode() ? 'rozkladů' : isPosMode() || isVetyMode() ? 'vět' : 'příkladů';
+  const what = isRiddleMode() ? 'hádanek' : isOver10Mode() ? 'rozkladů' : isPosMode() || isVetyMode() ? 'vět'
+    : isVyznamMode() ? 'úloh' : 'příkladů';
   const focus = isRiddleMode()
     ? ' Každá hádanka je pokaždé nová.'
     : isPosMode() || isVetyMode()
       ? ' Věty se pokaždé vylosují jiné.'
+    : isVyznamMode()
+      ? ' Slova se pokaždé vylosují jiná.'
     : isOver10Mode()
       ? ' Každý rozklad je pokaždé nový.'
       : isBigmulMode()
@@ -729,7 +770,9 @@ el('opChips').addEventListener('click', (e) => {
   const over10 = isOver10Mode();
   const pos = isPosMode();
   const vety = isVetyMode();
-  const current = pos ? config.posTypes : vety ? config.vetyTasks : over10 ? config.over10Ops : config.ops;
+  const vyznam = isVyznamMode();
+  const current = pos ? config.posTypes : vety ? config.vetyTasks : vyznam ? config.vyznamTasks
+    : over10 ? config.over10Ops : config.ops;
   const next = current.includes(value) ? current.filter((o) => o !== value) : [...current, value];
   if (!next.length) {
     const err = el('opsError');
@@ -739,6 +782,7 @@ el('opChips').addEventListener('click', (e) => {
   }
   if (pos) config.posTypes = next;
   else if (vety) config.vetyTasks = next;
+  else if (vyznam) config.vyznamTasks = next;
   else if (over10) config.over10Ops = next;
   else config.ops = next;
   saveConfig();
@@ -764,6 +808,7 @@ el('countChips').addEventListener('click', (e) => {
   if (isAbcMode()) config.abcCount = Number(chip.dataset.value);
   else if (isPosMode()) config.posCount = Number(chip.dataset.value);
   else if (isVetyMode()) config.vetyCount = Number(chip.dataset.value);
+  else if (isVyznamMode()) config.vyznamCount = Number(chip.dataset.value);
   else config.count = Number(chip.dataset.value);
   saveConfig();
   renderConfigScreen();
@@ -910,6 +955,7 @@ function startRound() {
     abc: () => buildAbcRound(config),     // jedna řada slov je celé kolo
     pos: () => buildPosRound(config),     // co věta, to úloha
     vety: () => buildVetyRound(config),   // taky
+    vyznam: () => buildVyznamRound(config), // úloha po úloze, nejvýš jedna plocha
   };
   round = (build[config.mode] || build.calc)();
   index = 0;
@@ -971,7 +1017,7 @@ function renderExercise() {
     ? `Mřížka ${ex.size}×${ex.size}`
     /* Rozměry plochy, ne počet dvojic: "Dvojice · 8 dvojic" je na 320 px
        delší, než se do horní lišty vejde, a roztáhlo by stránku. */
-    : ex.kind === 'pexeso'
+    : ex.kind === 'pexeso' || (ex.kind === 'slova' && round.length === 1)
       ? `Dvojice ${ex.cols}×${ex.rows}`
       /* Krátce - "Abeceda · 12" už se na 320 px do lišty nevešlo. */
       : ex.kind === 'abc'
@@ -986,7 +1032,7 @@ function renderExercise() {
   if (ex.kind === 'abc') resetAbc(ex);
   // u věty taky - označená slova jsou stav, ze kterého se kreslí
   if (ex.kind === 'pos') resetPos();
-  if (ex.kind === 'vety') vetyPicked = null;
+  if (CHOICE_HTML[ex.kind]) choicePicked = null;
   el('exerciseBody').innerHTML = (BODY_HTML[ex.kind] || equationHTML)(ex);
   /* Mřížka 5×5 a plocha pexesa o čtyřech sloupcích jsou nejširší, co
      aplikace kreslí. Na úzkém telefonu jim uvolníme okraje, ať nemusíme
@@ -1001,7 +1047,7 @@ function renderExercise() {
   el('feedback').innerHTML = '';
   /* Pexeso i velké násobení se ovládají klepáním, žádná klávesnice u nich
      není. */
-  const tapOnly = ['pexeso', 'bigmul', 'abc', 'pos', 'vety'].includes(ex.kind);
+  const tapOnly = TAP_ONLY.has(ex.kind);
   el('keypad').hidden = tapOnly;
   if (!tapOnly) renderKeypad(ex);
   el('keypad').dataset.disabled = 'false';
@@ -1009,7 +1055,7 @@ function renderExercise() {
   retried = false;
   activeField = null;
 
-  if (ex.kind === 'pexeso') startPexeso(ex);
+  if (PAIR_BOARDS.has(ex.kind)) startPexeso(ex);
 
   /* U pexesa žádné políčko na odpověď není - `#answerInput` v DOM chybí
      a slepé sáhnutí na něj by tady spadlo. */
@@ -1048,6 +1094,14 @@ function hintFor(ex) {
     return ex.task === 'ask'
       ? 'Přečti si větu a najdi, jak z ní udělat otázku. Klepni na správnou možnost.'
       : 'Přečti si větu a podívej se na znaménko na konci. Pak klepni na druh věty.';
+  }
+  if (ex.kind === 'slova') {
+    return 'Najdi dvě slova, která patří do stejné skupiny, a klepni na obě. Takhle spoj všechny dvojice.';
+  }
+  if (ex.kind === 'vyznam') {
+    return ex.task === 'nad'
+      ? 'Která skupina zahrnuje všechna čtyři slova? Klepni na slovo nadřazené.'
+      : 'Přečti si obě slova a rozmysli si, jak spolu souvisí. Pak klepni na správné slovo.';
   }
   if (ex.kind === 'bigmul') {
     return 'Rozlož si násobení na desítky a jednotky. V každém kroku klepni na tu možnost, která je správně.';
@@ -1288,13 +1342,17 @@ function over10FrameHTML(ex) {
    pohled vidět, co se s čím spojuje. `<button>` nedědí barvu textu, takže si
    ji kartička nastavuje sama - jinak by byl v tmavém režimu černý text
    na tmavém podkladu. */
+const PEX_FACE_LABEL = { task: 'Příklad', result: 'Výsledek', word: 'Slovo' };
+
 function pexesoHTML(ex) {
   const cards = ex.cards
     .map((card, i) => `<button type="button" class="pex-card" data-i="${i}" data-pair="${card.pair}"
         data-face="${card.face}"
-        aria-label="${card.face === 'task' ? 'Příklad' : 'Výsledek'} ${card.text}">${card.text}</button>`)
+        aria-label="${PEX_FACE_LABEL[card.face]} ${card.text}">${card.text}</button>`)
     .join('');
-  return `<div class="pex" data-cols="${ex.cols}">${cards}</div>
+  // plocha se slovy má širší a nižší kartičky, slovo je delší než `7+5`
+  const words = ex.kind === 'slova' ? ' data-words' : '';
+  return `<div class="pex" data-cols="${ex.cols}"${words}>${cards}</div>
     <p id="pexStatus" class="pex-status" aria-live="polite"></p>`;
 }
 
@@ -1328,8 +1386,15 @@ function bigmulHTML(ex) {
 const BODY_HTML = {
   bond: bondHTML, word: wordHTML, riddle: riddleHTML, sign: signHTML, grid: gridHTML,
   compare: compareHTML, over10: over10HTML, pexeso: pexesoHTML, bigmul: bigmulHTML, abc: abcHTML,
-  pos: posHTML, vety: vetyHTML,
+  pos: posHTML, vety: vetyHTML, vyznam: vyznamHTML, slova: pexesoHTML,
 };
+
+/* Druhy, které se ovládají jen klepáním - bez klávesnice a bez `submit()`. */
+const TAP_ONLY = new Set(['pexeso', 'bigmul', 'abc', 'pos', 'vety', 'vyznam', 'slova']);
+
+/* Plochy se spojováním dvojic: čísla v „Najdi dvojice“ a souřadná slova
+   ve „Význam slov“. Ovladač je pro obě tentýž. */
+const PAIR_BOARDS = new Set(['pexeso', 'slova']);
 
 /* ---------------- ovladač velkého násobení ----------------
    Úloha se neodpovídá políčkem, takže společnou cestou `submit()` neprochází.
@@ -1446,8 +1511,8 @@ el('exerciseBody').addEventListener('click', (e) => {
     posTap(e.target);
     return;
   }
-  if (round[index]?.kind === 'vety') {
-    vetyTap(e.target);
+  if (CHOICE_HTML[round[index]?.kind]) {
+    choiceTap(e.target);
     return;
   }
   const card = e.target.closest('.pex-card');
@@ -1461,7 +1526,7 @@ el('exerciseBody').addEventListener('click', (e) => {
 
 function pexTap(card) {
   const ex = round[index];
-  if (locked || pexBusy || ex?.kind !== 'pexeso') return;
+  if (locked || pexBusy || !PAIR_BOARDS.has(ex?.kind)) return;
   if (card.classList.contains('is-done')) return;
 
   // druhé klepnutí na tutéž kartičku výběr zruší - dítě si to smí rozmyslet
@@ -1532,7 +1597,9 @@ function finishPexeso(ex) {
        <button type="button" class="btn btn-primary">Hotovo <span aria-hidden="true">➜</span></button>`
     : `<div class="fb-badge"><span aria-hidden="true">🤔</span> Dvojice máš, ale s chybami</div>
        <p class="fb-retry-note">Špatně spojených bylo ${pexMiss}, vejít ses měla do ${limit}.
-         Spočítej si příklad celý, než klepneš na výsledek.</p>
+         ${ex.kind === 'slova'
+           ? 'Než klepneš, řekni si, do jaké skupiny slovo patří – třeba ovoce nebo nábytek.'
+           : 'Spočítej si příklad celý, než klepneš na výsledek.'}</p>
        <button type="button" class="btn btn-primary">Rozumím <span aria-hidden="true">➜</span></button>`;
   fb.hidden = false;
   fb.querySelector('.btn').addEventListener('click', next);
@@ -2009,25 +2076,30 @@ function finishPos(ex, correct) {
   beep('wrong');
 }
 
-/* ---------------- ovladač druhů vět ----------------
-   Věta a pod ní možnosti: u „Urči druh věty“ čtyři druhy v pevném pořadí,
-   u „Udělej otázku“ hotové věty v pořadí vylosovaném v generátoru. Jedno
-   klepnutí rozhoduje - z dvou až čtyř možností by druhý pokus byl spíš
-   tipování. Po chybě zčervená zvolená možnost, zezelená správná a pod
-   tím je vysvětlení. Záznam do `attempts` zapisuje ovladač sám. */
-let vetyPicked = null; // index zvolené možnosti, dokud nic, tak null
+/* ---------------- ovladač úloh s výběrem ----------------
+   Druhy vět i význam slov: zadání a pod ním možnosti. U „Urči druh věty“
+   a „Doplň vztah“ v pevném pořadí, u „Udělej otázku“ a „Najdi nadřazené“
+   v pořadí vylosovaném v generátoru. Jedno klepnutí rozhoduje - z dvou až
+   šesti možností by druhý pokus byl spíš tipování. Po chybě zčervená
+   zvolená možnost, zezelená správná a pod tím je vysvětlení. Záznam do
+   `attempts` zapisuje ovladač sám. */
+let choicePicked = null; // index zvolené možnosti, dokud nic, tak null
+
+/* Třída tlačítka podle stavu - stejná pro obě hry. */
+function choiceButtons(ex, label) {
+  return ex.options.map((o, i) => {
+    let cls = 'vt-opt';
+    if (choicePicked !== null && o.ok) cls += ' is-right';
+    else if (choicePicked === i) cls += ' is-wrong';
+    return `<button type="button" class="${cls}" data-i="${i}"${locked ? ' disabled' : ''}>${label(o)}</button>`;
+  }).join('');
+}
 
 function vetyHTML(ex) {
   const task = VETY_TASKS[ex.task];
-  const opts = ex.options.map((o, i) => {
-    let cls = 'vt-opt';
-    if (vetyPicked !== null && o.ok) cls += ' is-right';
-    else if (vetyPicked === i) cls += ' is-wrong';
-    const label = ex.task === 'type'
-      ? `<span aria-hidden="true">${VETY_TYPES[o.key].emoji}</span> ${o.text}`
-      : o.text;
-    return `<button type="button" class="${cls}" data-i="${i}"${locked ? ' disabled' : ''}>${label}</button>`;
-  }).join('');
+  const opts = choiceButtons(ex, (o) => (ex.task === 'type'
+    ? `<span aria-hidden="true">${VETY_TYPES[o.key].emoji}</span> ${o.text}`
+    : o.text));
   return `<div class="vt" data-task="${ex.task}">
       <p class="vt-ask"><span aria-hidden="true">${task.emoji}</span> ${task.ask}</p>
       <p class="vt-sentence">${ex.text}</p>
@@ -2035,20 +2107,49 @@ function vetyHTML(ex) {
     </div>`;
 }
 
-function vetyTap(target) {
+/* „Slovo savec je ___ slovu zvíře.“ Po klepnutí se do mezery doplní
+   zvolené slovo. U souzvučných slov je pod slovem nápověda, který význam
+   je myšlený - jinak by obě slova vypadala úplně stejně. */
+function vyznamHTML(ex) {
+  const task = VYZNAM_TASKS[ex.task];
+  if (ex.task === 'nad') {
+    const opts = choiceButtons(ex, (o) => o.text);
+    return `<div class="vt" data-task="nad">
+        <p class="vt-ask"><span aria-hidden="true">${task.emoji}</span> ${task.ask}</p>
+        <p class="vt-sentence">${ex.text}</p>
+        <div class="vt-opts">${opts}</div>
+      </div>`;
+  }
+  // tečka patří do bloku se slovem, jinak by se na úzkém displeji odtrhla na nový řádek
+  const word = (w, hint, dot = '') => `<b class="vz-word"><span>${w}${dot}</span>${hint ? `<small class="vz-hint">${hint}</small>` : ''}</b>`;
+  const picked = choicePicked === null ? null : ex.options[choicePicked];
+  const gap = picked
+    ? `<span class="vz-gap is-filled${picked.ok ? '' : ' is-wrong'}">${picked.text}</span>`
+    : '<span class="vz-gap" aria-label="vynechané slovo"></span>';
+  const opts = choiceButtons(ex, (o) => `<span aria-hidden="true">${VYZNAM_RELS[o.key].emoji}</span> ${o.text}`);
+  return `<div class="vt" data-task="vztah">
+      <p class="vt-sentence vz-sentence">Slovo ${word(ex.a, ex.hintA)} je ${gap} slovu ${word(ex.b, ex.hintB, '.')}</p>
+      <div class="vt-opts">${opts}</div>
+    </div>`;
+}
+
+const CHOICE_HTML = { vety: vetyHTML, vyznam: vyznamHTML };
+
+function choiceTap(target) {
   const ex = round[index];
   const btn = target.closest('.vt-opt');
-  if (locked || ex?.kind !== 'vety' || !btn) return;
-  vetyPicked = Number(btn.dataset.i);
-  const opt = ex.options[vetyPicked];
+  if (locked || !CHOICE_HTML[ex?.kind] || !btn) return;
+  choicePicked = Number(btn.dataset.i);
+  const opt = ex.options[choicePicked];
   const correct = Boolean(opt.ok);
   locked = true;
   stopClock();
 
   attempts.push({
     ex,
-    // u druhu věty je odpovědí klíč druhu (statistika ho přeloží na název), u otázky celá věta
-    given: ex.task === 'type' ? opt.key : opt.text,
+    /* U druhu věty a u vztahu je odpovědí klíč (statistika ho přeloží na
+       název), u otázky a nadřazeného slova rovnou text. */
+    given: ex.task === 'type' || ex.task === 'vztah' ? opt.key : opt.text,
     correct,
     retried: false,
     ms: Date.now() - shownAt,
@@ -2057,7 +2158,7 @@ function vetyTap(target) {
 
   el('dots').querySelectorAll('.dot')[index]?.classList.add(correct ? 'is-correct' : 'is-wrong');
   el('quizScore').textContent = String(attempts.filter((a) => a.correct).length);
-  el('exerciseBody').innerHTML = vetyHTML(ex);
+  el('exerciseBody').innerHTML = CHOICE_HTML[ex.kind](ex);
 
   if (correct) {
     renderFeedback(ex, null, true);
@@ -2216,14 +2317,14 @@ document.addEventListener('keydown', (e) => {
      obě možnosti dají vybrat klávesou 1 a 2. */
   /* Abeceda taky - Enter tam potvrdí plnou plochu (tlačítko Hotovo). */
   /* Slovní druhy stejně - Enter tam potvrdí označená slova. */
-  /* Druhy vět - možnosti se dají vybrat klávesami 1 až 4. */
-  if (['pexeso', 'bigmul', 'abc', 'pos', 'vety'].includes(round[index]?.kind)) {
+  /* Druhy vět a význam slov - možnosti se dají vybrat klávesami 1 až 6. */
+  if (TAP_ONLY.has(round[index]?.kind)) {
     if (e.key === 'Enter' && locked) {
       el('feedback').querySelector('.btn')?.click();
     } else if (e.key === 'Enter' && (round[index].kind === 'abc' || round[index].kind === 'pos')) {
       el('exerciseBody').querySelector('.abc-done:not([disabled]), .pos-done:not([disabled])')?.click();
       e.preventDefault();
-    } else if (!locked && round[index].kind === 'vety' && /^[1-4]$/.test(e.key)) {
+    } else if (!locked && CHOICE_HTML[round[index].kind] && /^[1-6]$/.test(e.key)) {
       el('exerciseBody').querySelectorAll('.vt-opt')[Number(e.key) - 1]?.click();
       e.preventDefault();
     } else if (!locked && round[index].kind === 'bigmul' && (e.key === '1' || e.key === '2')) {
@@ -2566,7 +2667,7 @@ function grantRewards(report) {
     mode: config.mode,
     level: rewards.difficultyOf(config),
     // v abecedě se nepočítá - rozsah čísel by jí jinak přidal epického
-    max: isAbcMode() || isPosMode() || isVetyMode() ? 0 : config.max,
+    max: isAbcMode() || isPosMode() || isVetyMode() || isVyznamMode() ? 0 : config.max,
     kindUnits,
     // druhy navic (slovni ulohy, pyramidy, znamenka) - podminka raritniho
     /* "Neco navic" existuje jen v rezimu Pocitani. Jinde karta schovana, ale
@@ -2739,7 +2840,9 @@ function renderResult(r) {
         ? 'Příště přijdou nová čísla.'
         : isPosMode() || isVetyMode()
           ? 'Příště se vylosují jiné věty.'
-          : 'Podobné příklady se objeví v dalším kole.';
+          : isVyznamMode()
+            ? 'Příště se vylosují jiná slova.'
+            : 'Podobné příklady se objeví v dalším kole.';
 
   const retry = r.missedList.length
     ? `<div class="card">
@@ -2757,7 +2860,8 @@ function renderResult(r) {
     : `<div class="card"><h2 class="card-title"><span aria-hidden="true">✨</span> Bez jediné chyby!</h2>
         <p style="margin:0;font-weight:700;color:var(--ink-soft)">Nic k procvičení – tohle byla čistá práce.</p></div>`;
 
-  const jednotka = riddle ? 'hádanku' : isOver10Mode() ? 'rozklad' : isPosMode() || isVetyMode() ? 'větu' : 'příklad';
+  const jednotka = riddle ? 'hádanku' : isOver10Mode() ? 'rozklad' : isPosMode() || isVetyMode() ? 'větu'
+    : isVyznamMode() ? 'úlohu' : 'příklad';
   const avg = r.avgMs
     ? `<p class="score-sub">Průměrně ${Math.max(1, Math.round(r.avgMs / 1000))} s na ${jednotka}</p>`
     : '';

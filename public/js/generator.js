@@ -6,6 +6,7 @@ import { makePexeso, pexesoExplain, pexesoText } from './pexeso.js';
 import { makeAbc, abcExplain, abcText } from './abc.js';
 import { makePosRound, posAnswer, posExplain, posText } from './pos.js';
 import { makeVetyRound, vetyExplain, vetyText } from './vety.js';
+import { makeVyznamRound, vyznamExplain, vyznamText } from './vyznam.js';
 import { makeBigmul, bigmulExplain, bigmulText } from './bigmul.js';
 
 export const OPS = {
@@ -141,6 +142,7 @@ export function signature(ex) {
   if (ex.kind === 'abc') return `abc|${ex.key}`;
   if (ex.kind === 'pos') return `pos|${ex.key}`;
   if (ex.kind === 'vety') return `vety|${ex.key}`;
+  if (ex.kind === 'vyznam' || ex.kind === 'slova') return `vyznam|${ex.key}`;
   // velké násobení je dané dvojicí činitelů, ne trojicí a, b, c
   if (ex.kind === 'bigmul') return `bigmul|${ex.key}`;
   return `${ex.op}|${ex.kind}|${ex.missing}|${ex.a}|${ex.b}`;
@@ -508,6 +510,23 @@ export function buildVetyRound(config) {
   }));
 }
 
+/* Význam slov - stejný tvar jako druhy vět. Plocha se souřadnými slovy
+   má vlastní druh `slova`, protože ji ovládá spojovačka z „Najdi dvojice“
+   a v rozpisu času i chyb se počítá jinak než jedna dvojice slov.
+   `a`/`b` jsou u „Doplň vztah“ slova, ne čísla - aritmetika se s těmihle
+   druhy nikde nedělá (`PLACEHOLDER_OP` ve stats.js). */
+export function buildVyznamRound(config) {
+  return makeVyznamRound(config.level, config.vyznamTasks, config.vyznamCount).map((p) => ({
+    op: 'add',
+    kind: p.task === 'spoj' ? 'slova' : 'vyznam',
+    missing: p.task,
+    a: 0, b: 0, c: 0,   // u „Doplň vztah“ je přepíše dvojice slov
+    cross: false,
+    skill: `vyznam:${p.task}`,
+    ...p,
+  }));
+}
+
 /* ---------------- velké násobení ----------------
    `op: 'mul'` je tu POCTIVÉ násobení, ne zástupná hodnota jako u mřížky -
    nemusí se tedy nikde vylučovat z aritmetiky. Odpovědí je ale řetězec
@@ -559,6 +578,7 @@ export function exToText(ex, reveal = false) {
   if (ex.kind === 'abc') return abcText(ex, reveal);
   if (ex.kind === 'pos') return posText(ex, reveal);
   if (ex.kind === 'vety') return vetyText(ex, reveal);
+  if (ex.kind === 'vyznam' || ex.kind === 'slova') return vyznamText(ex, reveal);
   if (ex.kind === 'bigmul') return bigmulText(ex, reveal);
   if (ex.kind === 'riddle') return riddleText(ex, reveal);
   if (ex.kind === 'sign') {
@@ -619,6 +639,7 @@ export function explain(ex) {
   if (kind === 'abc') return abcExplain(ex);
   if (kind === 'pos') return posExplain(ex);
   if (kind === 'vety') return vetyExplain(ex);
+  if (kind === 'vyznam' || kind === 'slova') return vyznamExplain(ex);
   if (kind === 'bigmul') return bigmulExplain(ex);
   if (kind === 'riddle') return riddleExplain(ex);
 
@@ -754,6 +775,11 @@ export const TAGS = {
   vetyType: 'záměna druhu věty',
   vetyMark: 'zapomenutý otazník',
   vetyChange: 'otázka na něco jiného',
+  vyznamSynAnt: 'záměna souznačného a protikladného',
+  vyznamDir: 'záměna nadřazeného a podřazeného',
+  vyznamSour: 'souřadné slovo místo nadřazeného',
+  vyznamOther: 'jiný vztah',
+  slovaMiss: 'moc chybných spojení',
   bigmulSplit: 'chyba v rozkladu',
   bigmulProduct: 'ztracená nula v součinu',
   bigmulSum: 'chyba v součtu',
@@ -788,6 +814,11 @@ export function diagnose(ex, given) {
   /* Druhy vět taky - odpovědí je klíč druhu nebo celá věta. Tag podle
      zvolené možnosti zapisuje ovladač v app.js, tohle je pojistka. */
   if (kind === 'vety') return 'vetyType';
+
+  /* Význam slov taky - tag podle zvolené možnosti zapisuje ovladač,
+     u plochy se souřadnými slovy je "odpovědí" počet chybných spojení. */
+  if (kind === 'vyznam') return 'vyznamOther';
+  if (kind === 'slova') return 'slovaMiss';
 
   /* Velké násobení taky - odpovědí je text vybrané možnosti. Konkrétní tag
      podle kroku si zapisuje ovladač v app.js, tohle je jen pojistka. */

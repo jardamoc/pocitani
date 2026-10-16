@@ -413,6 +413,7 @@ h1, h2, h3, .num, .box-value, .key, .score-big { font-family: 'Baloo 2', 'Nunito
 .chips-mode .chip.is-on[data-value="abc"] { background: linear-gradient(135deg, #f87171, #be123c); }
 .chips-mode .chip.is-on[data-value="pos"] { background: linear-gradient(135deg, #a78bfa, #6d28d9); }
 .chips-mode .chip.is-on[data-value="vety"] { background: linear-gradient(135deg, #34d399, #0f766e); }
+.chips-mode .chip.is-on[data-value="vyznam"] { background: linear-gradient(135deg, #fbbf24, #c2410c); }
 
 /* Záložky Matematika / Čeština nad kartami her. `<button>` nedědí barvu
    textu, proto ji záložka nastavuje sama. */
@@ -1053,6 +1054,36 @@ body.is-dark { --pair-task: #93c5fd; --pair-result: #fdba74; }
 .vt-opt:disabled { cursor: default; }
 .vt-opt.is-right { border-color: var(--good); background: var(--good-tint); }
 .vt-opt.is-wrong { border-color: var(--bad); background: var(--bad-tint); }
+
+/* ---------- význam slov ----------
+   „Slovo savec je ___ slovu zvíře.“ Mezera se po klepnutí vyplní zvoleným
+   slovem. Tlačítka jsou dvě vedle sebe - šest vztahů pod sebou by se na
+   telefon nevešlo. */
+/* `minmax(0, 1fr)`, ne `1fr` - jinak si sloupec roztáhne nejdelší slovo
+   („protikladné“) a na 320 px přečuhoval přes okraj karty. */
+.vt[data-task="vztah"] .vt-opts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.vt[data-task="vztah"] .vt-opt { font-size: clamp(.95rem, 4.6vw, 1.2rem); padding: 6px 4px; min-width: 0; }
+.vz-sentence { font-size: 1.45rem; line-height: 1.6; }
+.vz-word { display: inline-flex; flex-direction: column; align-items: center; vertical-align: baseline; }
+/* nápověda k souzvučnému slovu: který význam je myšlený */
+.vz-hint { font-size: .8rem; font-weight: 700; line-height: 1.1; color: var(--ink-soft); white-space: nowrap; }
+.vz-gap {
+  display: inline-block; min-width: 3.2em; padding: 0 6px; vertical-align: baseline;
+  border-bottom: 3px solid var(--line); color: var(--ink);
+}
+.vz-gap.is-filled { border-color: var(--good); background: var(--good-tint); border-radius: 8px 8px 0 0; }
+.vz-gap.is-wrong { border-color: var(--bad); background: var(--bad-tint); }
+
+/* Plocha se souřadnými slovy: slovo je delší než `7+5`, kartičky jsou
+   proto přes celou šířku a nižší. Barva textu je `--ink`, `<button>` ji
+   sám nezdědí. */
+.pex[data-words] {
+  grid-template-columns: repeat(3, minmax(0, 1fr)); justify-content: stretch; width: 100%;
+}
+.pex[data-words] .pex-card {
+  width: auto; height: 60px; font-size: clamp(.95rem, 4.4vw, 1.2rem); letter-spacing: 0;
+}
+.pex-card[data-face="word"] { color: var(--ink); }
 
 /* ---------- velké násobení ----------
    Zápis roste shora dolů: hotový krok je hodnota na zeleném podkladu

@@ -21,9 +21,10 @@ v zenskem rode a nikde se neobjevi zaporne ani desetinne cislo.
 | **Abeceda** (Cestina) | 9 az 25 slov se pretahuje do ocislovanych okenek podle abecedy; tezka uroven prida pasti c/č, h/ch a spol. |
 | **Slovni druhy** (Cestina) | ve vete se klepe na vsechna slovesa nebo podstatna jmena; vety jsou rucne sepsane a urcene, tezka uroven prida pasti jako „chce jít" nebo „plavání" |
 | **Druhy vet** (Cestina) | urcit druh vety (oznamovaci, tazaci, rozkazovaci, praci) a vybrat, jak z vety udelat otazku; vety jsou rucne sepsane |
+| **Vyznam slov** (Cestina) | doplnit vztah dvou slov (souznacna, protikladna, nadrazena, podrazena, souradna, souzvucna), spojit souradna slova do dvojic a najit slovo nadrazene |
 
 Rozsah cisel (do 10 az do 100), pocet prikladu i druhy uloh se vybiraji na uvodni
-obrazovce; obtiznost je u sedmi rezimu samostatna osa, nezavisla na rozsahu.
+obrazovce; obtiznost je u devíti rezimu samostatna osa, nezavisla na rozsahu.
 
 **Sbirka dumplingu.** Za bezchybne kolo padne jedna sberatelska postavicka z 40
 v peti kategoriich. Vzacnost se ridi tim, jak rychle a jak tezke kolo bylo;
@@ -70,6 +71,7 @@ public/
     abc.js          abeceda - slova a pravidla presouvani karticek
     pos.js          slovni druhy - rucne urcene vety a vyhodnoceni
     vety.js         druhy vet - rucne sepsane vety, moznosti k otazce
+    vyznam.js       vyznam slov - rucne sepsana slova a skupiny
     stats.js        rozbor kola a rady
     storage.js      jedina vrstva nad ulozistem
     rewards*.js     pravidla odmen, seznam obrazku odmen, vykresleni

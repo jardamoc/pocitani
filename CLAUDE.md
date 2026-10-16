@@ -85,6 +85,7 @@ běžel. Vypadalo to jako chyba nasazení, a nebyla.
 | `public/js/abc.js` | Abeceda: seznam slov, výběr podle obtížnosti, čisté funkce přesunu kartiček |
 | `public/js/pos.js` | Slovní druhy: ručně určené věty podle obtížnosti, výběr kola, vyhodnocení a vysvětlení |
 | `public/js/vety.js` | Druhy vět: ručně sepsané věty, výběr kola, možnosti k otázce a vysvětlení |
+| `public/js/vyznam.js` | Význam slov: ručně sepsaná slova a skupiny, tři úlohy, vysvětlení |
 | `public/js/stats.js` | rozbor kola, rady, `sanitizeState()` — **na úložiště nesahá** |
 | `public/js/storage.js` | **jediná vrstva nad úložištěm** — načtení, fronta zápisů, mazání, vyměnitelný backend |
 | `public/js/validate.js` | `wholeNumber` / `textList` — sdílené kousky validace, bez DOM |
@@ -113,7 +114,8 @@ na neexistující soubor. Když je tam někdy mít chceš, přidej napřed vlast
 | `package.json` | jen ty tři zkratky a `"type": "module"`; žádné závislosti |
 
 Prosté ES moduly, žádný framework, žádné závislosti. Závislosti jdou jedním směrem:
-`random.js → riddle.js / grid.js / over10.js / pexeso.js / bigmul.js / abc.js / pos.js / vety.js → generator.js → app.js`
+`random.js → riddle.js / grid.js / over10.js / pexeso.js / bigmul.js / abc.js / pos.js / vety.js / vyznam.js → generator.js → app.js`
+(`stats.js` si z `vety.js` a `vyznam.js` bere jen názvy pro výpis chyb)
 (`app.js` si z `abc.js` bere navíc funkce přesunu a z `pos.js` tabulky a `posCheck` / `posTag`),
 `rewards-data.js → rewards.js → rewards-ui.js → app.js`,
 `validate.js → stats.js / rewards.js → storage.js → app.js` a
@@ -158,7 +160,7 @@ Co z toho plyne pro psaní kódu:
 - **`mergePayload()` v `transfer.js` neukládá.** Slučování je čistá operace v paměti,
   která vrátí souhrn změn; zapisuje až `acceptIncoming()` v `app.js`.
 
-## Devět režimů hry
+## Deset režimů hry
 
 Na úvodní obrazovce se vybírá karta **„Co si zahrajeme?"**. Nad kartami jsou dvě
 záložky **🔢 Matematika / 📖 Čeština** (`SUBJECTS`, u každého režimu `subject` v `MODES`).
@@ -177,6 +179,7 @@ záložky.
 | **Abeceda** (Čeština) | `abc` | operace, „něco navíc", **rozsah „Do kolika"**; počet se vybírá ze slov |
 | **Slovní druhy** (Čeština) | `pos` | „něco navíc", **rozsah**; karta s operacemi vybírá, co se hledá; počet = počet vět |
 | **Druhy vět** (Čeština) | `vety` | „něco navíc", **rozsah**; karta s operacemi vybírá úlohu; počet = počet vět |
+| **Význam slov** (Čeština) | `vyznam` | „něco navíc", **rozsah**; karta s operacemi vybírá úlohu; jen se spojováním i **počet** |
 
 Větve se rozcházejí až v `startRound()`, kde je tabulka builderů. Všechno ostatní —
 klávesnice, vyhodnocení, statistiky — je společné, protože každá úloha má stejný tvar:
@@ -661,6 +664,40 @@ Pár věcí, které se snadno rozbijí:
 - Klávesnice se schová, klávesy `1` až `4` vyberou možnost.
 - Do odměn jde `max: 0` jako u ostatní češtiny; čas jsou 2 běžné příklady na větu
   (`speedKindMultiplier.vety`).
+
+## Význam slov
+
+Čtvrtá hra pod záložkou Čeština (`config.mode` = `vyznam`), předlohou byla cvičení
+na umimecesky.cz. Tři úlohy na kartě „Co budeme dělat?" (`config.vyznamTasks`,
+**do `config.ops` nepatří**), počet 5 / 10 / 15 (`config.vyznamCount`):
+
+- **Doplň vztah** (`vztah`) — „Slovo **savec** je ___ slovu **zvíře**." a tlačítka se
+  vztahy ve středním rodě (souznačné, protikladné, nadřazené, podřazené, souřadné,
+  souzvučné). **Kolik tlačítek, řídí obtížnost** (`VYZNAM_LEVEL_RELS`): lehká jen
+  souznačné/protikladné, střední + nad-/pod-/souřadné, těžká + souzvučné. Souzvučná
+  slova mají pod sebou nápovědu významu (`zámek` 🏰 hrad / 🔒 na dveřích), jinak by
+  obě slova vypadala stejně.
+- **Spoj souřadná** (`spoj`) — plocha 12 slov, spojují se do 6 dvojic. Má vlastní druh
+  **`ex.kind = 'slova'`** a jede přes ovladač „Najdi dvojice" (`PAIR_BOARDS` v `app.js`),
+  včetně `pexesoMismatchAllowance`. **V kole je nejvýš jedna plocha a stojí na začátku**;
+  když je zapnuté jen spojování, je kolo jediná plocha a karta s počtem se schová.
+- **Najdi nadřazené** (`nad`) — čtyři slova a tři možnosti: správná skupina (`měsíce`),
+  **souřadné slovo** z téže skupiny (`červen`, tag `vyznamSour`) a jiná skupina
+  (na těžké blízká: `dny`). Uživatel zvolil **výběr, ne psaní**.
+
+Vztah i nadřazené slovo jdou přes společný ovladač s druhy vět (`choiceTap`,
+`CHOICE_HTML`): jedno klepnutí rozhoduje, klávesy 1–6. U vztahu je `given` klíč
+(`pod`), `asShown()` ve `stats.js` ho přeloží na název.
+
+**Slova jsou ručně sepsaná** v `vyznam.js`. Při doplňování:
+
+- **Skupiny v `CATS` se nesmí překrývat ani být jedna v druhé** — žádná „zvířata" vedle
+  „ptáků". Jinak by špatná možnost u „Najdi nadřazené" byla taky správně a na ploše
+  by šlo slovo spojit se dvěma. Proto tam „zvířata" ani „obuv" (× oblečení) nejsou.
+- Slovo na plochu má **nejvýš 9 písmen**, víc se na 320 px do kartičky nevejde.
+- Žádné sporné dvojice (ráno – večer, teplý – horký). Slova mnohoznačná, která učebnice
+  neřadí mezi souzvučná (`jazyk`), do `HOM` nepatří.
+- Skupina má aspoň 5 slov (4 v řadě + 1 souřadné jako špatná možnost).
 
 ## Doplň znaménko
 
