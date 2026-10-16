@@ -18,4 +18,5 @@ node_modules/
 # na tenhle stroj, ne do repozitare s aplikaci
 .agents/
 .claude/skills/
+.claude/worktrees/
 skills-lock.json
