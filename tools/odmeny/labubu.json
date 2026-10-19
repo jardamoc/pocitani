@@ -1,0 +1,45 @@
+{
+"basic": [
+["r01_01","vanilka","Vanilka"],["r01_02","ruzovka","Růžovka"],["r01_03","blankytka","Blankytka"],["r01_04","citronek","Citrónek"],
+["r01_05","mrkalka","Mrkálka"],["r01_06","uhlik","Uhlík"],["r01_08","vcelka","Včelka"],["r01_09","kopacek","Kopáček"],
+["r01_12","lesnicek","Lesníček"],["r08_01","belasek","Bělásek"],["r10_07","sedivacek","Šediváček"],["r02_01","kuchar_varecka","Kuchař Vařečka"],
+["r02_02","hasic","Hasič"],["r02_03","zdravotnice","Zdravotnice"],["r02_04","malirka","Malířka"],["r07_01","doktorka","Doktorka"],
+["r06_10","policista","Policista"],["r06_11","stavbar","Stavbař"],["r02_10","vyletnik_s_mapou","Výletník s mapou"],["r02_11","zahradnik","Zahradník"],
+["r02_09","slidil_s_lupou","Slídil s lupou"],["r06_12","lovec_motylu","Lovec motýlů"],["r07_04","absolvent","Absolvent"],["r07_05","mnisek","Mníšek"],
+["r03_04","zpevak","Zpěvák"],["r03_11","elegan","Elegán"],["r02_05","strelec_golu","Střelec gólů"],["r02_06","cyklista","Cyklista"],
+["r04_01","lyzar","Lyžař"],["r04_02","snowboardista","Snowboardista"],["r04_03","plavec","Plavec"],["r04_04","tenista","Tenista"],
+["r04_05","hokejista","Hokejista"],["r04_06","baseballista","Baseballista"],["r04_07","basketbalista","Basketbalista"],["r04_08","pingpongista","Pingpongista"],
+["r04_09","badmintonista","Badmintonista"],["r04_10","sermir","Šermíř"],["r04_11","karatista","Karatista"]
+],
+"uncommon": [
+["r01_07","puntik","Puntík"],["r01_10","karkulka","Karkulka"],["r01_11","nosanek","Nosánek"],["r01_13","hribek","Hříbek"],
+["r01_14","pirat_s_paskou","Pirát s páskou"],["r08_02","tygrik","Tygřík"],["r08_03","lvicek","Lvíček"],["r08_04","pandicka","Pandička"],
+["r08_05","medvidek","Medvídek"],["r08_06","koala","Koala"],["r08_07","slune","Slůně"],["r08_08","zirafka","Žirafka"],
+["r08_09","zebricka","Zebřička"],["r08_10","kravicka","Kravička"],["r08_11","prasatko","Prasátko"],["r08_12","ovecka","Ovečka"],
+["r08_13","listicka","Lištička"],["r03_02","klavirista","Klavírista"],["r03_03","kytarista","Kytarista"],["r03_05","bubenik","Bubeník"],
+["r03_06","houslista","Houslista"],["r10_12","barevny_muzikant","Barevný muzikant"],["r03_09","cukrar_s_dortem","Cukrář s dortem"],["r07_02","vedec","Vědec"],
+["r07_03","knihomol","Knihomol"]
+],
+"rare": [
+["r02_07","zavodnik","Závodník"],["r02_08","motorkar","Motorkář"],["r03_07","rocker","Rocker"],["r03_08","dj_u_pultu","DJ u pultu"],
+["r10_13","dj_s_ksiltovkou","DJ s kšiltovkou"],["r03_01","modry_poutnik","Modrý poutník"],["r05_05","lesni_zbojnik","Lesní zbojník"],["r05_06","mechovy_strazce","Mechový strážce"],
+["r05_07","trpaslik","Trpaslík"],["r05_09","lesni_elf","Lesní elf"],["r06_07","kapitan","Kapitán"],["r06_09","pilot","Pilot"],
+["r10_09","vynalezce_s_brylemi","Vynálezce s brýlemi"],["r10_11","mechanik","Mechanik"],["r10_10","piratka","Pirátka"],["r07_08","kostlivec","Kostlivec"],
+["r07_09","dynacek","Dýňáček"],["r07_10","strasidylko","Strašidýlko"],["r07_12","zeleny_obr","Zelený obr"],["r09_01","snehulacek","Sněhuláček"],
+["r09_04","kericek","Keříček"]
+],
+"epic": [
+["r03_10","kouzelnik_s_cylindrem","Kouzelník s cylindrem"],["r05_10","carodej","Čaroděj"],["r05_11","carodejnice","Čarodějnice"],["r05_01","rytir_se_stitem","Rytíř se štítem"],
+["r05_02","cerny_nindza","Černý nindža"],["r05_03","stinovy_nindza","Stínový nindža"],["r05_04","vousaty_viking","Vousatý viking"],["r05_08","mimozemstanek","Mimozemšťánek"],
+["r06_01","morska_vila","Mořská víla"],["r06_03","ruzova_princezna","Růžová princezna"],["r06_06","kvetinova_princezna","Květinová princezna"],["r06_08","astronaut","Astronaut"],
+["r07_06","andilek","Andílek"],["r07_07","certik","Čertík"],["r07_11","upir","Upír"],["r09_02","ledacek","Ledáček"],
+["r09_03","ohnicek","Ohníček"],["r09_05","modry_plaminek","Modrý plamínek"],["r09_07","slunicko","Sluníčko"]
+],
+"legendary": [
+["r06_04","kral_se_zezlem","Král se žezlem"],["r06_05","kral_v_plasti","Král v plášti"],["r06_02","snehova_princezna","Sněhová princezna"],["r09_06","duhovy_oblacek","Duhový obláček"],
+["r09_08","hvezdna_noc","Hvězdná noc"],["r09_09","dzin_z_lampy","Džin z lampy"],["r09_10","dracek","Dráček"],["r09_11","jednorozec","Jednorožec"],
+["r09_12","dinosaurek","Dinosaurek"],["r10_01","superhrdina","Superhrdina"],["r10_02","modra_maska","Modrá maska"],["r10_03","zelena_maska","Zelená maska"],
+["r10_04","netopyri_hrdina","Netopýří hrdina"],["r10_05","pavouci_hrdina","Pavoučí hrdina"],["r10_06","zelezny_hrdina","Železný hrdina"],["r10_08","stribrny_robot","Stříbrný robot"],
+["r10_14","tajny_agent","Tajný agent"]
+]
+}

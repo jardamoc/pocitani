@@ -91,17 +91,19 @@ běžel. Vypadalo to jako chyba nasazení, a nebyla.
 | `public/js/storage.js` | **jediná vrstva nad úložištěm** — načtení, fronta zápisů, mazání, vyměnitelný backend |
 | `public/js/validate.js` | `wholeNumber` / `textList` — sdílené kousky validace, bez DOM |
 | `public/js/random.js` | `rnd` / `pick` / `chance` / `shuffle` / `range` |
-| `public/js/rewards-data.js` | soubory obrázků, česká jména a pevná ID 78 dumplingů, pořadí pro QR — čistá data |
+| `public/js/rewards-data.js` | sbírky (78 dumplingů, 121 labubáků): soubory obrázků, česká jména, pevná ID, pořadí pro QR — čistá data |
 | `public/js/rewards.js` | pravidla odměn, vyhodnocení kola, výběr postavičky — **bez DOM a bez úložiště** |
 | `public/js/rewards-ui.js` | vykreslení odměn: obrázky, sbírka, závěrečné okno, animace |
 | `public/js/version.js` | razítko posledního nasazení (datum + pořadí v rámci dne) — **přepisuje ho `publish.mjs`**, ručně se needituje |
 | `public/js/qr.js` | generátor QR kódu podle normy — bez knihovny |
 | `public/js/transfer.js` | přenos postupu mezi zařízeními: zabalení, adresa, slučování |
 | `public/js/export-ui.js` | dialog „Export" — heslo, QR kód, tři mazací tlačítka |
-| `public/img/odmeny/dumplings/` | 78 postaviček (`.webp`, složka podle kategorie) a 5 nadpisů v `_category_titles/` |
+| `public/img/odmeny/dumplings/` | 78 postaviček (`.webp`, složka podle kategorie) a 5 nadpisů v `_category_titles/` (sdílí je všechny sbírky) |
+| `public/img/odmeny/labubu/` | 121 labubáků (`.webp`, složka podle kategorie) |
 | `public/css/styles.css` | vše včetně devíti barevných témat, tmavého režimu a odměn |
 | `server.mjs` | vývojový server (`npm run dev`) — mimo `public/`, nenasazuje se |
 | `publish.mjs` | nasazení i s kontrolami a ověřením (`npm run publish`) |
+| `tools/odmeny/` | Python skripty na rozřezání listu postaviček na `.webp` — mimo `public/`, nenasazují se |
 | `wrangler.jsonc` | nastavení Cloudflare Workers — jméno služby a složka s aktivy |
 | `public/_headers` | bezpečnostní hlavičky pro živý web; wrangler ho sám neservíruje |
 | `tests/*.test.mjs` | testy pro `node --test`, bez frameworku i bez závislostí |
@@ -852,7 +854,8 @@ Pár věcí, které se snadno rozbijí:
   neobjevených v dané kategorii, teprve když má dítě všechny z kategorie, může padnout duplikát.
   Generátor náhody je parametr `applyRound(data, summary, rng)`, aby šly testy zopakovat.
 - **U neobjevené postavičky se skutečné jméno nesmí objevit nikde** — ani v popisku, ani
-  v `title` nebo `aria-label`, ani v popupu. Je tam `Neobjevený dumpling`.
+  v `title` nebo `aria-label`, ani v popupu. Je tam `Neobjevený dumpling` / `Neobjevený labubák`
+  (`COLLECTIONS[…].unknown`).
 - **Návod v popupu se generuje z `REWARD_RULES`** (`howToGet()`), nikdy se nepíše ručně.
   Jinak by text po změně hranice tiše lhal proti skutečnému chování.
 
@@ -890,8 +893,40 @@ přesně barvu podkladu a volnější mez je „prožrala". Mají 286–594 px (
 takže méně detailu než první várka s 640 px). Víc takových listů = stejný postup, skript se dá
 napsat znovu podle téhle poznámky.
 
-Další sbírka (např. auta) by dostala vlastní složku vedle `dumplings/`; `COLLECTION`
-v `rewards-data.js` je na to připravené, výběr sbírky v UI zatím není.
+### Víc sbírek: dumplingy a labubáci (19. 10. 2026)
+
+Dítě si nahoře na stránce sbírky vybere **„Co sbírám?"** — Dumplingy, Labubáky, nebo obojí
+(`rewardData.collections`, výchozí `['dumplings']`, aspoň jedna musí zůstat). Pod tím jsou
+záložky, kterou sbírku si prohlíží; ukazují se i sbírky, které už nesbírá, ale něco z nich má.
+
+- **Pravidla vzácnosti jsou pro všechny sbírky společná** a `REWARD_RULES` o sbírkách nic neví.
+  Legendární za pravidelnost je jeden společný postup (uživatel to tak zvolil).
+- **Při obou sbírkách si dítě po kole vybere samo.** `applyRound()` pak nevybere postavičku,
+  ale uloží vzácnost do `pendingRewards` a vrátí `{ pending: true, category, choices }`;
+  závěrečné okno ukáže 🎁 a tlačítka „Dumpling / Labubák", klepnutí volá `claimPending()`.
+  Zavřené okno odměnu nezahodí — počká nahoře na stránce sbírky a svítí v čísle u tlačítka.
+  `pendingRewards` se **nepřenáší QR kódem** (slučování by nebylo idempotentní).
+- **ID labubáků mají předponu `lab_`** (`lab_basic_01`); ID jsou unikátní napříč sbírkami.
+  Na konci `TRANSFER_ORDER` je jich 121.
+- Labubáci vznikli rozřezáním `labubaci/Designer.png` (mimo git) — to PNG má **skutečnou
+  průhlednost**, takže stačilo rozdělit souvislé oblasti; dvě postavičky, které se dotýkaly,
+  se dělily v nejužším sloupci. Jsou malé (zhruba 160–230 px, zvětšené 2×).
+  **Skripty jsou v `tools/odmeny/`** (Python + Pillow, mimo `public/`, nenasazují se):
+  `cut.py` rozřeže list, `contact.py` udělá náhled k pojmenování, `towebp.py` podle
+  mapování (`labubu.json`) uloží `.webp` a vypíše řádky do `rewards-data.js`.
+- Rozdělení do kategorií odpovídá dumplingům (39 / 25 / 21 / 19 / 17): barvy, povolání
+  a sport základní, zvířátka a muzikanti neobvyklí, dobrodruzi a strašidla raritní,
+  kouzla a princezny epické, hrdinové, draci a králové legendární.
+- **Nadpisy kategorií jsou obecné a sdílené** (`headerSrc()` míří do `dumplings/_category_titles`).
+- Texty pro dítě berou tvary jména ze `COLLECTIONS[…].words` (dumplinga / labubáka). Obě jména
+  jsou mužská životná, takže „Epický", „nový" sedí. **Sbírka s jiným rodem** (např. „auta")
+  bude potřebovat upravit i texty v `howToGet()` a na stránce sbírky.
+
+**Nová sbírka** (autíčka, motorky, rakety): řádek v `COLLECTIONS` s vlastní předponou ID,
+klíč v `COLLECTION_ORDER`, složka `public/img/odmeny/<sbírka>/<kategorie>/`, ID na konec
+`TRANSFER_ORDER`, předpona do `ID_PREFIX` v `tests/images.test.mjs` a barva zapnutého chipu
+(`.chips-collect .chip.is-on[data-value="…"]`). S víc než dvěma sbírkami se volba po kole
+nabídne ze všech zapnutých.
 
 ## Nastavení, export a přenos na druhé zařízení
 

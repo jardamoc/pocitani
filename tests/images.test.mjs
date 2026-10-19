@@ -47,11 +47,15 @@ test('kazda kategorie ma nadpis .webp', () => {
   }
 });
 
-test('ID ve tvaru <kategorie>_NN, unikatni, soubory se neopakuji', () => {
+/* Predpona ID podle sbirky - dumplingy ji nemaji (byly prvni). */
+const ID_PREFIX = { dumplings: '', labubu: 'lab_' };
+
+test('ID ve tvaru <predpona><kategorie>_NN, unikatni, soubory se neopakuji', () => {
   const ids = new Set();
   const srcs = new Set();
   for (const item of data.ALL_ITEMS) {
-    assert.match(item.id, new RegExp(`^${item.category}_\\d{2}$`));
+    assert.ok(item.collection in ID_PREFIX, `${item.id}: sbirka bez predpony v testu`);
+    assert.match(item.id, new RegExp(`^${ID_PREFIX[item.collection]}${item.category}_\\d{2}$`));
     assert.match(item.file, /^[a-z0-9_]+$/, `${item.id}: nazev souboru jen bez diakritiky`);
     assert.ok(!ids.has(item.id), `duplicitni ID ${item.id}`);
     assert.ok(!srcs.has(item.src), `duplicitni obrazek ${item.src}`);
@@ -63,11 +67,14 @@ test('ID ve tvaru <kategorie>_NN, unikatni, soubory se neopakuji', () => {
 test('ve slozkach neni obrazek, ktery by nikdo nepouzival', () => {
   // pripomenuti, ze novy obrazek potrebuje i radek v rewards-data.js
   const pouzite = new Set(data.ALL_ITEMS.map((i) => i.src));
-  for (const cat of data.CATEGORY_ORDER) {
-    const dir = pub(`${data.COLLECTION.dir}/${cat}`);
-    for (const f of readdirSync(dir).filter((n) => n.endsWith('.webp'))) {
-      const src = `${data.COLLECTION.dir}/${cat}/${f}`;
-      assert.ok(pouzite.has(src), `${src} neni zapsany v rewards-data.js`);
+  for (const key of data.COLLECTION_ORDER) {
+    const base = data.COLLECTIONS[key].dir;
+    for (const cat of data.CATEGORY_ORDER) {
+      const dir = pub(`${base}/${cat}`);
+      for (const f of readdirSync(dir).filter((n) => n.endsWith('.webp'))) {
+        const src = `${base}/${cat}/${f}`;
+        assert.ok(pouzite.has(src), `${src} neni zapsany v rewards-data.js`);
+      }
     }
   }
 });

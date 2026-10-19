@@ -18,7 +18,7 @@ import { BIGMUL_LEVELS, BIGMUL_LEVEL_KEYS, bigmulMax, bigmulRangeNote } from './
 import * as store from './stats.js';
 import * as rewards from './rewards.js';
 import * as storage from './storage.js';
-import { bindCollectionTaps, dismissGranted, dismissPopup, renderCollection, showGranted, updateBadge } from './rewards-ui.js';
+import { bindCollectionTaps, dismissGranted, dismissPopup, renderCollection, setCollectionView, showGranted, updateBadge } from './rewards-ui.js';
 import { dismissExport, openExport } from './export-ui.js';
 import { mergePayload, readIncoming } from './transfer.js';
 
@@ -897,9 +897,49 @@ el('rewardsBackBtn').addEventListener('click', () => {
   renderConfigScreen();
 });
 
+/* Dite si u cekajici odmeny vybralo sbirku - zapis hned, okno je pak jen
+   oslava jako u kazde jine odmeny. */
+function claimReward(collection) {
+  const got = rewards.claimPending(rewardData, collection);
+  if (!got) return null;
+  storage.saveRewards(rewardData);
+  updateBadge(rewardData);
+  return got;
+}
+
+const afterRewardDialog = () => {
+  updateBadge(rewardData);
+  if (screens.rewards.classList.contains('is-active')) renderCollection(rewardData);
+};
+
 /* Tlacitko "Pokracovat" obsluhuje primo vrstva s odmenami (rewards-ui.js),
-   tady se uz nic vazat nemusi. */
-bindCollectionTaps();
+   tady se vazou jen volby sbirek nahore na strance. */
+bindCollectionTaps({
+  onToggle(key) {
+    const list = rewardData.collections.includes(key)
+      ? rewardData.collections.filter((k) => k !== key)
+      : [...rewardData.collections, key];
+    if (!rewards.setCollections(rewardData, list)) {
+      renderCollection(rewardData, 'Aspoň jedna sbírka musí zůstat zapnutá.');
+      return;
+    }
+    if (list.includes(key)) setCollectionView(key);
+    storage.saveRewards(rewardData);
+    updateBadge(rewardData);
+    renderCollection(rewardData);
+  },
+  onView(key) {
+    setCollectionView(key);
+    renderCollection(rewardData);
+  },
+  onClaim(key) {
+    const got = claimReward(key);
+    if (!got) return;
+    setCollectionView(key);
+    renderCollection(rewardData);
+    showGranted([got], afterRewardDialog);
+  },
+});
 
 /* ---------------- export a prenos ---------------- */
 
@@ -954,8 +994,8 @@ async function acceptIncoming() {
 
   const casti = [];
   if (zmeny.dumplingu) {
-    casti.push(`${zmeny.dumplingu} ${rewards.plural(zmeny.dumplingu, 'dumpling', 'dumplingy', 'dumplingů')}`
-      + (zmeny.novych ? ` (z toho ${zmeny.novych} ${rewards.plural(zmeny.novych, 'nový', 'nové', 'nových')})` : ''));
+    casti.push(`${zmeny.dumplingu} ${rewards.plural(zmeny.dumplingu, 'postavička', 'postavičky', 'postaviček')}`
+      + (zmeny.novych ? ` (z toho ${zmeny.novych} ${rewards.plural(zmeny.novych, 'nová', 'nové', 'nových')})` : ''));
   }
   if (zmeny.chyb) casti.push(`${zmeny.chyb} ${rewards.plural(zmeny.chyb, 'příklad', 'příklady', 'příkladů')} k procvičení`);
   if (zmeny.kol) casti.push(`${zmeny.kol} ${rewards.plural(zmeny.kol, 'výsledek', 'výsledky', 'výsledků')}`);
@@ -2960,10 +3000,7 @@ function grantRewards(report) {
   storage.saveRewards(rewardData);
   updateBadge(rewardData);
   if (!granted?.length) return;
-  showGranted(granted, () => {
-    updateBadge(rewardData);
-    if (screens.rewards.classList.contains('is-active')) renderCollection(rewardData);
-  });
+  showGranted(granted, afterRewardDialog, claimReward);
 }
 
 function verdictFor(pct) {

@@ -1,4 +1,4 @@
-import { ALL_IDS, TRANSFER_ORDER } from './rewards-data.js';
+import { ALL_IDS, COLLECTION_ORDER, TRANSFER_ORDER } from './rewards-data.js';
 
 /* Prenos progresu mezi zarizenimi.
  *
@@ -120,6 +120,7 @@ export function buildPayload(state, rewardData, nowMs = Date.now()) {
     ld: rewardData.legendaryDaysUsed,
     cm: rewardData.completedMilestones,
     ur: rewardData.ultimateRuns,
+    sb: rewardData.collections,
     // uspesnost podle dovednosti a seznam chyb k procvicovani
     sk: state.skills,
     ms: state.missed,
@@ -227,7 +228,14 @@ export function mergePayload(state, rewardData, payload) {
     if (typeof payload.th === 'string') state.theme = payload.th;
     if (typeof payload.dk === 'boolean') state.dark = payload.dk;
     if (typeof payload.sn === 'boolean') state.sound = payload.sn;
+    // vyber sbirek je taky nastaveni; nezname klice se zahodi, prazdny vyber nic nezmeni
+    if (Array.isArray(payload.sb)) {
+      const sb = COLLECTION_ORDER.filter((k) => payload.sb.includes(k));
+      if (sb.length) rewardData.collections = sb;
+    }
   }
+  /* Odmeny cekajici na vyber sbirky (`pendingRewards`) se neprenaseji -
+     slouceni by nebylo idempotentni a druhe naskenovani by je zdvojilo. */
 
   /* Ulozeni tady neni schvalne - funkce jen slouci data v pameti a vrati
      souhrn. Zapis obstara volajici (acceptIncoming v app.js) pres

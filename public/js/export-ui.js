@@ -19,12 +19,12 @@ const MAZANI = [
   {
     id: 'wipeRewardsBtn',
     scope: 'rewards',
-    otazka: 'Opravdu smazat celou sbírku dumplingů? Historie počítání a nastavení zůstanou.',
+    otazka: 'Opravdu smazat celou sbírku odměn (dumplingy i labubáky)? Historie počítání a nastavení zůstanou.',
   },
   {
     id: 'wipeProgressBtn',
     scope: 'progress',
-    otazka: 'Opravdu smazat sbírku dumplingů i historii počítání? Téma, zvuk a nastavení hry zůstanou.',
+    otazka: 'Opravdu smazat sbírku odměn i historii počítání? Téma, zvuk a nastavení hry zůstanou.',
   },
   {
     id: 'wipeAllBtn',

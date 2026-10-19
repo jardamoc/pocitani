@@ -298,7 +298,7 @@ test('nejdriv se vybiraji dosud neobjevene postavicky', () => {
 
   // pri libovolnem losu nesmi padnout uz vlastnena postavicka
   for (let roll = 0; roll < 1; roll += 0.01) {
-    const id = rewards.pickDumpling('basic', inventory, () => roll);
+    const id = rewards.pickItem('dumplings', 'basic', inventory, () => roll);
     assert.equal(inventory[id], 0, `los ${roll.toFixed(2)} vratil uz vlastneneho ${id}`);
   }
 });
@@ -306,21 +306,21 @@ test('nejdriv se vybiraji dosud neobjevene postavicky', () => {
 test('po ziskani vsech postavicek kategorie lze ziskavat duplikaty', () => {
   const inventory = {};
   for (const id of data.ALL_IDS) inventory[id] = 0;
-  for (const item of data.CATEGORIES.basic.items) inventory[item.id] = 1;
+  for (const item of data.itemsOf('dumplings', 'basic')) inventory[item.id] = 1;
 
   const ids = new Set();
-  for (let roll = 0; roll < 1; roll += 0.01) ids.add(rewards.pickDumpling('basic', inventory, () => roll));
-  assert.equal(ids.size, data.CATEGORIES.basic.items.length);
+  for (let roll = 0; roll < 1; roll += 0.01) ids.add(rewards.pickItem('dumplings', 'basic', inventory, () => roll));
+  assert.equal(ids.size, data.itemsOf('dumplings', 'basic').length);
   for (const id of ids) assert.equal(inventory[id], 1);
 });
 
 test('vyber se drzi uvnitr sve kategorie i pri neplatnem losu', () => {
   const inventory = {};
   for (const id of data.ALL_IDS) inventory[id] = 0;
-  const ids = data.CATEGORIES.rare.items.map((i) => i.id);
-  assert.equal(ids.includes(rewards.pickDumpling('rare', inventory, () => 0)), true);
-  assert.equal(ids.includes(rewards.pickDumpling('rare', inventory, () => 0.999999)), true);
-  assert.equal(ids.includes(rewards.pickDumpling('rare', inventory, () => NaN)), true);
+  const ids = data.itemsOf('dumplings', 'rare').map((i) => i.id);
+  assert.equal(ids.includes(rewards.pickItem('dumplings', 'rare', inventory, () => 0)), true);
+  assert.equal(ids.includes(rewards.pickItem('dumplings', 'rare', inventory, () => 0.999999)), true);
+  assert.equal(ids.includes(rewards.pickItem('dumplings', 'rare', inventory, () => NaN)), true);
 });
 
 /* ---------------- 14-15. legendarni milniky ---------------- */
@@ -384,7 +384,7 @@ test('kazdy dumpling ma neprazdne ceske jmeno', () => {
 });
 
 test('neobjeveny dumpling nezobrazi sve skutecne jmeno', () => {
-  assert.equal(rewards.displayName('legendary_01', 0), data.UNKNOWN_NAME);
+  assert.equal(rewards.displayName('legendary_01', 0), 'Neobjevený dumpling');
   assert.equal(rewards.displayName('legendary_01', 1), 'Zlatý král');
   assert.equal(rewards.displayName('legendary_01', 0).includes('Zlatý'), false);
 });
@@ -479,7 +479,125 @@ test('souhrn sbirky sedi s inventarem', () => {
   const s = rewards.collectionSummary(d, '2026-09-13');
   assert.equal(s.totalOwned, 6);
   assert.equal(s.uniqueOwned, 3);
-  assert.equal(s.uniqueTotal, data.ALL_IDS.length);
+  // souhrn je za jednu sbirku - vychozi dumplingy
+  assert.equal(s.uniqueTotal, data.ALL_ITEMS.filter((i) => i.collection === 'dumplings').length);
   assert.equal(s.perCategory.basic.owned, 2);
   assert.equal(s.legendaryOwned, 2);
+});
+
+/* ---------------- vic sbirek: dumplingy a labubaci ---------------- */
+
+test('vychozi sbirka jsou dumplingy a odmena padne rovnou z ni', () => {
+  const d = rewards.emptyData();
+  assert.deepEqual(d.collections, ['dumplings']);
+  const granted = rewards.applyRound(d, round(), firstPick);
+  assert.equal(granted[0].collection, 'dumplings');
+  assert.equal(data.ITEM_BY_ID.get(granted[0].id).collection, 'dumplings');
+});
+
+test('jen labubaci: odmena padne z labubaku', () => {
+  const d = rewards.emptyData();
+  assert.equal(rewards.setCollections(d, ['labubu']), true);
+  const granted = rewards.applyRound(d, round(), firstPick);
+  assert.equal(granted[0].collection, 'labubu');
+  assert.match(granted[0].id, /^lab_basic_/);
+});
+
+test('obe sbirky: odmena ceka na vyber, pak padne z vybrane', () => {
+  const d = rewards.emptyData();
+  rewards.setCollections(d, ['labubu', 'dumplings']);
+  assert.deepEqual(d.collections, ['dumplings', 'labubu'], 'poradi je pevne');
+  const granted = rewards.applyRound(d, secondsPerExercise(14), firstPick);
+  assert.equal(granted.length, 1);
+  assert.equal(granted[0].pending, true);
+  assert.equal(granted[0].category, 'uncommon');
+  assert.equal(d.pendingRewards.length, 1);
+  assert.equal(rewards.newCount(d), 1, 'cekajici odmena sviti u tlacitka');
+  // do vyberu se do sbirky nic nepripsalo
+  assert.equal(Object.values(d.rewardInventory).reduce((a, b) => a + b, 0), 0);
+
+  const got = rewards.claimPending(d, 'labubu', firstPick);
+  assert.equal(got.collection, 'labubu');
+  assert.equal(got.category, 'uncommon');
+  assert.equal(d.rewardInventory[got.id], 1);
+  assert.equal(d.pendingRewards.length, 0);
+  assert.equal(rewards.claimPending(d, 'dumplings', firstPick), null, 'podruhe uz nic neceka');
+});
+
+test('posledni sbirku vypnout nejde', () => {
+  const d = rewards.emptyData();
+  assert.equal(rewards.setCollections(d, []), false);
+  assert.equal(rewards.setCollections(d, ['neznama']), false);
+  assert.deepEqual(d.collections, ['dumplings']);
+});
+
+test('sanitize: vyber sbirek a cekajici odmeny', () => {
+  const d = rewards.sanitize({
+    collections: ['labubu', 'auta', 'labubu'],
+    pendingRewards: [{ category: 'epic', reason: 'Za sadu' }, { category: 'mega', reason: 'x' }, null],
+  });
+  assert.deepEqual(d.collections, ['labubu']);
+  assert.deepEqual(d.pendingRewards, [{ category: 'epic', reason: 'Za sadu' }]);
+  assert.deepEqual(rewards.sanitize({ collections: [] }).collections, ['dumplings']);
+  assert.deepEqual(rewards.sanitize({}).pendingRewards, []);
+});
+
+test('navod mluvi o sbirce, ze ktere postavicka je', () => {
+  const n = rewards.howToGet('legendary', 'labubu');
+  assert.equal(n.lead.includes('labubáka'), true);
+  assert.equal(n.tail.includes('labubák'), true);
+  assert.equal(JSON.stringify(n).includes('dumpling'), false);
+});
+
+test('souhrn sbirky pocita jen prohlizenou sbirku', () => {
+  const d = rewards.emptyData();
+  d.rewardInventory.basic_01 = 2;
+  d.rewardInventory.lab_basic_01 = 1;
+  const lab = rewards.collectionSummary(d, '2026-09-13', 'labubu');
+  assert.equal(lab.totalOwned, 1);
+  assert.equal(lab.uniqueTotal, data.ALL_ITEMS.filter((i) => i.collection === 'labubu').length);
+  assert.equal(rewards.collectionSummary(d, '2026-09-13').totalOwned, 2);
+});
+/* ---------------- drive ziskane dumplingy se nesmi ztratit ---------------- */
+
+/* Data ulozena verzi pred labubaky: zadne `collections` ani `pendingRewards`,
+   inventar jen s ID dumplingu. Po nacteni musi kazdy dumpling mit presne
+   tolik kusu jako predtim a dite dal sbirat dumplingy. */
+test('stara ulozena sbirka dumplingu se nacte beze ztraty', () => {
+  const dumplingIds = data.ALL_ITEMS.filter((i) => i.collection === 'dumplings').map((i) => i.id);
+  assert.equal(dumplingIds.length, 78);
+  const rewardInventory = {};
+  dumplingIds.forEach((id, i) => { rewardInventory[id] = i % 4; }); // 0 az 3 kusy
+  const stara = {
+    version: 1,
+    rewardInventory,
+    totalCorrectAnswers: 512,
+    completedSets: 40,
+    perfectSets: 31,
+    activePracticeDates: ['2026-10-10', '2026-10-12'],
+    legendaryDaysUsed: ['2026-10-01'],
+    completedMilestones: ['days:1'],
+    newRewardIds: ['basic_03', 'legendary_09'],
+  };
+  const d = rewards.sanitize(JSON.parse(JSON.stringify(stara)));
+  for (const id of dumplingIds) assert.equal(d.rewardInventory[id], rewardInventory[id], `${id} zmenil pocet`);
+  assert.deepEqual(d.collections, ['dumplings']);
+  assert.deepEqual(d.pendingRewards, []);
+  assert.deepEqual(d.newRewardIds, ['basic_03', 'legendary_09']);
+  assert.equal(d.perfectSets, 31);
+  assert.deepEqual(d.completedMilestones, ['days:1']);
+  // labubaci zacinaji od nuly
+  assert.equal(data.ALL_IDS.filter((id) => id.startsWith('lab_')).every((id) => d.rewardInventory[id] === 0), true);
+});
+
+test('stary QR kod (jen 78 dumplingu) se slouci na spravne postavicky', async () => {
+  const transfer = await load('transfer.js');
+  const stareId = data.TRANSFER_ORDER.slice(0, 78);
+  assert.equal(stareId.every((id) => !id.startsWith('lab_')), true, 'prvnich 78 jsou dumplingy');
+  const payload = { v: transfer.FORMAT, i: stareId.map((_, i) => (i % 3) + 1) };
+  const state = { config: null, rounds: [], skills: {}, missed: [] };
+  const d = rewards.emptyData();
+  transfer.mergePayload(state, d, payload);
+  stareId.forEach((id, i) => assert.equal(d.rewardInventory[id], (i % 3) + 1, id));
+  assert.equal(data.ALL_IDS.filter((id) => id.startsWith('lab_')).every((id) => d.rewardInventory[id] === 0), true);
 });

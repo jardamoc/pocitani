@@ -1,4 +1,6 @@
-import { ALL_IDS, CATEGORIES, CATEGORY_ORDER, ITEM_BY_ID, UNKNOWN_NAME } from './rewards-data.js';
+import {
+  ALL_IDS, CATEGORY_ORDER, COLLECTIONS, COLLECTION_ORDER, DEFAULT_COLLECTIONS, ITEM_BY_ID, collectionOf, itemsOf, unknownName,
+} from './rewards-data.js';
 import { wholeNumber, textList } from './validate.js';
 
 /* Logika odmen. Cisty modul bez DOM - vsechno se da spustit i v Node, takze
@@ -120,6 +122,11 @@ export function emptyData() {
     processedGameIds: [],
     completedMilestones: [],
     newRewardIds: [],
+    /* Ktere sbirky dite sbira (vybira si samo na strance sbirky). */
+    collections: [...DEFAULT_COLLECTIONS],
+    /* Odmeny, u kterych si dite jeste nevybralo sbirku - vznikaji, kdyz sbira
+       vic sbirek naraz. Vzacnost je uz dana, chybi jen, ze ktere sbirky. */
+    pendingRewards: [],
     ultimateRuns: 0,
     lastUpdated: null,
     lastUpdatedMs: 0,
@@ -155,10 +162,32 @@ export function sanitize(raw) {
   data.processedGameIds = textList(raw.processedGameIds, (x) => x.length > 0 && x.length <= 64, 50);
   data.completedMilestones = textList(raw.completedMilestones, (x) => x.length > 0 && x.length <= 64, 400);
   data.newRewardIds = textList(raw.newRewardIds, (x) => ITEM_BY_ID.has(x), ALL_IDS.length);
+  data.collections = cleanCollections(raw.collections);
+  if (Array.isArray(raw.pendingRewards)) {
+    data.pendingRewards = raw.pendingRewards
+      .filter((p) => p && TIERS.includes(p.category) && typeof p.reason === 'string' && p.reason.length <= 200)
+      .map((p) => ({ category: p.category, reason: p.reason }))
+      .slice(0, 20);
+  }
 
   data.lastUpdated = typeof raw.lastUpdated === 'string' ? raw.lastUpdated : null;
   data.lastUpdatedMs = wholeNumber(raw.lastUpdatedMs);
   return data;
+}
+
+/* Zname sbirky v pevnem poradi, bez opakovani. Prazdny vyber neni dovoleny -
+   spadne na vychozi, aby kolo vzdycky melo z ceho odmenu vzit. */
+function cleanCollections(list) {
+  const chosen = Array.isArray(list) ? COLLECTION_ORDER.filter((key) => list.includes(key)) : [];
+  return chosen.length ? chosen : [...DEFAULT_COLLECTIONS];
+}
+
+/* Zmena vyberu sbirek. Vraci false, kdyz by nezbyla zadna. */
+export function setCollections(data, list) {
+  const chosen = Array.isArray(list) ? COLLECTION_ORDER.filter((key) => list.includes(key)) : [];
+  if (!chosen.length) return false;
+  data.collections = chosen;
+  return true; // zapis obstara volajici pres storage.js
 }
 
 /* Cteni ani zapis tady uz nejsou - oboji obstarava storage.js, ktery si
@@ -290,8 +319,8 @@ function reasonFor(parts, summary, dailyCorrect) {
 
 /* Nejdriv se losuje ze seznamu dosud neziskanych postavicek dane kategorie.
    Teprve kdyz uz dite vlastni vsechny z kategorie, muze dostat duplikat. */
-export function pickDumpling(category, inventory, rng = Math.random) {
-  const ids = (CATEGORIES[category]?.items ?? []).map((item) => item.id);
+export function pickItem(collection, category, inventory, rng = Math.random) {
+  const ids = itemsOf(collection, category).map((item) => item.id);
   if (!ids.length) return null;
   const fresh = ids.filter((id) => !(inventory?.[id] > 0));
   const pool = fresh.length ? fresh : ids;
@@ -427,25 +456,49 @@ export function applyRound(data, summary, rng = Math.random) {
   }
 
   const category = TIERS[tier];
-  const id = pickDumpling(category, data.rewardInventory, rng);
-  if (!id) {
+
+  /* Kdo sbira vic sbirek, vybira si sam, odkud postavicka bude. Vzacnost
+     je dana uz ted; do vyberu se odmena drzi v `pendingRewards`, takze ji
+     nevezme ani zavreni okna, ani obnoveni stranky. */
+  if (data.collections.length > 1) {
+    data.pendingRewards = [...data.pendingRewards, { category, reason: why }].slice(-20);
     zaver();
-    return [];
+    return [{ pending: true, category, reason: why, choices: [...data.collections] }];
   }
+
+  const granted = grantItem(data, data.collections[0], category, why, rng);
+  zaver();
+  return granted ? [granted] : [];
+}
+
+/* Prida jednu postavicku dane sbirky a kategorie do sbirky ditete. */
+function grantItem(data, collection, category, reason, rng) {
+  const id = pickItem(collection, category, data.rewardInventory, rng);
+  if (!id) return null;
 
   const isNew = !(data.rewardInventory[id] > 0);
   data.rewardInventory[id] += 1;
   if (!data.newRewardIds.includes(id)) data.newRewardIds.push(id);
-  zaver();
 
-  return [{
+  return {
     id,
+    collection,
     category,
     name: ITEM_BY_ID.get(id).name,
-    reason: why,
+    reason,
     isNew,
     owned: data.rewardInventory[id],
-  }];
+  };
+}
+
+/* Dite si u cekajici odmeny vybralo sbirku. Bere se nejstarsi cekajici.
+   Vraci ziskanou postavicku, nebo null (nic neceka, neznama sbirka). */
+export function claimPending(data, collection, rng = Math.random) {
+  if (!data.pendingRewards.length || !COLLECTIONS[collection]) return null;
+  const [first, ...rest] = data.pendingRewards;
+  const granted = grantItem(data, collection, first.category, first.reason, rng);
+  if (granted) data.pendingRewards = rest;
+  return granted; // zapis obstara volajici pres storage.js
 }
 
 /* ---------------- podklady pro rozhrani ---------------- */
@@ -457,7 +510,8 @@ export const plural = (n, one, few, many) => (n === 1 ? one : n >= 2 && n <= 4 ?
 /* Popis, jak se dumpling dane kategorie ziskava. Vsechna cisla se berou
    z REWARD_RULES, aby text nikdy nelhal proti skutecnym pravidlum. Zadne
    scitani bodu - rekne se rovnou podminka, ktera pro tu kategorii plati. */
-export function howToGet(category) {
+export function howToGet(category, collection = COLLECTION_ORDER[0]) {
+  const w = collectionOf(collection).words;
   const s = REWARD_RULES.fastSeconds;
   const casovy = `v průměru do ${s} s na jeden běžný příklad`;
   /* Delsi ulohy maji vlastni pridel casu. Nasobky se berou z REWARD_RULES,
@@ -488,16 +542,16 @@ export function howToGet(category) {
   const p = REWARD_RULES.pexesoMismatchAllowance;
   const pexesoNote = `U „Najdi dvojice“ a „Spoj souřadná“ je chybou spojení dvou kartiček, které k sobě nepatří – `
     + `splést se smíš ${p.easy}krát na lehké ploše, ${p.medium}krát na střední a ${p.hard}krát na těžké.`;
-  const tail = `Za jedno kolo přijde nejvýš jeden dumpling. Sada s chybou nepřinese žádný. ${pexesoNote}`;
+  const tail = `Za jedno kolo přijde nejvýš jeden ${w.one}. Sada s chybou nepřinese žádný. ${pexesoNote}`;
 
   if (category === 'legendary') {
     return {
-      lead: 'Legendárního si nevypočítáš. Přijde za pravidelnost a povýší dumplinga, kterého sis v tom kole zasloužila:',
+      lead: `Legendárního si nevypočítáš. Přijde za pravidelnost a povýší ${w.acc}, kterého sis v tom kole zasloužila:`,
       bullets: [
         `spočítej sadu bez jediné chyby aspoň v ${REWARD_RULES.legendaryActiveDaysRequired} z posledních ${REWARD_RULES.legendaryWindowDays} dnů`,
         'dny nemusí jít po sobě – jeden vynechaný ti postup nezruší',
       ],
-      tail: 'Je to jediná cesta k legendárnímu. Za jedno kolo přijde nejvýš jeden dumpling.',
+      tail: `Je to jediná cesta k legendárnímu. Za jedno kolo přijde nejvýš jeden ${w.one}.`,
     };
   }
 
@@ -553,31 +607,41 @@ export const makeGameId = () => {
 
 /* U neobjevene postavicky se skutecne jmeno nevraci nikde - ani do popisku,
    ani do title nebo aria-label. */
-export const displayName = (id, owned) => (owned > 0 ? ITEM_BY_ID.get(id)?.name ?? UNKNOWN_NAME : UNKNOWN_NAME);
+export const displayName = (id, owned) => (owned > 0 ? ITEM_BY_ID.get(id)?.name ?? unknownName(id) : unknownName(id));
 
-export const newCount = (data) => data.newRewardIds.length;
+/* Cislo u tlacitka Odmeny - nove postavicky a k tomu odmeny, ktere cekaji
+   na vyber sbirky. */
+export const newCount = (data) => data.newRewardIds.length + data.pendingRewards.length;
 
+/* Cekajici odmeny se otevrenim sbirky neztrati - zmizi az po vyberu. */
 export function markCollectionSeen(data) {
   data.newRewardIds = [];
   return data; // zapis obstara volajici pres storage.js
 }
 
-export function collectionSummary(data, todayKey = localDateKey()) {
+/* Ma dite z dane sbirky aspon jednu postavicku? */
+export const ownsAny = (data, collection) =>
+  ALL_IDS.some((id) => ITEM_BY_ID.get(id).collection === collection && data.rewardInventory[id] > 0);
+
+export function collectionSummary(data, todayKey = localDateKey(), collection = data.collections[0]) {
   const perCategory = {};
   let totalOwned = 0;
   let uniqueOwned = 0;
+  let uniqueTotal = 0;
 
   for (const key of CATEGORY_ORDER) {
     let owned = 0;
     let pieces = 0;
-    for (const item of CATEGORIES[key].items) {
+    const items = itemsOf(collection, key);
+    for (const item of items) {
       const n = data.rewardInventory[item.id] || 0;
       if (n > 0) owned += 1;
       pieces += n;
     }
-    perCategory[key] = { owned, pieces, total: CATEGORIES[key].items.length };
+    perCategory[key] = { owned, pieces, total: items.length };
     totalOwned += pieces;
     uniqueOwned += owned;
+    uniqueTotal += items.length;
   }
 
   const activeDays = readyPracticeDays(data, todayKey).length;
@@ -586,7 +650,7 @@ export function collectionSummary(data, todayKey = localDateKey()) {
   return {
     totalOwned,
     uniqueOwned,
-    uniqueTotal: ALL_IDS.length,
+    uniqueTotal,
     perCategory,
     activeDays: Math.min(activeDays, needed),
     activeDaysNeeded: needed,

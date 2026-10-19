@@ -13,6 +13,7 @@ node_modules/
 # zdrojove podklady odmen (originaly, zip) - aplikace bere kopie z public/
 /Odmeny/
 /dumplings/
+/labubaci/
 
 # dovednosti nainstalovane pres `npx skills add` - cizi kod, patri jen
 # na tenhle stroj, ne do repozitare s aplikaci
