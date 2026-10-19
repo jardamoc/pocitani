@@ -28,6 +28,7 @@ function fakeStorage(initial = {}) {
 globalThis.localStorage = fakeStorage();
 
 const storage = await nacti('storage.js');
+const { ALL_IDS } = await nacti('rewards-data.js');
 const store = await nacti('stats.js');
 const rewards = await nacti('rewards.js');
 
@@ -107,7 +108,7 @@ test('pri poskozenem ulozisti se aplikace spusti bez padu', async () => {
     globalThis.localStorage = fakeStorage({ [store.KEY]: rozbite, [rewards.STORAGE_KEY]: rozbite });
     const { state, rewards: odmeny } = await storage.load();
     assert.equal(state.theme, 'panda');
-    assert.equal(Object.keys(odmeny.rewardInventory).length, 40);
+    assert.equal(Object.keys(odmeny.rewardInventory).length, ALL_IDS.length);
     assert.equal(odmeny.totalCorrectAnswers, 0);
   }
 });

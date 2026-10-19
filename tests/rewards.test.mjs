@@ -303,14 +303,14 @@ test('nejdriv se vybiraji dosud neobjevene postavicky', () => {
   }
 });
 
-test('po ziskani vsech osmi postavicek kategorie lze ziskavat duplikaty', () => {
+test('po ziskani vsech postavicek kategorie lze ziskavat duplikaty', () => {
   const inventory = {};
   for (const id of data.ALL_IDS) inventory[id] = 0;
   for (const item of data.CATEGORIES.basic.items) inventory[item.id] = 1;
 
   const ids = new Set();
   for (let roll = 0; roll < 1; roll += 0.01) ids.add(rewards.pickDumpling('basic', inventory, () => roll));
-  assert.equal(ids.size, 8);
+  assert.equal(ids.size, data.CATEGORIES.basic.items.length);
   for (const id of ids) assert.equal(inventory[id], 1);
 });
 
@@ -371,8 +371,8 @@ test('spotrebovane dny se do dalsiho postupu uz nepocitaji', () => {
 
 /* ---------------- 18-19. jmena postavicek ---------------- */
 
-test('kazdy ze 40 dumplingu ma neprazdne ceske jmeno', () => {
-  assert.equal(data.ALL_ITEMS.length, 40);
+test('kazdy dumpling ma neprazdne ceske jmeno', () => {
+  assert.ok(data.ALL_ITEMS.length >= 40, 'puvodnich 40 nesmi ubyt');
   const names = new Set();
   for (const item of data.ALL_ITEMS) {
     assert.equal(typeof item.name, 'string');
@@ -380,7 +380,7 @@ test('kazdy ze 40 dumplingu ma neprazdne ceske jmeno', () => {
     assert.equal(/undefined|NaN|�/.test(item.name), false, `${item.id} ma poskozene jmeno`);
     names.add(item.name);
   }
-  assert.equal(names.size, 40, 'jmena se nesmi opakovat');
+  assert.equal(names.size, data.ALL_ITEMS.length, 'jmena se nesmi opakovat');
 });
 
 test('neobjeveny dumpling nezobrazi sve skutecne jmeno', () => {
@@ -397,7 +397,7 @@ test('z nesmyslneho vstupu vznikne platny vychozi stav', () => {
   for (const broken of [null, undefined, 42, 'text', [], { rewardInventory: 42 }]) {
     const d = rewards.sanitize(broken);
     assert.equal(d.version, rewards.DATA_VERSION);
-    assert.equal(Object.keys(d.rewardInventory).length, 40);
+    assert.equal(Object.keys(d.rewardInventory).length, data.ALL_IDS.length);
     assert.equal(d.totalCorrectAnswers, 0);
   }
 });
@@ -479,7 +479,7 @@ test('souhrn sbirky sedi s inventarem', () => {
   const s = rewards.collectionSummary(d, '2026-09-13');
   assert.equal(s.totalOwned, 6);
   assert.equal(s.uniqueOwned, 3);
-  assert.equal(s.uniqueTotal, 40);
+  assert.equal(s.uniqueTotal, data.ALL_IDS.length);
   assert.equal(s.perCategory.basic.owned, 2);
   assert.equal(s.legendaryOwned, 2);
 });

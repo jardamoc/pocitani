@@ -289,7 +289,7 @@ function reasonFor(parts, summary, dailyCorrect) {
 /* ---------------- ferovy vyber postavicky ---------------- */
 
 /* Nejdriv se losuje ze seznamu dosud neziskanych postavicek dane kategorie.
-   Teprve kdyz uz dite vlastni vsech osm, muze dostat duplikat. */
+   Teprve kdyz uz dite vlastni vsechny z kategorie, muze dostat duplikat. */
 export function pickDumpling(category, inventory, rng = Math.random) {
   const ids = (CATEGORIES[category]?.items ?? []).map((item) => item.id);
   if (!ids.length) return null;

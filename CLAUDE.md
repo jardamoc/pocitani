@@ -91,14 +91,14 @@ běžel. Vypadalo to jako chyba nasazení, a nebyla.
 | `public/js/storage.js` | **jediná vrstva nad úložištěm** — načtení, fronta zápisů, mazání, vyměnitelný backend |
 | `public/js/validate.js` | `wholeNumber` / `textList` — sdílené kousky validace, bez DOM |
 | `public/js/random.js` | `rnd` / `pick` / `chance` / `shuffle` / `range` |
-| `public/js/rewards-data.js` | soubory obrázků, česká jména a pevná ID 40 dumplingů, pořadí pro QR — čistá data |
+| `public/js/rewards-data.js` | soubory obrázků, česká jména a pevná ID 78 dumplingů, pořadí pro QR — čistá data |
 | `public/js/rewards.js` | pravidla odměn, vyhodnocení kola, výběr postavičky — **bez DOM a bez úložiště** |
 | `public/js/rewards-ui.js` | vykreslení odměn: obrázky, sbírka, závěrečné okno, animace |
 | `public/js/version.js` | razítko posledního nasazení (datum + pořadí v rámci dne) — **přepisuje ho `publish.mjs`**, ručně se needituje |
 | `public/js/qr.js` | generátor QR kódu podle normy — bez knihovny |
 | `public/js/transfer.js` | přenos postupu mezi zařízeními: zabalení, adresa, slučování |
 | `public/js/export-ui.js` | dialog „Export" — heslo, QR kód, tři mazací tlačítka |
-| `public/img/odmeny/dumplings/` | 40 postaviček (`.webp`, složka podle kategorie) a 5 nadpisů v `_category_titles/` |
+| `public/img/odmeny/dumplings/` | 78 postaviček (`.webp`, složka podle kategorie) a 5 nadpisů v `_category_titles/` |
 | `public/css/styles.css` | vše včetně devíti barevných témat, tmavého režimu a odměn |
 | `server.mjs` | vývojový server (`npm run dev`) — mimo `public/`, nenasazuje se |
 | `publish.mjs` | nasazení i s kontrolami a ověřením (`npm run publish`) |
@@ -769,8 +769,8 @@ zbytek dodají náhodné shody při malém rozsahu.
 
 ## Odměny — sbírka dumplingů
 
-Za dokončené kolo může Alžběta získat sběratelskou postavičku. Je jich 40 v pěti
-kategoriích (Základní / Neobvyklé / Raritní / Epické / Legendární), každá je samostatný
+Za dokončené kolo může Alžběta získat sběratelskou postavičku. Je jich 78 v pěti
+kategoriích (Základní 26 / Neobvyklé 16 / Raritní 13 / Epické 12 / Legendární 11), každá je samostatný
 obrázek `.webp` (viz *Obrázky odměn*).
 
 **Za jedno kolo padne nejvýš JEDEN dumpling.** Nerozhoduje se o počtu kusů, ale o tom,
@@ -849,7 +849,7 @@ Pár věcí, které se snadno rozbijí:
   zapíše až po dvou skutečných hodinách od poslední aktualizace a datum starší než poslední
   zapsané se ignoruje — přetočení systémových hodin tak neumí vyrobit pět dnů za minutu.
 - **Náhodný je jedině výběr konkrétní postavičky.** Nejdřív se losuje ze seznamu dosud
-  neobjevených v dané kategorii, teprve když má dítě všech osm, může padnout duplikát.
+  neobjevených v dané kategorii, teprve když má dítě všechny z kategorie, může padnout duplikát.
   Generátor náhody je parametr `applyRound(data, summary, rng)`, aby šly testy zopakovat.
 - **U neobjevené postavičky se skutečné jméno nesmí objevit nikde** — ani v popisku, ani
   v `title` nebo `aria-label`, ani v popupu. Je tam `Neobjevený dumpling`.
@@ -881,6 +881,14 @@ pole čísel v tomhle pořadí; vložení doprostřed by starším kódům při�
 postavičkám. `tests/images.test.mjs` hlídá existenci souborů, průhlednost (bez ní by
 neobjevená postavička byla černý čtverec místo siluety), původní pořadí 40 ID
 a i to, že ve složce neleží obrázek bez řádku v datech.
+
+**Druhá várka (19. 10. 2026, 38 postaviček podobných pohádkovým)** vznikla rozřezáním
+jednoho listu `dumplings/Designer.png` (vygenerovaný obrázek, dlaždice na krémovém
+podkladu). Krémový podklad se odstraňoval vyplněním od okraje dlaždice s **těsnou mezí
+barvy** a maskou předem zúženou o 2 px — sněhulák, králík a bílé čepice mají místy
+přesně barvu podkladu a volnější mez je „prožrala". Mají 286–594 px (zvětšené 2× z listu,
+takže méně detailu než první várka s 640 px). Víc takových listů = stejný postup, skript se dá
+napsat znovu podle téhle poznámky.
 
 Další sbírka (např. auta) by dostala vlastní složku vedle `dumplings/`; `COLLECTION`
 v `rewards-data.js` je na to připravené, výběr sbírky v UI zatím není.
