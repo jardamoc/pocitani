@@ -7,6 +7,7 @@ import { makeAbc, abcExplain, abcText } from './abc.js';
 import { makePosRound, posAnswer, posExplain, posText } from './pos.js';
 import { makeVetyRound, vetyExplain, vetyText } from './vety.js';
 import { makeVyznamRound, vyznamExplain, vyznamText } from './vyznam.js';
+import { makeUuRound, uuExplain, uuText } from './uu.js';
 import { makeBigmul, bigmulExplain, bigmulText } from './bigmul.js';
 
 export const OPS = {
@@ -141,8 +142,9 @@ export function signature(ex) {
   if (ex.kind === 'pexeso') return `pexeso|${ex.key}`;
   if (ex.kind === 'abc') return `abc|${ex.key}`;
   if (ex.kind === 'pos') return `pos|${ex.key}`;
-  if (ex.kind === 'vety') return `vety|${ex.key}`;
+  if (ex.kind === 'vety' || ex.kind === 'vetylist') return `vety|${ex.key}`;
   if (ex.kind === 'vyznam' || ex.kind === 'slova') return `vyznam|${ex.key}`;
+  if (ex.kind === 'uu') return `uu|${ex.key}`;
   // velké násobení je dané dvojicí činitelů, ne trojicí a, b, c
   if (ex.kind === 'bigmul') return `bigmul|${ex.key}`;
   return `${ex.op}|${ex.kind}|${ex.missing}|${ex.a}|${ex.b}`;
@@ -498,10 +500,12 @@ export function buildPosRound(config) {
    hodnota, `missing` nese úlohu (`type` / `ask`), aby statistika uměla
    říct „Nejvíc chyb máš u otázek“. Odpovídá se klepnutím na možnost,
    ovladač je v app.js. */
+/* List „Označ písmenem“ má vlastní druh `vetylist` - je to celá řada vět
+   s okénky a vlastním ovladačem, ne jedna věta s možnostmi. */
 export function buildVetyRound(config) {
   return makeVetyRound(config.level, config.vetyTasks, config.vetyCount).map((p) => ({
     op: 'add',
-    kind: 'vety',
+    kind: p.task === 'list' ? 'vetylist' : 'vety',
     missing: p.task,
     a: 0, b: 0, c: 0,
     cross: false,
@@ -523,6 +527,20 @@ export function buildVyznamRound(config) {
     a: 0, b: 0, c: 0,   // u „Doplň vztah“ je přepíše dvojice slov
     cross: false,
     skill: `vyznam:${p.task}`,
+    ...p,
+  }));
+}
+
+/* Doplň u, ú, ů - co věta, to úloha. Odpovědí jsou doplněná písmena
+   spojená ', ' v pořadí mezer, ovladač klepání je v app.js. */
+export function buildUuRound(config) {
+  return makeUuRound(config.level, config.uuCount).map((p) => ({
+    op: 'add',
+    kind: 'uu',
+    missing: 'gap',
+    a: 0, b: 0, c: 0,
+    cross: false,
+    skill: `uu:${p.level}`,
     ...p,
   }));
 }
@@ -577,8 +595,9 @@ export function exToText(ex, reveal = false) {
   if (ex.kind === 'pexeso') return pexesoText(ex, reveal);
   if (ex.kind === 'abc') return abcText(ex, reveal);
   if (ex.kind === 'pos') return posText(ex, reveal);
-  if (ex.kind === 'vety') return vetyText(ex, reveal);
+  if (ex.kind === 'vety' || ex.kind === 'vetylist') return vetyText(ex, reveal);
   if (ex.kind === 'vyznam' || ex.kind === 'slova') return vyznamText(ex, reveal);
+  if (ex.kind === 'uu') return uuText(ex, reveal);
   if (ex.kind === 'bigmul') return bigmulText(ex, reveal);
   if (ex.kind === 'riddle') return riddleText(ex, reveal);
   if (ex.kind === 'sign') {
@@ -638,8 +657,9 @@ export function explain(ex) {
   if (kind === 'pexeso') return pexesoExplain(ex);
   if (kind === 'abc') return abcExplain(ex);
   if (kind === 'pos') return posExplain(ex);
-  if (kind === 'vety') return vetyExplain(ex);
+  if (kind === 'vety' || kind === 'vetylist') return vetyExplain(ex);
   if (kind === 'vyznam' || kind === 'slova') return vyznamExplain(ex);
+  if (kind === 'uu') return uuExplain(ex);
   if (kind === 'bigmul') return bigmulExplain(ex);
   if (kind === 'riddle') return riddleExplain(ex);
 
@@ -780,6 +800,9 @@ export const TAGS = {
   vyznamSour: 'souřadné slovo místo nadřazeného',
   vyznamOther: 'jiný vztah',
   slovaMiss: 'moc chybných spojení',
+  uuStart: 'chyba na začátku slova',
+  uuMark: 'záměna ú a ů',
+  uuLength: 'záměna krátkého a dlouhého u',
   bigmulSplit: 'chyba v rozkladu',
   bigmulProduct: 'ztracená nula v součinu',
   bigmulSum: 'chyba v součtu',
@@ -813,7 +836,11 @@ export function diagnose(ex, given) {
 
   /* Druhy vět taky - odpovědí je klíč druhu nebo celá věta. Tag podle
      zvolené možnosti zapisuje ovladač v app.js, tohle je pojistka. */
-  if (kind === 'vety') return 'vetyType';
+  if (kind === 'vety' || kind === 'vetylist') return 'vetyType';
+
+  /* Doplň u, ú, ů taky - odpovědí jsou písmena. Přesný tag podle mezer
+     počítá ovladač (`uuTag()`), tohle je pojistka. */
+  if (kind === 'uu') return 'uuLength';
 
   /* Význam slov taky - tag podle zvolené možnosti zapisuje ovladač,
      u plochy se souřadnými slovy je "odpovědí" počet chybných spojení. */

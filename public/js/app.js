@@ -1,6 +1,9 @@
-import { OPS, COMPARES, EXTRA_KINDS, MISSING_LABEL, kindOps, buildRound, buildRiddleRound, buildGridRound, buildOver10Round, buildPexesoRound, buildBigmulRound, buildAbcRound, buildPosRound, buildVetyRound, buildVyznamRound, explain, diagnose } from './generator.js';
+import { OPS, COMPARES, EXTRA_KINDS, MISSING_LABEL, kindOps, buildRound, buildRiddleRound, buildGridRound, buildOver10Round, buildPexesoRound, buildBigmulRound, buildAbcRound, buildPosRound, buildVetyRound, buildVyznamRound, buildUuRound, explain, diagnose } from './generator.js';
 import { POS_TYPES, POS_TYPE_KEYS, POS_COUNTS, POS_LEVELS, POS_LEVEL_KEYS, posCheck, posTag } from './pos.js';
-import { VETY_TYPES, VETY_TASKS, VETY_TASK_KEYS, VETY_COUNTS, VETY_LEVELS, VETY_LEVEL_KEYS } from './vety.js';
+import {
+  VETY_TYPES, VETY_TASKS, VETY_TASK_KEYS, VETY_COUNTS, VETY_LEVELS, VETY_LEVEL_KEYS, VETY_LETTERS, vetyListExplain,
+} from './vety.js';
+import { UU_LETTERS, UU_COUNTS, UU_LEVELS, UU_LEVEL_KEYS, uuShown, uuTag, uuExplain } from './uu.js';
 import {
   VYZNAM_TASKS, VYZNAM_TASK_KEYS, VYZNAM_RELS, VYZNAM_COUNTS, VYZNAM_LEVELS, VYZNAM_LEVEL_KEYS,
 } from './vyznam.js';
@@ -49,6 +52,7 @@ const MODES = {
   pos: { subject: 'czech', label: 'Slovní druhy', icon: '🔍', sub: 'Najdi ve větě slovesa nebo podstatná jména' },
   vety: { subject: 'czech', label: 'Druhy vět', icon: '💬', sub: 'Urči, jaká je věta, a udělej z ní otázku' },
   vyznam: { subject: 'czech', label: 'Význam slov', icon: '💡', sub: 'Slova souznačná, protikladná, nadřazená…' },
+  uu: { subject: 'czech', label: 'Doplň u, ú, ů', icon: '✏️', sub: 'Které u patří do slova?' },
 };
 
 const SUBJECTS = {
@@ -75,16 +79,19 @@ const VETY_COUNT_DEFAULT = 10;
 /* Význam slov: které úlohy a kolik jich v kole je. */
 const VYZNAM_COUNT_DEFAULT = 10;
 
+/* Doplň u, ú, ů: kolik vět. */
+const UU_COUNT_DEFAULT = 10;
+
 /* Tabulky obtížností podle režimu - klíče (easy/medium/hard) jsou schválně
    společné, takže `config.level` přežije přepnutí režimu. */
 const LEVEL_TABLES = {
   riddle: RIDDLE_LEVELS, grid: GRID_LEVELS, over10: OVER10_LEVELS, pexeso: PEXESO_LEVELS, bigmul: BIGMUL_LEVELS,
-  abc: ABC_LEVELS, pos: POS_LEVELS, vety: VETY_LEVELS, vyznam: VYZNAM_LEVELS,
+  abc: ABC_LEVELS, pos: POS_LEVELS, vety: VETY_LEVELS, vyznam: VYZNAM_LEVELS, uu: UU_LEVELS,
 };
 const LEVEL_KEYS = {
   riddle: RIDDLE_LEVEL_KEYS, grid: GRID_LEVEL_KEYS, over10: OVER10_LEVEL_KEYS, pexeso: PEXESO_LEVEL_KEYS,
   bigmul: BIGMUL_LEVEL_KEYS, abc: ABC_LEVEL_KEYS, pos: POS_LEVEL_KEYS, vety: VETY_LEVEL_KEYS,
-  vyznam: VYZNAM_LEVEL_KEYS,
+  vyznam: VYZNAM_LEVEL_KEYS, uu: UU_LEVEL_KEYS,
 };
 
 /* Společná množina klíčů obtížnosti. Tabulky výš ji musí mít všechny stejnou,
@@ -198,6 +205,7 @@ const VYCHOZI_CONFIG = () => ({
   posTypes: ['noun', 'verb'], posCount: POS_COUNT_DEFAULT,
   vetyTasks: ['type', 'ask'], vetyCount: VETY_COUNT_DEFAULT,
   vyznamTasks: [...VYZNAM_TASK_KEYS], vyznamCount: VYZNAM_COUNT_DEFAULT,
+  uuCount: UU_COUNT_DEFAULT,
 });
 
 /* Stav se jen deklaruje. Naplni ho `boot()` na konci souboru, protoze
@@ -273,6 +281,8 @@ function normalizeConfig(raw) {
     // starší uložené nastavení význam slov nezná - prázdný výběr = všechny úlohy
     vyznamTasks: vyznamTasks.length ? vyznamTasks : [...VYZNAM_TASK_KEYS],
     vyznamCount: VYZNAM_COUNTS.includes(Number(raw.vyznamCount)) ? Number(raw.vyznamCount) : VYZNAM_COUNT_DEFAULT,
+    // starší uložené nastavení doplňování u, ú, ů nezná
+    uuCount: UU_COUNTS.includes(Number(raw.uuCount)) ? Number(raw.uuCount) : UU_COUNT_DEFAULT,
   };
 }
 
@@ -294,6 +304,9 @@ const isAbcMode = () => config.mode === 'abc';
 const isPosMode = () => config.mode === 'pos';
 const isVetyMode = () => config.mode === 'vety';
 const isVyznamMode = () => config.mode === 'vyznam';
+const isUuMode = () => config.mode === 'uu';
+/* Druhy vět jen s listem „Označ písmenem“ - taky jediná úloha za kolo. */
+const isVetyBoardOnly = () => isVetyMode() && config.vetyTasks.every((t) => t === 'list');
 /* Význam slov se samotným spojováním je jedna plocha - počet úloh odpadá. */
 const isVyznamBoardOnly = () => isVyznamMode() && config.vyznamTasks.every((t) => t === 'spoj');
 /* Režimy, které mají obtížnost místo výběru druhů úloh. */
@@ -417,15 +430,16 @@ function renderModeCards() {
   const pos = isPosMode();
   const vety = isVetyMode();
   const vyznam = isVyznamMode();
-  el('card-ops').hidden = isRiddleMode() || bigmul || abc;
+  const uu = isUuMode();
+  el('card-ops').hidden = isRiddleMode() || bigmul || abc || uu;
   el('card-kinds').hidden = usesLevel();
   el('card-level').hidden = !usesLevel();
   // jedna mřížka i jedna plocha pexesa jsou celé kolo - počet příkladů odpadá
-  el('card-count').hidden = grid || pexeso || isVyznamBoardOnly();
+  el('card-count').hidden = grid || pexeso || isVyznamBoardOnly() || isVetyBoardOnly();
   // v abecedě ani ve slovních druzích se nepočítá, rozsah čísel tam nic neříká
-  el('card-max').hidden = abc || pos || vety || vyznam;
+  el('card-max').hidden = abc || pos || vety || vyznam || uu;
   // u češtiny se vybírá jen z pevných počtů slov / vět
-  el('countCustomWrap').hidden = abc || pos || vety || vyznam;
+  el('countCustomWrap').hidden = abc || pos || vety || vyznam || uu;
   /* Ve slovních druzích karta s operacemi zůstává, jen se v ní místo
      operací vybírá, co se ve větách hledá. */
   el('opsTitle').innerHTML = pos
@@ -437,7 +451,7 @@ function renderModeCards() {
     ? '<span aria-hidden="true">🔢</span> Kolik hádanek?'
     : abc
       ? '<span aria-hidden="true">🔢</span> Kolik slov?'
-      : pos || vety
+      : pos || vety || uu
         ? '<span aria-hidden="true">🔢</span> Kolik vět?'
         : vyznam
           ? '<span aria-hidden="true">🔢</span> Kolik úloh?'
@@ -472,10 +486,20 @@ function renderModeCards() {
 
   if (vety) {
     el('levelNote').textContent = `${level.label} – ${level.note}.`;
-    opsNote.textContent = config.vetyTasks.length > 1
-      ? 'Úlohy se budou v kole střídat – nad každou větou je napsané, co s ní máš udělat.'
-      : 'Můžeš si zapnout obojí naráz, úlohy se pak střídají.';
+    const others = config.vetyTasks.filter((t) => t !== 'list').length;
+    opsNote.textContent = isVetyBoardOnly()
+      ? 'Zahraješ si jeden list s větami a ke každé doplníš písmeno.'
+      : config.vetyTasks.includes('list')
+        ? 'Kolo začne listem s písmeny, pak přijdou další věty.'
+        : others > 1
+          ? 'Úlohy se budou v kole střídat – nad každou větou je napsané, co s ní máš udělat.'
+          : 'Můžeš si zapnout víc úloh naráz, úlohy se pak střídají.';
     opsNote.hidden = false;
+    return;
+  }
+
+  if (uu) {
+    el('levelNote').textContent = `${level.label} – ${level.note}.`;
     return;
   }
 
@@ -617,6 +641,8 @@ function renderConfigScreen() {
       ? VETY_COUNTS.map((n) => chipHTML(n, `${n} vět`, config.vetyCount === n)).join('')
       : isVyznamMode()
       ? VYZNAM_COUNTS.map((n) => chipHTML(n, `${n} úloh`, config.vyznamCount === n)).join('')
+      : isUuMode()
+      ? UU_COUNTS.map((n) => chipHTML(n, `${n} vět`, config.uuCount === n)).join('')
       : COUNT_PRESETS.map((n) => chipHTML(n, `${n} příkladů`, config.count === n)).join('');
 
   el('maxChips').innerHTML = MAX_PRESETS
@@ -696,11 +722,11 @@ function renderLastHint() {
   }
 
   const pct = Math.round((last.correct / last.total) * 100);
-  const what = isRiddleMode() ? 'hádanek' : isOver10Mode() ? 'rozkladů' : isPosMode() || isVetyMode() ? 'vět'
+  const what = isRiddleMode() ? 'hádanek' : isOver10Mode() ? 'rozkladů' : isPosMode() || isVetyMode() || isUuMode() ? 'vět'
     : isVyznamMode() ? 'úloh' : 'příkladů';
   const focus = isRiddleMode()
     ? ' Každá hádanka je pokaždé nová.'
-    : isPosMode() || isVetyMode()
+    : isPosMode() || isVetyMode() || isUuMode()
       ? ' Věty se pokaždé vylosují jiné.'
     : isVyznamMode()
       ? ' Slova se pokaždé vylosují jiná.'
@@ -809,6 +835,7 @@ el('countChips').addEventListener('click', (e) => {
   else if (isPosMode()) config.posCount = Number(chip.dataset.value);
   else if (isVetyMode()) config.vetyCount = Number(chip.dataset.value);
   else if (isVyznamMode()) config.vyznamCount = Number(chip.dataset.value);
+  else if (isUuMode()) config.uuCount = Number(chip.dataset.value);
   else config.count = Number(chip.dataset.value);
   saveConfig();
   renderConfigScreen();
@@ -956,6 +983,7 @@ function startRound() {
     pos: () => buildPosRound(config),     // co věta, to úloha
     vety: () => buildVetyRound(config),   // taky
     vyznam: () => buildVyznamRound(config), // úloha po úloze, nejvýš jedna plocha
+    uu: () => buildUuRound(config),       // co věta, to úloha
   };
   round = (build[config.mode] || build.calc)();
   index = 0;
@@ -1022,7 +1050,9 @@ function renderExercise() {
       /* Krátce - "Abeceda · 12" už se na 320 px do lišty nevešlo. */
       : ex.kind === 'abc'
         ? `${ex.words.length} slov`
-        : `${index + 1} / ${round.length}`;
+        : ex.kind === 'vetylist' && round.length === 1
+          ? `${ex.items.length} vět`
+          : `${index + 1} / ${round.length}`;
   el('dots').querySelectorAll('.dot').forEach((dot, i) => dot.classList.toggle('is-current', i === index));
   el('exerciseHint').textContent = hintFor(ex);
   /* Zápis velkého násobení roste podle toho, kolik kroků je za námi -
@@ -1032,6 +1062,9 @@ function renderExercise() {
   if (ex.kind === 'abc') resetAbc(ex);
   // u věty taky - označená slova jsou stav, ze kterého se kreslí
   if (ex.kind === 'pos') resetPos();
+  // list s písmeny i věta s u, ú, ů taky
+  if (ex.kind === 'vetylist') resetFill(ex.items.length);
+  if (ex.kind === 'uu') resetFill(ex.gaps.length);
   if (CHOICE_HTML[ex.kind]) choicePicked = null;
   el('exerciseBody').innerHTML = (BODY_HTML[ex.kind] || equationHTML)(ex);
   /* Mřížka 5×5 a plocha pexesa o čtyřech sloupcích jsou nejširší, co
@@ -1094,6 +1127,13 @@ function hintFor(ex) {
     return ex.task === 'ask'
       ? 'Přečti si větu a najdi, jak z ní udělat otázku. Klepni na správnou možnost.'
       : 'Přečti si větu a podívej se na znaménko na konci. Pak klepni na druh věty.';
+  }
+  if (ex.kind === 'vetylist') {
+    return 'Klepej na okénko u každé věty: O oznamovací, T tázací, R rozkazovací, P přací. '
+      + 'Až budou vyplněná všechna, klepni na Hotovo.';
+  }
+  if (ex.kind === 'uu') {
+    return 'Klepni na mezeru ve slově a pak na u, ú nebo ů. Až doplníš všechna písmena, klepni na Hotovo.';
   }
   if (ex.kind === 'slova') {
     return 'Najdi dvě slova, která patří do stejné skupiny, a klepni na obě. Takhle spoj všechny dvojice.';
@@ -1386,11 +1426,11 @@ function bigmulHTML(ex) {
 const BODY_HTML = {
   bond: bondHTML, word: wordHTML, riddle: riddleHTML, sign: signHTML, grid: gridHTML,
   compare: compareHTML, over10: over10HTML, pexeso: pexesoHTML, bigmul: bigmulHTML, abc: abcHTML,
-  pos: posHTML, vety: vetyHTML, vyznam: vyznamHTML, slova: pexesoHTML,
+  pos: posHTML, vety: vetyHTML, vyznam: vyznamHTML, slova: pexesoHTML, vetylist: vetyListHTML, uu: uuHTML,
 };
 
 /* Druhy, které se ovládají jen klepáním - bez klávesnice a bez `submit()`. */
-const TAP_ONLY = new Set(['pexeso', 'bigmul', 'abc', 'pos', 'vety', 'vyznam', 'slova']);
+const TAP_ONLY = new Set(['pexeso', 'bigmul', 'abc', 'pos', 'vety', 'vyznam', 'slova', 'vetylist', 'uu']);
 
 /* Plochy se spojováním dvojic: čísla v „Najdi dvojice“ a souřadná slova
    ve „Význam slov“. Ovladač je pro obě tentýž. */
@@ -1509,6 +1549,10 @@ el('exerciseBody').addEventListener('click', (e) => {
   }
   if (round[index]?.kind === 'pos') {
     posTap(e.target);
+    return;
+  }
+  if (FILL[round[index]?.kind]) {
+    fillTap(e.target);
     return;
   }
   if (CHOICE_HTML[round[index]?.kind]) {
@@ -2076,6 +2120,228 @@ function finishPos(ex, correct) {
   beep('wrong');
 }
 
+/* ---------------- ovladač doplňování ----------------
+   List „Označ písmenem“ (druhy vět) a věta s u, ú, ů mají totéž: řadu
+   okének, do kterých dítě klepáním doplní hodnotu, a tlačítko Hotovo.
+   U listu se písmeno v okénku mění každým klepnutím (O → T → R → P),
+   u věty se klepne na mezeru a pak na u / ú / ů.
+
+   Jako u slovních druhů má dítě jednu opravu: první Hotovo jen obarví
+   špatná okénka červeně, druhé ukáže řešení. Oprava napodruhé se počítá
+   jako správně. Záznam do `attempts` zapisuje ovladač sám (`finishFill`). */
+const VETY_CYCLE = Object.keys(VETY_LETTERS);
+
+const FILL = {
+  vetylist: {
+    answers: (ex) => ex.items.map((it) => it.answer),
+    shown: (ex, i, v) => VETY_LETTERS[v] || '',
+    sep: ' ',
+    tag: () => 'vetyType',
+    steps: (ex, picks) => vetyListExplain(ex, picks),
+    red: (n) => (n === 1 ? 'Červené okénko nesedí.' : 'Červená okénka nesedí.'),
+    fix: 'V přerušovaném rámečku je písmeno, které tam patří.',
+    html: () => vetyListHTML,
+  },
+  uu: {
+    answers: (ex) => ex.gaps.map((g) => g.answer),
+    shown: (ex, i, v) => (v ? uuShown(ex.gaps[i], v) : ''),
+    sep: ', ',
+    tag: (ex, picks) => uuTag(ex, picks) || 'uuLength',
+    steps: (ex, picks) => uuExplain(ex, picks),
+    red: (n) => (n === 1 ? 'Červené písmeno je špatně.' : 'Červená písmena jsou špatně.'),
+    fix: 'V přerušovaném rámečku je písmeno, které tam patří.',
+    html: () => uuHTML,
+  },
+};
+
+let fillPicks = [];        // co je v okénkách ('' = prázdné)
+let fillSel = null;        // vybraná mezera u věty s u, ú, ů
+let fillChecks = 0;        // kolikrát už se kontrolovalo
+let fillWrong = new Set(); // okénka, která při první kontrole nesehrála
+let fillNote = '';         // hláška pod okénky po první kontrole
+let fillReveal = false;    // po vyhodnocení se ukáže řešení
+
+function resetFill(n) {
+  fillPicks = Array(n).fill('');
+  fillSel = 0;
+  fillChecks = 0;
+  fillWrong = new Set();
+  fillNote = '';
+  fillReveal = false;
+}
+
+/* Status a Hotovo pod okénky - Hotovo jde až s vyplněným vším. */
+function fillFooter() {
+  const full = fillPicks.every(Boolean);
+  return `<p id="fillStatus" class="pex-status" aria-live="polite">${fillReveal ? '' : fillNote}</p>
+    ${locked ? '' : `<button type="button" class="btn btn-primary fill-done"${full ? '' : ' disabled'}>Hotovo <span aria-hidden="true">✓</span></button>`}`;
+}
+
+function vetyListBox(ex, i) {
+  const it = ex.items[i];
+  const have = fillPicks[i];
+  if (fillReveal) {
+    return have === it.answer
+      ? `<span class="vl-box is-right">${VETY_LETTERS[have]}</span>`
+      : `<span class="vl-box is-wrong"><s>${VETY_LETTERS[have] || ''}</s></span><span class="vl-box is-fix">${VETY_LETTERS[it.answer]}</span>`;
+  }
+  return `<button type="button" class="vl-box${fillWrong.has(i) ? ' is-wrong' : ''}" data-i="${i}"
+      aria-label="Písmeno u ${i + 1}. věty">${VETY_LETTERS[have] || ''}</button>`;
+}
+
+function vetyListHTML(ex) {
+  const legend = VETY_CYCLE.map((k) => `<span><b>${VETY_LETTERS[k]}</b> ${VETY_TYPES[k].label}</span>`).join('');
+  const rows = ex.items
+    .map((it, i) => `<li class="vl-row"><span class="vl-text">${it.text}</span><span class="vl-boxes">${vetyListBox(ex, i)}</span></li>`)
+    .join('');
+  return `<div class="vl">
+      <p class="vt-ask"><span aria-hidden="true">${VETY_TASKS.list.emoji}</span> ${VETY_TASKS.list.ask}</p>
+      <p class="vl-legend">${legend}</p>
+      <ol class="vl-list">${rows}</ol>
+      ${fillFooter()}
+    </div>`;
+}
+
+function uuGap(ex, i) {
+  const g = ex.gaps[i];
+  const have = fillPicks[i];
+  if (fillReveal) {
+    return have === g.answer
+      ? `<span class="uu-gap is-right">${uuShown(g, have)}</span>`
+      : `<span class="uu-gap is-fix">${uuShown(g, g.answer)}</span>`;
+  }
+  let cls = 'uu-gap';
+  if (fillWrong.has(i)) cls += ' is-wrong';
+  if (fillSel === i) cls += ' is-sel';
+  return `<button type="button" class="${cls}" data-i="${i}" aria-pressed="${fillSel === i}"
+      aria-label="${have ? `Doplněno ${have}` : 'Prázdné místo'}">${have ? uuShown(g, have) : ''}</button>`;
+}
+
+function uuHTML(ex) {
+  const sentence = ex.tokens
+    .map((parts) => `<span class="uu-word">${parts.map((p) => ('s' in p ? p.s : uuGap(ex, p.g))).join('')}</span>`)
+    .join(' ');
+  const keys = locked ? '' : `<div class="uu-keys">${UU_LETTERS
+    .map((l) => `<button type="button" class="uu-key" data-letter="${l}">${l}</button>`).join('')}</div>`;
+  return `<div class="uu">
+      <p class="uu-sentence">${sentence}</p>
+      ${keys}
+      ${fillFooter()}
+    </div>`;
+}
+
+function renderFill() {
+  const ex = round[index];
+  el('exerciseBody').innerHTML = FILL[ex.kind].html()(ex);
+}
+
+function fillTap(target) {
+  const ex = round[index];
+  if (locked || !FILL[ex?.kind]) return;
+  if (target.closest('.fill-done')) {
+    fillSubmit(ex);
+    return;
+  }
+  if (ex.kind === 'vetylist') {
+    const box = target.closest('.vl-box[data-i]');
+    if (!box) return;
+    const i = Number(box.dataset.i);
+    // prázdné → O → T → R → P → O …
+    fillPicks[i] = VETY_CYCLE[(VETY_CYCLE.indexOf(fillPicks[i]) + 1) % VETY_CYCLE.length];
+    if (fillWrong.delete(i)) fillNote = '';
+    renderFill();
+    return;
+  }
+  const gap = target.closest('.uu-gap[data-i]');
+  if (gap) {
+    fillSel = Number(gap.dataset.i);
+    renderFill();
+    return;
+  }
+  const key = target.closest('.uu-key');
+  if (!key) return;
+  if (fillSel === null) fillSel = Math.max(0, fillPicks.indexOf(''));
+  fillPicks[fillSel] = key.dataset.letter;
+  if (fillWrong.delete(fillSel)) fillNote = '';
+  // výběr skočí na další prázdnou mezeru, ať se nemusí klepat dvakrát
+  const n = fillPicks.length;
+  for (let k = 1; k <= n; k++) {
+    const j = (fillSel + k) % n;
+    if (!fillPicks[j]) {
+      fillSel = j;
+      break;
+    }
+  }
+  renderFill();
+}
+
+function fillSubmit(ex) {
+  if (!fillPicks.every(Boolean)) return;
+  const answers = FILL[ex.kind].answers(ex);
+  const wrong = answers.map((a, i) => (fillPicks[i] === a ? -1 : i)).filter((i) => i >= 0);
+  if (!wrong.length) {
+    finishFill(ex, true);
+    return;
+  }
+  if (fillChecks === 0) {
+    fillChecks = 1;
+    fillWrong = new Set(wrong);
+    fillSel = wrong[0];
+    fillNote = `${FILL[ex.kind].red(wrong.length)} Oprav ${wrong.length === 1 ? 'ho' : 'je'} a klepni znovu na Hotovo.`;
+    beep('wrong');
+    renderFill();
+    return;
+  }
+  finishFill(ex, false);
+}
+
+function finishFill(ex, correct) {
+  locked = true;
+  stopClock();
+  const f = FILL[ex.kind];
+  const picks = [...fillPicks];
+
+  attempts.push({
+    ex,
+    given: picks.map((v, i) => f.shown(ex, i, v)).join(f.sep),
+    correct,
+    retried: fillChecks > 0,
+    ms: Date.now() - shownAt,
+    tag: correct ? null : f.tag(ex, picks),
+  });
+
+  el('dots').querySelectorAll('.dot')[index]?.classList.add(correct ? 'is-correct' : 'is-wrong');
+  el('quizScore').textContent = String(attempts.filter((a) => a.correct).length);
+
+  fillReveal = true;
+  renderFill();
+
+  if (correct) {
+    renderFeedback(ex, null, true);
+    beep('correct');
+    confetti();
+    return;
+  }
+
+  const answers = f.answers(ex);
+  const bad = picks.filter((v, i) => v !== answers[i]).length;
+  const legend = [];
+  if (bad < picks.length) legend.push('Zelené máš správně.');
+  legend.push(f.red(bad), f.fix);
+  const steps = f.steps(ex, picks).map((s) => `<li>${s.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')}</li>`).join('');
+  const fb = el('feedback');
+  fb.dataset.state = 'wrong';
+  fb.innerHTML = `
+    <div class="fb-badge"><span aria-hidden="true">🤔</span> Tentokrát ne</div>
+    <p class="fb-retry-note">${legend.join(' ')}</p>
+    <p class="fb-steps-title">Jak na to:</p>
+    <ul class="fb-steps">${steps}</ul>
+    <button type="button" class="btn btn-primary">Rozumím, další <span aria-hidden="true">➜</span></button>`;
+  fb.hidden = false;
+  fb.querySelector('.btn').addEventListener('click', next);
+  beep('wrong');
+}
+
 /* ---------------- ovladač úloh s výběrem ----------------
    Druhy vět i význam slov: zadání a pod ním možnosti. U „Urči druh věty“
    a „Doplň vztah“ v pevném pořadí, u „Udělej otázku“ a „Najdi nadřazené“
@@ -2321,8 +2587,12 @@ document.addEventListener('keydown', (e) => {
   if (TAP_ONLY.has(round[index]?.kind)) {
     if (e.key === 'Enter' && locked) {
       el('feedback').querySelector('.btn')?.click();
-    } else if (e.key === 'Enter' && (round[index].kind === 'abc' || round[index].kind === 'pos')) {
-      el('exerciseBody').querySelector('.abc-done:not([disabled]), .pos-done:not([disabled])')?.click();
+    } else if (e.key === 'Enter' && (round[index].kind === 'abc' || round[index].kind === 'pos' || FILL[round[index].kind])) {
+      el('exerciseBody').querySelector('.abc-done:not([disabled]), .pos-done:not([disabled]), .fill-done:not([disabled])')?.click();
+      e.preventDefault();
+    } else if (!locked && round[index].kind === 'uu' && /^[1-3]$/.test(e.key)) {
+      // u, ú, ů klávesami 1 až 3 - do vybrané mezery
+      el('exerciseBody').querySelectorAll('.uu-key')[Number(e.key) - 1]?.click();
       e.preventDefault();
     } else if (!locked && CHOICE_HTML[round[index].kind] && /^[1-6]$/.test(e.key)) {
       el('exerciseBody').querySelectorAll('.vt-opt')[Number(e.key) - 1]?.click();
@@ -2659,15 +2929,18 @@ function grantRewards(report) {
     acc[kind] = (acc[kind] || 0) + 1;
     return acc;
   }, {});
-  // u abecedy se čas počítá za každé slovo, ne za celou plochu
+  // u abecedy se čas počítá za každé slovo, u listu s písmeny za každou větu
   const abcEx = attempts.find((at) => at.ex?.kind === 'abc')?.ex;
-  const kindUnits = abcEx ? { abc: abcEx.words.length } : {};
+  const listEx = attempts.find((at) => at.ex?.kind === 'vetylist')?.ex;
+  const kindUnits = {};
+  if (abcEx) kindUnits.abc = abcEx.words.length;
+  if (listEx) kindUnits.vetylist = listEx.items.length;
   const granted = rewards.applyRound(rewardData, {
     gameId,
     mode: config.mode,
     level: rewards.difficultyOf(config),
     // v abecedě se nepočítá - rozsah čísel by jí jinak přidal epického
-    max: isAbcMode() || isPosMode() || isVetyMode() || isVyznamMode() ? 0 : config.max,
+    max: isAbcMode() || isPosMode() || isVetyMode() || isVyznamMode() || isUuMode() ? 0 : config.max,
     kindUnits,
     // druhy navic (slovni ulohy, pyramidy, znamenka) - podminka raritniho
     /* "Neco navic" existuje jen v rezimu Pocitani. Jinde karta schovana, ale
@@ -2838,7 +3111,7 @@ function renderResult(r) {
       ? 'Příště přijdou nové příklady na rozklad.'
       : isBigmulMode()
         ? 'Příště přijdou nová čísla.'
-        : isPosMode() || isVetyMode()
+        : isPosMode() || isVetyMode() || isUuMode()
           ? 'Příště se vylosují jiné věty.'
           : isVyznamMode()
             ? 'Příště se vylosují jiná slova.'
@@ -2860,7 +3133,7 @@ function renderResult(r) {
     : `<div class="card"><h2 class="card-title"><span aria-hidden="true">✨</span> Bez jediné chyby!</h2>
         <p style="margin:0;font-weight:700;color:var(--ink-soft)">Nic k procvičení – tohle byla čistá práce.</p></div>`;
 
-  const jednotka = riddle ? 'hádanku' : isOver10Mode() ? 'rozklad' : isPosMode() || isVetyMode() ? 'větu'
+  const jednotka = riddle ? 'hádanku' : isOver10Mode() ? 'rozklad' : isPosMode() || isVetyMode() || isUuMode() ? 'větu'
     : isVyznamMode() ? 'úlohu' : 'příklad';
   const avg = r.avgMs
     ? `<p class="score-sub">Průměrně ${Math.max(1, Math.round(r.avgMs / 1000))} s na ${jednotka}</p>`

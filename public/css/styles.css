@@ -398,6 +398,7 @@ h1, h2, h3, .num, .box-value, .key, .score-big { font-family: 'Baloo 2', 'Nunito
 .chips .chip.is-on[data-value="vztah"] { background: linear-gradient(135deg, #60a5fa, #2563eb); }
 .chips .chip.is-on[data-value="spoj"] { background: linear-gradient(135deg, #f472b6, #be185d); }
 .chips .chip.is-on[data-value="nad"] { background: linear-gradient(135deg, #34d399, #0f766e); }
+.chips .chip.is-on[data-value="list"] { background: linear-gradient(135deg, #fbbf24, #c2410c); }
 /* Volba hry - dvě velké dlaždice vedle sebe, na úzkém displeji pod sebou. */
 .chips-mode { display: grid; grid-template-columns: repeat(auto-fit, minmax(158px, 1fr)); gap: 10px; }
 .chip-mode {
@@ -417,6 +418,7 @@ h1, h2, h3, .num, .box-value, .key, .score-big { font-family: 'Baloo 2', 'Nunito
 .chips-mode .chip.is-on[data-value="pos"] { background: linear-gradient(135deg, #a78bfa, #6d28d9); }
 .chips-mode .chip.is-on[data-value="vety"] { background: linear-gradient(135deg, #34d399, #0f766e); }
 .chips-mode .chip.is-on[data-value="vyznam"] { background: linear-gradient(135deg, #fbbf24, #c2410c); }
+.chips-mode .chip.is-on[data-value="uu"] { background: linear-gradient(135deg, #60a5fa, #be185d); }
 
 /* Záložky Matematika / Čeština nad kartami her. `<button>` nedědí barvu
    textu, proto ji záložka nastavuje sama. */
@@ -1076,6 +1078,68 @@ body.is-dark { --pair-task: #93c5fd; --pair-result: #fdba74; }
 }
 .vz-gap.is-filled { border-color: var(--good); background: var(--good-tint); border-radius: 8px 8px 0 0; }
 .vz-gap.is-wrong { border-color: var(--bad); background: var(--bad-tint); }
+
+/* ---------- list „Označ písmenem“ (druhy vět) ----------
+   Věty pod sebou, vpravo okénko s písmenem. Okénko je tlačítko a písmeno
+   se mění klepáním. Barvu nese podklad a rámeček, text zůstává `--ink`;
+   `<button>` nedědí barvu textu. */
+.vl-legend {
+  margin: 0 0 12px; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 12px;
+  color: var(--ink-soft); font-weight: 700; font-size: .95rem;
+}
+.vl-legend b { color: var(--ink); font-family: 'Baloo 2', sans-serif; font-size: 1.1rem; }
+.vl-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.vl-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 6px 6px 12px; border-radius: 14px; background: var(--surface-2);
+}
+/* `min-width: 0`, jinak dlouhá věta roztáhne řádek přes okraj karty */
+.vl-text {
+  flex: 1; min-width: 0; color: var(--ink);
+  font-family: 'Baloo 2', sans-serif; font-weight: 700; font-size: 1.15rem; line-height: 1.25;
+}
+.vl-boxes { display: flex; gap: 4px; flex: none; }
+.vl-box {
+  width: 48px; height: 48px; flex: none; display: grid; place-items: center; cursor: pointer;
+  border: 3px solid var(--line); border-radius: 12px; background: var(--card); color: var(--ink);
+  font-family: 'Baloo 2', sans-serif; font-weight: 800; font-size: 1.6rem; line-height: 1;
+}
+.vl-box:focus-visible { outline: 3px solid var(--violet); outline-offset: 2px; }
+span.vl-box { cursor: default; }
+.vl-box.is-wrong { border-color: var(--bad); background: var(--bad-tint); }
+.vl-box.is-right { border-color: var(--good); background: var(--good-tint); }
+.vl-box.is-fix { border: 3px dashed var(--good); }
+
+/* ---------- Doplň u, ú, ů ----------
+   Slovo je `nowrap`, aby se mezera neodtrhla od zbytku slova na nový
+   řádek. Mezera je tlačítko velikosti písmene; vybraná má fialový rámeček. */
+.uu-sentence {
+  margin: 0 0 16px; text-align: center; color: var(--ink);
+  font-family: 'Baloo 2', sans-serif; font-weight: 700; font-size: 1.6rem; line-height: 1.9;
+}
+.uu-word { white-space: nowrap; }
+.uu-gap {
+  display: inline-block; min-width: 1.15em; height: 1.4em; padding: 0 2px; margin: 0 1px;
+  vertical-align: baseline; cursor: pointer; text-align: center;
+  font: inherit; line-height: 1.2; color: var(--ink);
+  border: 3px solid var(--line); border-radius: 8px; background: var(--card);
+}
+.uu-gap:focus-visible { outline: 3px solid var(--violet); outline-offset: 2px; }
+span.uu-gap { cursor: default; }
+.uu-gap.is-sel { border-color: var(--violet); box-shadow: var(--shadow); }
+.uu-gap.is-wrong { border-color: var(--bad); background: var(--bad-tint); }
+.uu-gap.is-right { border-color: var(--good); background: var(--good-tint); }
+.uu-gap.is-fix { border: 3px dashed var(--good); }
+.uu-keys { display: flex; justify-content: center; gap: 12px; }
+.uu-key {
+  width: 72px; height: 64px; cursor: pointer;
+  border: 3px solid transparent; border-radius: 16px; background: var(--surface-2); color: var(--ink);
+  font-family: 'Baloo 2', sans-serif; font-weight: 800; font-size: 2.2rem; line-height: 1;
+}
+.uu-key:focus-visible { outline: 3px solid var(--violet); outline-offset: 2px; }
+.uu-key:active { border-color: var(--violet); }
+.fill-done { display: block; margin: 14px auto 0; }
+.fill-done:disabled { opacity: .45; cursor: not-allowed; }
 
 /* Plocha se souřadnými slovy: slovo je delší než `7+5`, kartičky jsou
    proto přes celou šířku a nižší. Barva textu je `--ink`, `<button>` ji

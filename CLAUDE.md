@@ -86,6 +86,7 @@ běžel. Vypadalo to jako chyba nasazení, a nebyla.
 | `public/js/pos.js` | Slovní druhy: ručně určené věty podle obtížnosti, výběr kola, vyhodnocení a vysvětlení |
 | `public/js/vety.js` | Druhy vět: ručně sepsané věty, výběr kola, možnosti k otázce a vysvětlení |
 | `public/js/vyznam.js` | Význam slov: ručně sepsaná slova a skupiny, tři úlohy, vysvětlení |
+| `public/js/uu.js` | Doplň u, ú, ů: ručně sepsané věty se zápisem `[ů]`, rozbor mezer, tag chyby, vysvětlení |
 | `public/js/stats.js` | rozbor kola, rady, `sanitizeState()` — **na úložiště nesahá** |
 | `public/js/storage.js` | **jediná vrstva nad úložištěm** — načtení, fronta zápisů, mazání, vyměnitelný backend |
 | `public/js/validate.js` | `wholeNumber` / `textList` — sdílené kousky validace, bez DOM |
@@ -114,7 +115,7 @@ na neexistující soubor. Když je tam někdy mít chceš, přidej napřed vlast
 | `package.json` | jen ty tři zkratky a `"type": "module"`; žádné závislosti |
 
 Prosté ES moduly, žádný framework, žádné závislosti. Závislosti jdou jedním směrem:
-`random.js → riddle.js / grid.js / over10.js / pexeso.js / bigmul.js / abc.js / pos.js / vety.js / vyznam.js → generator.js → app.js`
+`random.js → riddle.js / grid.js / over10.js / pexeso.js / bigmul.js / abc.js / pos.js / vety.js / vyznam.js / uu.js → generator.js → app.js`
 (`stats.js` si z `vety.js` a `vyznam.js` bere jen názvy pro výpis chyb)
 (`app.js` si z `abc.js` bere navíc funkce přesunu a z `pos.js` tabulky a `posCheck` / `posTag`),
 `rewards-data.js → rewards.js → rewards-ui.js → app.js`,
@@ -160,7 +161,7 @@ Co z toho plyne pro psaní kódu:
 - **`mergePayload()` v `transfer.js` neukládá.** Slučování je čistá operace v paměti,
   která vrátí souhrn změn; zapisuje až `acceptIncoming()` v `app.js`.
 
-## Deset režimů hry
+## Jedenáct režimů hry
 
 Na úvodní obrazovce se vybírá karta **„Co si zahrajeme?"**. Nad kartami jsou dvě
 záložky **🔢 Matematika / 📖 Čeština** (`SUBJECTS`, u každého režimu `subject` v `MODES`).
@@ -180,6 +181,7 @@ záložky.
 | **Slovní druhy** (Čeština) | `pos` | „něco navíc", **rozsah**; karta s operacemi vybírá, co se hledá; počet = počet vět |
 | **Druhy vět** (Čeština) | `vety` | „něco navíc", **rozsah**; karta s operacemi vybírá úlohu; počet = počet vět |
 | **Význam slov** (Čeština) | `vyznam` | „něco navíc", **rozsah**; karta s operacemi vybírá úlohu; jen se spojováním i **počet** |
+| **Doplň u, ú, ů** (Čeština) | `uu` | operace, „něco navíc", **rozsah**; počet = počet vět |
 
 Větve se rozcházejí až v `startRound()`, kde je tabulka builderů. Všechno ostatní —
 klávesnice, vyhodnocení, statistiky — je společné, protože každá úloha má stejný tvar:
@@ -625,9 +627,10 @@ Pár věcí, které se snadno rozbijí:
 
 ## Druhy vět
 
-Třetí hra pod záložkou Čeština (`config.mode` = `vety`). Dvě úlohy, vybírají se na kartě
-s operacemi (nadpis „Co budeme dělat?", vlastní klíč `config.vetyTasks`, **do `config.ops`
-nepatří**); když jsou zapnuté obě, kolo se rozdělí půl na půl. Počet vět 5 / 10 / 15
+Třetí hra pod záložkou Čeština (`config.mode` = `vety`). Tři úlohy (třetí je list
+„Označ písmenem", viz níž), vybírají se na kartě s operacemi (nadpis „Co budeme dělat?",
+vlastní klíč `config.vetyTasks`, **do `config.ops` nepatří**); když jsou zapnuté první
+dvě, kolo se rozdělí půl na půl. Počet vět 5 / 10 / 15
 (`config.vetyCount`). Co věta, to úloha.
 
 - **Urči druh věty** (`task: 'type'`) — čtyři školní druhy: oznamovací, tázací,
@@ -664,6 +667,39 @@ Pár věcí, které se snadno rozbijí:
 - Klávesnice se schová, klávesy `1` až `4` vyberou možnost.
 - Do odměn jde `max: 0` jako u ostatní češtiny; čas jsou 2 běžné příklady na větu
   (`speedKindMultiplier.vety`).
+
+### Označ písmenem (třetí úloha, `task: 'list'`)
+
+Podle školního listu: 10 vět pod sebou (`VETY_LIST_SIZE`), u každé okénko. **Dítě písmeno
+nevybírá z nabídky — klepáním na okénko se střídá O → T → R → P** (`VETY_LETTERS`), uživatel
+si to tak vyžádal. Hotovo jde až s vyplněnými všemi okénky, první Hotovo s chybou jen
+obarví špatná okénka, druhé ukáže řešení (oprava napodruhé se počítá jako správně).
+
+- **Druh se losuje u každé věty zvlášť, ne rovnoměrně** — uživatel nechtěl, aby na listu
+  byly vždycky všechny čtyři druhy (poslední by se dal dopočítat). `spread()` sem nepatří.
+- Vlastní druh **`ex.kind = 'vetylist'`**; list je v kole nejvýš jeden a stojí na začátku
+  (jako plocha ve „Význam slov"). Se samotným listem je kolo jediná úloha a karta
+  s počtem se schová (`isVetyBoardOnly()`).
+- Ovladač je společný s „Doplň u, ú, ů" (`FILL`, `fillTap`, `finishFill` v `app.js`).
+- Čas se počítá **za každou větu** (`speedPerUnitKinds`, počet vět posílá `kindUnits`).
+
+## Doplň u, ú, ů
+
+Pátá hra pod záložkou Čeština (`config.mode` = `uu`), předlohou cvičení „Doplň u, ú, ů"
+ze sešitu. Věta s mezerami, **dítě klepne na mezeru a pak na u / ú / ů**; výběr pak sám
+skočí na další prázdnou mezeru. Hotovo až se vším vyplněným, jedna oprava jako u listu.
+Co věta, to úloha, počet 5 / 10 / 15 (`config.uuCount`).
+
+**Věty jsou ručně sepsané** v `uu.js`, doplňované písmeno je v hranatých závorkách:
+`'Ve vlak[u] [u]kaž pr[ů]kazk[u].'`. Velké písmeno (`[Ú]stí`) se doplňuje velké.
+`+` označí složené slovo (`ne+[ú]roda`) — nevypisuje se, jen z něj vysvětlení udělá
+„ne + úroda". Ú uprostřed slova bez `+` je výjimka (`t[ú]ra`, `sk[ú]tr`). Druh pravidla
+(`short` / `start` / `ring` / `join` / `except`) si `parseUu()` odvodí sám.
+
+Při doplňování vět hlídej, **aby šlo doplnit jen jedno písmeno** („u domu" × „jdu domů")
+a aby slovo bylo opravdu s u (stádo **koz**, ne kůz; kamz**í**ky).
+
+Tagy chyb: `uuStart` (začátek slova), `uuMark` (ú × ů), `uuLength` (krátké × dlouhé).
 
 ## Význam slov
 

@@ -50,8 +50,16 @@ export const VETY_TYPE_KEYS = Object.keys(VETY_TYPES);
 export const VETY_TASKS = {
   type: { label: 'Urči druh věty', emoji: '🏷️', ask: 'Jaká je to věta?' },
   ask: { label: 'Udělej otázku', emoji: '❓', ask: 'Udělej z věty otázku. Která je správně?' },
+  list: { label: 'Označ písmenem', emoji: '🔠', ask: 'Klepej na okénko, dokud v něm není správné písmeno.' },
 };
 export const VETY_TASK_KEYS = Object.keys(VETY_TASKS);
+
+/* Písmena ze sešitu: oznamovací O, tázací T, rozkazovací R, přací P.
+   V tomhle pořadí se písmena v okénku střídají při klepání. */
+export const VETY_LETTERS = { ozn: 'O', taz: 'T', roz: 'R', pra: 'P' };
+
+/* Kolik vět je na listu „Označ písmenem“. */
+export const VETY_LIST_SIZE = 10;
 
 export const VETY_COUNTS = [5, 10, 15];
 
@@ -256,18 +264,44 @@ function askOptions(q, level) {
    půl na půl a u určování se i druhy vět rozdělí rovnoměrně - jinak by
    z pěti vět mohly vyjít čtyři oznamovací. Pořadí možností se losuje
    tady, ne při vykreslení: obrazovka se po klepnutí překresluje. */
+/* List „Označ písmenem“: celá řada vět naráz. Druh se losuje u každé
+   věty zvlášť, NE rovnoměrně - uživatel nechtěl, aby na listu byly vždycky
+   všechny čtyři druhy (pak by se poslední dal dopočítat). */
+function listExercise(level, usedBase, pool) {
+  const items = [];
+  for (let i = 0; i < VETY_LIST_SIZE; i++) {
+    const type = VETY_TYPE_KEYS[Math.floor(Math.random() * VETY_TYPE_KEYS.length)];
+    const pick = pool.find((p) => p.type === type && !usedBase.has(p.base))
+      || pool.find((p) => !usedBase.has(p.base));
+    usedBase.add(pick.base);
+    items.push({ text: pick.text, answer: pick.type, note: pick.note });
+  }
+  return {
+    level, task: 'list', items, note: '', text: '',
+    answer: items.map((it) => VETY_LETTERS[it.answer]).join(' '),
+    key: `list|${items.map((it) => it.text).join('|')}`,
+  };
+}
+
 export function makeVetyRound(levelKey = 'easy', tasks = ['type', 'ask'], count = 10) {
   const level = VETY_LEVELS[levelKey] ? levelKey : 'easy';
   const n = VETY_COUNTS.includes(count) ? count : VETY_COUNTS[1];
   const use = tasks.filter((t) => t in VETY_TASKS);
-  const plan = spread(use.length ? use : ['type'], n);
+  const rest = use.filter((t) => t !== 'list');
 
   const usedBase = new Set();
   const askQueue = shuffle(ASK[level].map((line, i) => ({ ...splitAsk(line), base: `a${i}` })));
-  const typeTargets = spread(VETY_TYPE_KEYS, plan.filter((t) => t === 'type').length);
   const pool = shuffle(typePool(level));
 
-  return plan.map((task) => {
+  /* List je v kole nejvýš jeden a stojí na začátku, stejně jako plocha ve
+     „Význam slov“. Se samotným listem je kolo jediná úloha. */
+  const out = [];
+  if (use.includes('list')) out.push(listExercise(level, usedBase, pool));
+  if (!rest.length && out.length) return out;
+  const plan = spread(rest.length ? rest : ['type'], n - out.length);
+  const typeTargets = spread(VETY_TYPE_KEYS, plan.filter((t) => t === 'type').length);
+
+  return out.concat(plan.map((task) => {
     if (task === 'ask') {
       const q = askQueue.find((x) => !usedBase.has(x.base)) || askQueue[0];
       usedBase.add(q.base);
@@ -285,11 +319,24 @@ export function makeVetyRound(levelKey = 'easy', tasks = ['type', 'ask'], count 
       options: VETY_TYPE_KEYS.map((k) => ({ text: VETY_TYPES[k].label, key: k, ok: k === pick.type, tag: 'vetyType' })),
       key: `type|${pick.text}`,
     };
-  });
+  }));
+}
+
+/* Vysvětlení k listu: pravidla druhů, které se spletly, a pak každá
+   špatná věta zvlášť. Bez `picks` (pojistka) se projde celý list. */
+export function vetyListExplain(ex, picks = null) {
+  const wrong = ex.items.filter((it, i) => !picks || picks[i] !== it.answer);
+  const steps = [...new Set(wrong.map((it) => it.answer))].map((t) => VETY_TYPES[t].rule);
+  for (const it of wrong) {
+    steps.push(`${it.text} → **${VETY_LETTERS[it.answer]}** (${VETY_TYPES[it.answer].label})`);
+    if (it.note) steps.push(it.note);
+  }
+  return steps;
 }
 
 /* Kroky vysvětlení po chybě, **tučné** převádí app.js na <b>. */
 export function vetyExplain(ex) {
+  if (ex.task === 'list') return vetyListExplain(ex);
   if (ex.task === 'ask') {
     return [
       'Z oznamovací věty uděláš tázací takhle: slovo, které říká, **co se děje**, dáš dopředu a na konec napíšeš **otazník**.',
@@ -305,6 +352,7 @@ export function vetyExplain(ex) {
 }
 
 export function vetyText(ex, reveal) {
+  if (ex.task === 'list') return reveal ? `List s písmeny: ${ex.answer}` : `List s písmeny (${ex.items.length} vět)`;
   if (!reveal) return ex.text;
   return ex.task === 'ask' ? `${ex.text} → ${ex.answer}` : `${ex.text} → ${VETY_TYPES[ex.answer].label}`;
 }

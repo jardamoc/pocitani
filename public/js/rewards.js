@@ -50,11 +50,12 @@ export const REWARD_RULES = {
      ulohu zvlast, ne az na hotovy prumer - jedna slovni uloha v sade tak
      opravdu prida cas na tri priklady. Drz cela cisla, nasobek se zobrazuje
      v navodu a desetinne cislo do textu pro dite nepatri. */
-  speedKindMultiplier: { equation: 1, word: 3, bond: 2, sign: 2, compare: 1, over10: 2, riddle: 3, grid: 4, pexeso: 6, bigmul: 3, abc: 1, pos: 2, vety: 2, vyznam: 2, slova: 4 },
+  speedKindMultiplier: { equation: 1, word: 3, bond: 2, sign: 2, compare: 1, over10: 2, riddle: 3, grid: 4, pexeso: 6, bigmul: 3, abc: 1, pos: 2, vety: 2, vetylist: 2, vyznam: 2, slova: 4, uu: 2 },
   /* Druhy, u kterych se nasobek bere ZA KAZDE SLOVO, ne za celou ulohu -
      plocha s deviti slovy a s petadvaceti se lusti uplne jinak dlouho.
-     Kolik slov na ploše bylo, posila app.js v `kindUnits`. */
-  speedPerUnitKinds: ['abc'],
+     Kolik slov na ploše bylo, posila app.js v `kindUnits`. List s pismeny
+     v druzich vet se pocita za kazdou vetu. */
+  speedPerUnitKinds: ['abc', 'vetylist'],
   speedLevelMultiplier: { easy: 1, medium: 1.3, hard: 1.7 },
 
   /* Rezim "Najdi dvojice" (vnitrni klic `pexeso`): karticky jsou vsechny
@@ -193,7 +194,7 @@ const kindWeight = (kind) => REWARD_RULES.speedKindMultiplier[kind] ?? 1;
 
 /* Druh, kterym nahradime ulohy bez rozpisu - stara ulozena data i souhrn,
    ktery `kindCounts` neposlal. */
-const DEFAULT_KIND_BY_MODE = { riddle: 'riddle', grid: 'grid', over10: 'over10', pexeso: 'pexeso', bigmul: 'bigmul', abc: 'abc', pos: 'pos', vety: 'vety', vyznam: 'vyznam' };
+const DEFAULT_KIND_BY_MODE = { riddle: 'riddle', grid: 'grid', over10: 'over10', pexeso: 'pexeso', bigmul: 'bigmul', abc: 'abc', pos: 'pos', vety: 'vety', vyznam: 'vyznam', uu: 'uu' };
 const defaultKind = (mode) => DEFAULT_KIND_BY_MODE[mode] || 'equation';
 
 /* Casovy rozpocet cele sady v sekundach. Kazda uloha si prispeje vlastnim
@@ -267,7 +268,7 @@ export function performanceTier(summary, dailyCorrect) {
 }
 
 /* Nazev jedne ulohy podle rezimu - do vety o rychlosti. */
-const UNIT_BY_MODE = { riddle: 'hádanku', grid: 'mřížku', over10: 'rozklad', pexeso: 'celou plochu', abc: 'celou řadu slov', pos: 'větu', vety: 'větu', vyznam: 'úlohu' };
+const UNIT_BY_MODE = { riddle: 'hádanku', grid: 'mřížku', over10: 'rozklad', pexeso: 'celou plochu', abc: 'celou řadu slov', pos: 'větu', vety: 'větu', vyznam: 'úlohu', uu: 'větu' };
 const unitName = (mode) => UNIT_BY_MODE[mode] || 'příklad';
 
 /* Cesky duvod: rekne presne tu podminku, ktera dumplinga vynesla nejvys. */
@@ -280,7 +281,7 @@ function reasonFor(parts, summary, dailyCorrect) {
   if (parts.fast) return `Za sadu bez chyby ${rychle}`;
   // v abecede se nepocita, "do kolika" tam nic nerika
   if (summary.mode === 'abc') return 'Za slova seřazená bez jediné chyby';
-  if (summary.mode === 'pos' || summary.mode === 'vety') return 'Za věty bez jediné chyby';
+  if (summary.mode === 'pos' || summary.mode === 'vety' || summary.mode === 'uu') return 'Za věty bez jediné chyby';
   if (summary.mode === 'vyznam') return 'Za slova bez jediné chyby';
   return `Za počítání do ${summary.max} bez jediné chyby`;
 }
@@ -476,8 +477,10 @@ export function howToGet(category) {
     nasobek('abc', 'v abecedě každé slovo'),
     nasobek('pos', 'věta ve slovních druzích'),
     nasobek('vety', 'věta v druzích vět'),
+    nasobek('vetylist', 'na listu s písmeny každá věta'),
     nasobek('vyznam', 'úloha ve významu slov'),
     nasobek('slova', 'plocha se souřadnými slovy'),
+    nasobek('uu', 'věta s doplňováním u, ú, ů'),
   ].join(', ')}.`;
   /* U "Najdi dvojice" je chybou spojeni dvou karticek, ktere k sobe nepatri.
      Jedno prehlednuti se odpousti. Cisla se berou z REWARD_RULES, aby text
