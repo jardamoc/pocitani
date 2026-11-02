@@ -399,6 +399,13 @@ h1, h2, h3, .num, .box-value, .key, .score-big { font-family: 'Baloo 2', 'Nunito
 .chips .chip.is-on[data-value="spoj"] { background: linear-gradient(135deg, #f472b6, #be185d); }
 .chips .chip.is-on[data-value="nad"] { background: linear-gradient(135deg, #34d399, #0f766e); }
 .chips .chip.is-on[data-value="list"] { background: linear-gradient(135deg, #fbbf24, #c2410c); }
+.chips .chip.is-on[data-value="znak"] { background: linear-gradient(135deg, #c084fc, #7c3aed); }
+.chips .chip.is-on[data-value="nazev"] { background: linear-gradient(135deg, #60a5fa, #2563eb); }
+.chips .chip.is-on[data-value="umisti"] { background: linear-gradient(135deg, #34d399, #0f766e); }
+.chips .chip.is-on[data-value="vyska"] { background: linear-gradient(135deg, #fb923c, #ea580c); }
+.chips .chip.is-on[data-value="takt"] { background: linear-gradient(135deg, #f472b6, #be185d); }
+.chips .chip.is-on[data-value="naklavir"] { background: linear-gradient(135deg, #475569, #0f172a); }
+.chips .chip.is-on[data-value="naosnovu"] { background: linear-gradient(135deg, #c084fc, #7c3aed); }
 /* Volba hry - dvě velké dlaždice vedle sebe, na úzkém displeji pod sebou. */
 .chips-mode { display: grid; grid-template-columns: repeat(auto-fit, minmax(158px, 1fr)); gap: 10px; }
 .chip-mode {
@@ -419,21 +426,25 @@ h1, h2, h3, .num, .box-value, .key, .score-big { font-family: 'Baloo 2', 'Nunito
 .chips-mode .chip.is-on[data-value="vety"] { background: linear-gradient(135deg, #34d399, #0f766e); }
 .chips-mode .chip.is-on[data-value="vyznam"] { background: linear-gradient(135deg, #fbbf24, #c2410c); }
 .chips-mode .chip.is-on[data-value="uu"] { background: linear-gradient(135deg, #60a5fa, #be185d); }
+.chips-mode .chip.is-on[data-value="hudba"] { background: linear-gradient(135deg, #e879f9, #7c3aed); }
+.chips-mode .chip.is-on[data-value="klavir"] { background: linear-gradient(135deg, #64748b, #1e293b); }
 
 /* Záložky Matematika / Čeština nad kartami her. `<button>` nedědí barvu
    textu, proto ji záložka nastavuje sama. */
 .subject-tabs {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px;
   padding: 5px; margin-bottom: 14px; border-radius: 999px;
   background: var(--surface-2); box-shadow: inset 0 0 0 3px var(--line);
 }
 .subject-tab {
-  font: inherit; font-weight: 800; font-size: 1rem; cursor: pointer;
-  border: 0; border-radius: 999px; padding: 10px 8px;
+  font: inherit; font-weight: 800; font-size: clamp(.74rem, 3.6vw, 1rem); cursor: pointer;
+  border: 0; border-radius: 999px; padding: 10px 4px; min-width: 0;
   background: transparent; color: var(--ink-soft); white-space: nowrap;
   transition: background .18s ease, color .18s ease;
 }
 .subject-tab.is-on { background: var(--card); color: var(--ink); box-shadow: var(--shadow); }
+/* Tři záložky se na úzký telefon s ikonou nevejdou - ikona tam odpadne. */
+@media (max-width: 400px) { .subject-tab span[aria-hidden] { display: none; } }
 .subject-tab:focus-visible { outline: 3px solid var(--violet); outline-offset: 2px; }
 .custom-max[hidden] { display: none; }
 
@@ -1078,6 +1089,73 @@ body.is-dark { --pair-task: #93c5fd; --pair-result: #fdba74; }
 }
 .vz-gap.is-filled { border-color: var(--good); background: var(--good-tint); border-radius: 8px 8px 0 0; }
 .vz-gap.is-wrong { border-color: var(--bad); background: var(--bad-tint); }
+
+/* ---------- hudební nauka ----------
+   Noty kreslí notace.js jako SVG v barvě `currentColor`, takže barvu nese
+   `color` - `var(--ink)` na kartě, zelená/červená po odpovědi. Tlačítka
+   s obrázkem jsou obyčejné `.vt-opt`, jen s obrázkem uvnitř. */
+.hd-figure { display: flex; justify-content: center; margin: 0 0 14px; color: var(--ink); }
+.hd-figure.is-shake { animation: shake .45s ease; }
+.hd-svg { display: block; width: 100%; height: auto; overflow: visible; }
+.hd-figure .hd-staff { max-width: 340px; }
+.hd-figure .hd-grand { max-width: 280px; }
+.hd-place .hd-staff { max-width: 380px; }
+.hd-place .hd-grand { max-width: 320px; }
+.hd-figure .hd-bar { max-width: 360px; }
+.hd-figure .hd-sym { max-width: 170px; }
+/* Klávesnice zůstává bílo-černá i v tmavém režimu - je to obrázek klavíru. */
+.hd-figure .hd-piano { max-width: 360px; }
+.vt-opt.hd-key { cursor: pointer; }
+.hd-white rect { fill: #fff; stroke: #1e293b; stroke-width: 1.5; }
+.hd-white text { fill: #64748b; }
+.hd-black rect { fill: #1e293b; stroke: #0f172a; stroke-width: 1; }
+.vt-opt.hd-white:hover rect { fill: #ede9fe; }
+.vt-opt.hd-black:hover rect { fill: #4c1d95; }
+.hd-key.is-right rect { fill: var(--good); }
+.hd-key.is-wrong rect { fill: var(--bad); }
+.hd-key.is-right text, .hd-key.is-wrong text { fill: #fff; }
+/* svítící klávesa u „klavír obráceně“ - jen se na ni kouká, neklepe */
+.hd-key.is-lit { cursor: default; }
+.hd-key.is-lit rect { fill: #8b5cf6; stroke: #5b21b6; }
+.hd-key.is-lit text { fill: #fff; }
+/* Tři stejné sloupce - volné řazení na úzkém telefonu přeteklo z karty. */
+.hd-accs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 0 0 10px; }
+.hd-accbtn {
+  font-family: 'Baloo 2', sans-serif; font-weight: 800; font-size: clamp(.9rem, 4vw, 1.05rem); cursor: pointer;
+  padding: 6px 4px; border-radius: 999px; border: 3px solid transparent; white-space: nowrap; min-width: 0;
+  background: var(--surface-2); color: var(--ink);
+}
+.hd-accbtn.is-on { border-color: var(--violet); background: #ede9fe; color: #3b0764; }
+.hd-accbtn:focus-visible { outline: 3px solid var(--violet); outline-offset: 2px; }
+.hd-faint { opacity: .3; }
+.hd-letter { font-size: 1.5em; color: var(--violet); }
+.hd .hd-note.is-right, .hd .hd-gap-fill.is-right { color: var(--good); }
+.hd .hd-note.is-wrong, .hd .hd-gap-fill.is-wrong { color: var(--bad); }
+/* klepací pruhy „Umísti notu“ - neviditelné, při najetí myší jemně podbarvené */
+.hd-slot { fill: transparent; cursor: pointer; }
+.hd-slot:hover { fill: rgba(124, 92, 255, .14); }
+/* „Která nota je vyšší?“ - klepe se přímo na notu */
+.hd-hit { cursor: pointer; }
+.hd-hit-bg { fill: transparent; stroke: transparent; stroke-width: 2; }
+.hd-hit:hover .hd-hit-bg { fill: rgba(124, 92, 255, .1); }
+.hd-hit.is-right .hd-hit-bg { fill: var(--good-tint); stroke: var(--good); }
+.hd-hit.is-wrong .hd-hit-bg { fill: var(--bad-tint); stroke: var(--bad); }
+.hd-gap { fill: none; stroke: var(--ink-soft); stroke-width: 1.6; stroke-dasharray: 5 4; }
+.hd-gap.is-right { fill: var(--good-tint); stroke: var(--good); stroke-dasharray: none; }
+.hd-gap.is-wrong { fill: var(--bad-tint); stroke: var(--bad); stroke-dasharray: none; }
+.hd-pic { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px; }
+.hd-pic .hd-svg { max-width: 110px; }
+.hd-pic-label { font-size: .95rem; line-height: 1.1; }
+.hd-barbtn { flex-direction: row; gap: 8px; }
+.hd-barbtn .hd-svg { max-width: none; flex: 1; min-width: 0; }
+.hd[data-task="hd-znak-show"] .vt-opts,
+.hd[data-task="hd-znak-find"] .vt-opts,
+.hd[data-task="hd-takt-doby"] .vt-opts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.hd[data-task="hd-znak-show"] .vt-opt { font-size: clamp(.95rem, 4.4vw, 1.2rem); padding: 6px 4px; min-width: 0; }
+.hd[data-task="hd-nazev"] .vt-opts { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.hd[data-task="hd-nazev"] .vt-opt { font-size: 1.6rem; }
+.hd[data-task="hd-takt-dopln"] .vt-opts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.hd[data-task="hd-takt-dopln"] .vt-opt { min-width: 0; }
 
 /* ---------- list „Označ písmenem“ (druhy vět) ----------
    Věty pod sebou, vpravo okénko s písmenem. Okénko je tlačítko a písmeno

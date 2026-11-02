@@ -87,6 +87,8 @@ běžel. Vypadalo to jako chyba nasazení, a nebyla.
 | `public/js/vety.js` | Druhy vět: ručně sepsané věty, výběr kola, možnosti k otázce a vysvětlení |
 | `public/js/vyznam.js` | Význam slov: ručně sepsaná slova a skupiny, tři úlohy, vysvětlení |
 | `public/js/uu.js` | Doplň u, ú, ů: ručně sepsané věty se zápisem `[ů]`, rozbor mezer, tag chyby, vysvětlení |
+| `public/js/hudba.js` | Hudební nauka a Klavír: tabulky, generátory úloh, vysvětlení — bez DOM |
+| `public/js/notace.js` | kreslení not jako SVG text (osnova, klíče, noty, pomlky, takty) — bez knihovny |
 | `public/js/stats.js` | rozbor kola, rady, `sanitizeState()` — **na úložiště nesahá** |
 | `public/js/storage.js` | **jediná vrstva nad úložištěm** — načtení, fronta zápisů, mazání, vyměnitelný backend |
 | `public/js/validate.js` | `wholeNumber` / `textList` — sdílené kousky validace, bez DOM |
@@ -117,7 +119,8 @@ na neexistující soubor. Když je tam někdy mít chceš, přidej napřed vlast
 | `package.json` | jen ty tři zkratky a `"type": "module"`; žádné závislosti |
 
 Prosté ES moduly, žádný framework, žádné závislosti. Závislosti jdou jedním směrem:
-`random.js → riddle.js / grid.js / over10.js / pexeso.js / bigmul.js / abc.js / pos.js / vety.js / vyznam.js / uu.js → generator.js → app.js`
+`random.js → riddle.js / grid.js / over10.js / pexeso.js / bigmul.js / abc.js / pos.js / vety.js / vyznam.js / uu.js / hudba.js → generator.js → app.js`
+(`notace.js → app.js` nezávisle, nic neimportuje)
 (`stats.js` si z `vety.js` a `vyznam.js` bere jen názvy pro výpis chyb)
 (`app.js` si z `abc.js` bere navíc funkce přesunu a z `pos.js` tabulky a `posCheck` / `posTag`),
 `rewards-data.js → rewards.js → rewards-ui.js → app.js`,
@@ -163,10 +166,11 @@ Co z toho plyne pro psaní kódu:
 - **`mergePayload()` v `transfer.js` neukládá.** Slučování je čistá operace v paměti,
   která vrátí souhrn změn; zapisuje až `acceptIncoming()` v `app.js`.
 
-## Jedenáct režimů hry
+## Třináct režimů hry
 
-Na úvodní obrazovce se vybírá karta **„Co si zahrajeme?"**. Nad kartami jsou dvě
-záložky **🔢 Matematika / 📖 Čeština** (`SUBJECTS`, u každého režimu `subject` v `MODES`).
+Na úvodní obrazovce se vybírá karta **„Co si zahrajeme?"**. Nad kartami jsou tři
+záložky **🔢 Matematika / 📖 Čeština / 🎵 Hudba** (`SUBJECTS`, u každého režimu `subject` v `MODES`).
+Pod 400 px se ikony záložek schovají, jinak se tři vedle sebe nevejdou.
 Otevřená záložka se neukládá, odvodí se z `config.mode`; přepnutí záložky rovnou vybere
 hru (naposledy hranou pod ní, jinak první) — bez toho by dole zůstalo nastavení z druhé
 záložky.
@@ -184,6 +188,8 @@ záložky.
 | **Druhy vět** (Čeština) | `vety` | „něco navíc", **rozsah**; karta s operacemi vybírá úlohu; počet = počet vět |
 | **Význam slov** (Čeština) | `vyznam` | „něco navíc", **rozsah**; karta s operacemi vybírá úlohu; jen se spojováním i **počet** |
 | **Doplň u, ú, ů** (Čeština) | `uu` | operace, „něco navíc", **rozsah**; počet = počet vět |
+| **Hudební nauka** (Hudba) | `hudba` | „něco navíc", **rozsah**; karta s operacemi vybírá úlohy; počet = počet úloh |
+| **Klavír** (Hudba) | `klavir` | „něco navíc", **rozsah**; karta s operacemi vybírá směr; počet = počet úloh |
 
 Větve se rozcházejí až v `startRound()`, kde je tabulka builderů. Všechno ostatní —
 klávesnice, vyhodnocení, statistiky — je společné, protože každá úloha má stejný tvar:
@@ -736,6 +742,67 @@ Vztah i nadřazené slovo jdou přes společný ovladač s druhy vět (`choiceTa
 - Žádné sporné dvojice (ráno – večer, teplý – horký). Slova mnohoznačná, která učebnice
   neřadí mezi souzvučná (`jazyk`), do `HOM` nepatří.
 - Skupina má aspoň 5 slov (4 v řadě + 1 souřadné jako špatná možnost).
+
+## Hudební nauka
+
+Jediná hra pod záložkou Hudba (`config.mode` = `hudba`, `ex.kind` = `hudba`). Předlohou
+byly musictheory.net (poznej notu / umísti notu) a sešity ZUŠ pro 1. ročník (doplň takt,
+najdi chybný takt). Pět úloh na kartě „Co budeme dělat?" (`config.hudbaTasks`,
+**do `config.ops` nepatří**), počet 5 / 10 / 15 (`config.hudbaCount`):
+
+| `task` | úloha | ovládání |
+|---|---|---|
+| `znak` | Co je to? — osnova, klíče, noty a pomlky celá–osminová; obrázek → název, nebo naopak | výběr |
+| `nazev` | Poznej notu — tlačítka c d e f g a h | výběr |
+| `umisti` | Umísti notu — klepnutí na linku/mezeru, **jediná s druhým pokusem** (`ex.retry`) | pruhy v SVG |
+| `vyska` | Která nota je vyšší/nižší — klepe se přímo na notu | výběr |
+| `takt` | podtyp `form`: `doby` (kolik dob), `dopln` (která pomlka doplní takt), `chyba` (který ze tří taktů nesedí) | výběr |
+
+**Obtížnost = osnova a takt** (rozhodl uživatel): lehká houslová + 4/4, střední basová + 3/4,
+těžká obě osnovy najednou (velká osnova) + oba takty. Rozsah: houslová c1–g2, basová G–c1.
+**Názvy not jen písmeny** — oktávy se netrénují, proto je u „Umísti notu" správně
+každé místo s tím písmenem (i na obou osnovách).
+
+**Kreslí se vlastním SVG** (`notace.js`), žádná knihovna ani notové písmo (rozhodl uživatel).
+Barva je všude `currentColor`, nese ji CSS. Klíče jsou ručně kreslené cesty. Výška noty je
+celé číslo `d` (c1 = 28), krok na osnově `step` od spodní linky — žádné zlomky.
+
+Pár věcí, které se snadno rozbijí:
+
+- **Žádná desetinná čísla:** osminové noty jsou v taktech jen ve dvojici s trámcem
+  (`n:eighth2` = 1 doba), osminová pomlka se v taktech nepoužívá. Celá nota/pomlka jen
+  jako jediná věc v taktu 4/4.
+- Celá a půlová pomlka se liší **jen polohou** (visí pod 4. linkou × sedí na 3.), proto
+  se značky kreslí na kousku osnovy. Osnova je mezi špatnými možnostmi jen u klíčů,
+  jinak by „notová osnova" byla taky pravda.
+- Všechno jede přes `choiceTap()` (`CHOICE_HTML.hudba`); obrázkové možnosti, noty
+  i pruhy v osnově mají třídu `vt-opt` a `data-i`. Druhý pokus drží `choiceMiss`.
+- Linky a mezery se v textech počítají **zdola** (jak se učí ve škole).
+- Klávesy 1–7 vyberou možnost, kromě „Umísti notu".
+- Do odměn jde `max: 0` jako u češtiny, čas 2 běžné příklady na úlohu.
+
+## Klavír
+
+Druhá hra pod záložkou Hudba (`config.mode` = `klavir`). Uživatel ji chtěl **jako samostatnou
+hru vedle Hudební nauky**, ne jako její úlohu. Úlohy ale generuje `hudba.js` (`makeKlavirRound()`)
+a jedou stejnou cestou: `ex.kind = 'hudba'`, `ex.task = 'klavir'`, směr v `ex.form`. Směry jsou
+na kartě „Co budeme dělat?" (`config.klavirForms`), počet `config.klavirCount`:
+
+- `naklavir` — nota na osnově (i s ♯ / ♭), dítě klepne na klávesu.
+- `naosnovu` — na klávesnici svítí klávesa, dítě vybere **bez / ♯ / ♭** a klepne na linku
+  nebo mezeru. Možnost je dvojice místo + posuvka; správně je všechno, co zní jako klávesa
+  (fis i ges, e na první lince i ve čtvrté mezeře).
+
+Klávesnice má jednu oktávu **c až c** (8 bílých, 5 černých); oktáva se netrénuje, u c platí obě
+krajní. Obtížnost: lehká houslová a jen křížky, střední basová s křížky i béčky, těžká obě osnovy.
+
+- **České názvy:** -is / -es, ale `es`, `as` a `b` (= h s béčkem). Zápisy, které padnou na bílou
+  klávesu (eis, his, ces, fes), se nepoužívají.
+- Svítící klávesa nemá třídu `vt-opt` (`pianoSVG({ tap: false })`), jinak by ji `choiceTap()`
+  vzal jako odpověď. Volbu posuvky drží `hudbaAcc` v `app.js`.
+- Druhý pokus v obou směrech (`ex.retry`).
+- Tři tlačítka posuvek jsou mřížka 3 × `minmax(0, 1fr)` s krátkými popisky — „bez posuvky"
+  v volném řazení přeteklo na 320 px z karty.
 
 ## Doplň znaménko
 

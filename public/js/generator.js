@@ -8,6 +8,7 @@ import { makePosRound, posAnswer, posExplain, posText } from './pos.js';
 import { makeVetyRound, vetyExplain, vetyText } from './vety.js';
 import { makeVyznamRound, vyznamExplain, vyznamText } from './vyznam.js';
 import { makeUuRound, uuExplain, uuText } from './uu.js';
+import { makeHudbaRound, makeKlavirRound, hudbaExplain, hudbaText, HUDBA_TAGS } from './hudba.js';
 import { makeBigmul, bigmulExplain, bigmulText } from './bigmul.js';
 
 export const OPS = {
@@ -145,6 +146,7 @@ export function signature(ex) {
   if (ex.kind === 'vety' || ex.kind === 'vetylist') return `vety|${ex.key}`;
   if (ex.kind === 'vyznam' || ex.kind === 'slova') return `vyznam|${ex.key}`;
   if (ex.kind === 'uu') return `uu|${ex.key}`;
+  if (ex.kind === 'hudba') return `hudba|${ex.key}`;
   // velké násobení je dané dvojicí činitelů, ne trojicí a, b, c
   if (ex.kind === 'bigmul') return `bigmul|${ex.key}`;
   return `${ex.op}|${ex.kind}|${ex.missing}|${ex.a}|${ex.b}`;
@@ -545,6 +547,34 @@ export function buildUuRound(config) {
   }));
 }
 
+/* Hudební nauka - stejný tvar jako druhy vět: co úloha, to jedna věc,
+   `missing` nese úlohu (`znak` / `nazev` / `umisti` / `vyska` / `takt`).
+   Odpovídá se klepnutím, ovladač je v app.js. */
+export function buildHudbaRound(config) {
+  return makeHudbaRound(config.level, config.hudbaTasks, config.hudbaCount).map((p) => ({
+    op: 'add',
+    kind: 'hudba',
+    missing: p.task,
+    a: 0, b: 0, c: 0,
+    cross: false,
+    skill: `hudba:${p.task}`,
+    ...p,
+  }));
+}
+
+/* Klavír - samostatná hra, ale úlohy stejného druhu `hudba` (`task` je
+   `klavir`, `form` směr). Ovladač, vysvětlení i statistika jsou společné. */
+export function buildKlavirRound(config) {
+  return makeKlavirRound(config.level, config.klavirForms, config.klavirCount).map((p) => ({
+    op: 'add',
+    kind: 'hudba',
+    missing: 'klavir',
+    a: 0, b: 0, c: 0,
+    cross: false,
+    skill: `klavir:${p.form}`,
+    ...p,
+  }));
+}
 /* ---------------- velké násobení ----------------
    `op: 'mul'` je tu POCTIVÉ násobení, ne zástupná hodnota jako u mřížky -
    nemusí se tedy nikde vylučovat z aritmetiky. Odpovědí je ale řetězec
@@ -598,6 +628,7 @@ export function exToText(ex, reveal = false) {
   if (ex.kind === 'vety' || ex.kind === 'vetylist') return vetyText(ex, reveal);
   if (ex.kind === 'vyznam' || ex.kind === 'slova') return vyznamText(ex, reveal);
   if (ex.kind === 'uu') return uuText(ex, reveal);
+  if (ex.kind === 'hudba') return hudbaText(ex, reveal);
   if (ex.kind === 'bigmul') return bigmulText(ex, reveal);
   if (ex.kind === 'riddle') return riddleText(ex, reveal);
   if (ex.kind === 'sign') {
@@ -660,6 +691,7 @@ export function explain(ex) {
   if (kind === 'vety' || kind === 'vetylist') return vetyExplain(ex);
   if (kind === 'vyznam' || kind === 'slova') return vyznamExplain(ex);
   if (kind === 'uu') return uuExplain(ex);
+  if (kind === 'hudba') return hudbaExplain(ex);
   if (kind === 'bigmul') return bigmulExplain(ex);
   if (kind === 'riddle') return riddleExplain(ex);
 
@@ -808,6 +840,7 @@ export const TAGS = {
   bigmulSum: 'chyba v součtu',
   bigmulStep: 'chyba v jednom kroku',
   compareFlip: 'obrácený zobáček',
+  ...HUDBA_TAGS,
   other: 'jiná chyba',
 };
 
@@ -841,6 +874,10 @@ export function diagnose(ex, given) {
   /* Doplň u, ú, ů taky - odpovědí jsou písmena. Přesný tag podle mezer
      počítá ovladač (`uuTag()`), tohle je pojistka. */
   if (kind === 'uu') return 'uuLength';
+
+  /* Hudební nauka taky - odpovědí je název nebo místo, tag podle zvolené
+     možnosti zapisuje ovladač, tohle je pojistka. */
+  if (kind === 'hudba') return 'hudbaNazev';
 
   /* Význam slov taky - tag podle zvolené možnosti zapisuje ovladač,
      u plochy se souřadnými slovy je "odpovědí" počet chybných spojení. */

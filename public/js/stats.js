@@ -76,7 +76,7 @@ export function sanitizeState(raw) {
 }
 
 /* Druhy úloh, které se nedají z descriptoru znovu poskládat. */
-const NO_REPEAT = new Set(['riddle', 'grid', 'over10', 'pexeso', 'bigmul', 'abc', 'pos', 'vety', 'vetylist', 'vyznam', 'slova', 'uu']);
+const NO_REPEAT = new Set(['riddle', 'grid', 'over10', 'pexeso', 'bigmul', 'abc', 'pos', 'vety', 'vetylist', 'vyznam', 'slova', 'uu', 'hudba']);
 
 const descriptor = (ex) => ({
   op: ex.op,
@@ -158,6 +158,12 @@ const KIND_LABEL = {
   'vety:ask': { acc: 'otázky', gen: 'otázek' },
   'vyznam:vztah': { acc: 'vztahy mezi slovy', gen: 'vztahů mezi slovy' },
   'vyznam:nad': { all: 'všechna', acc: 'slova nadřazená', gen: 'slov nadřazených' },
+  'hudba:znak': { all: 'všechny', acc: 'značky', gen: 'značek' },
+  'hudba:nazev': { all: 'všechny', acc: 'názvy not', gen: 'názvů not' },
+  'hudba:umisti': { all: 'všechny', acc: 'noty na osnově', gen: 'umisťování not' },
+  'hudba:vyska': { all: 'všechny', acc: 'vyšší a nižší noty', gen: 'vyšších a nižších not' },
+  'hudba:takt': { all: 'všechny', acc: 'takty', gen: 'taktů' },
+  'hudba:klavir': { all: 'všechny', acc: 'noty na klavíru', gen: 'hledání not na klavíru' },
 };
 
 function starsFor(pct) {
@@ -190,7 +196,7 @@ const LEVEL_NAME = { easy: 'Lehké', medium: 'Střední', hard: 'Těžké' };
 
 /* Jak se v rozpadu podle obtížnosti pojmenuje jedna úloha daného režimu.
    Rod i číslo musí sedět na věty "Lehké mřížky ti jdou výborně". */
-const MODE_UNITS = { grid: 'mřížky', riddle: 'hádanky', over10: 'rozklady', pexeso: 'plochy', bigmul: 'příklady', abc: 'řady slov', pos: 'věty', vety: 'věty', vyznam: 'úlohy', uu: 'věty' };
+const MODE_UNITS = { grid: 'mřížky', riddle: 'hádanky', over10: 'rozklady', pexeso: 'plochy', bigmul: 'příklady', abc: 'řady slov', pos: 'věty', vety: 'věty', vyznam: 'úlohy', uu: 'věty', hudba: 'úlohy', klavir: 'úlohy' };
 
 export function analyze(state, config, attempts) {
   const riddleMode = config.mode === 'riddle';
@@ -203,12 +209,14 @@ export function analyze(state, config, attempts) {
   const vetyMode = config.mode === 'vety';
   const vyznamMode = config.mode === 'vyznam';
   const uuMode = config.mode === 'uu';
+  // klavír je samostatná hra, ale úlohy i rady má společné s hudební naukou
+  const hudbaMode = config.mode === 'hudba' || config.mode === 'klavir';
   /* Režimy, kde se rozpad podle operací nehodí - hádanky, mřížky i pexeso
      mají `op: 'add'` jen jako zástupnou hodnotu a u rozkladu přes desítku je
      sčítání zase úplně všude, takže by "sčítání ti jde" nic neřeklo.
      Ve všech pěti jedeme podle obtížnosti. U velkého násobení je zase
      násobení úplně všude, takže by rozpad podle operací neřekl nic. */
-  const levelMode = riddleMode || gridMode || over10Mode || pexesoMode || bigmulMode || abcMode || posMode || vetyMode || vyznamMode || uuMode;
+  const levelMode = riddleMode || gridMode || over10Mode || pexesoMode || bigmulMode || abcMode || posMode || vetyMode || vyznamMode || uuMode || hudbaMode;
   const total = attempts.length;
   const correct = attempts.filter((a) => a.correct).length;
   const pct = total ? Math.round((correct / total) * 100) : 0;
@@ -216,7 +224,7 @@ export function analyze(state, config, attempts) {
   /* Porovnávání a pexeso mají `op: 'add'` jen zástupně - do rozpadu podle
      operací ani do přechodu přes desítku nepatří, jinak by "sčítání ti jde"
      stálo z půlky na úlohách, kde se nic nesčítá. */
-  const PLACEHOLDER_OP = new Set(['compare', 'pexeso', 'abc', 'pos', 'vety', 'vetylist', 'vyznam', 'slova', 'uu']);
+  const PLACEHOLDER_OP = new Set(['compare', 'pexeso', 'abc', 'pos', 'vety', 'vetylist', 'vyznam', 'slova', 'uu', 'hudba']);
   const scored = attempts.filter((a) => !PLACEHOLDER_OP.has(a.ex.kind));
   const byOp = group(scored, (a) => a.ex.op).sort((x, y) => y.seen - x.seen);
   const byLevel = group(attempts, (a) => a.ex.level || null)
@@ -259,7 +267,7 @@ export function analyze(state, config, attempts) {
     if (cross.pct >= 85) strengths.push(`Přechod přes desítku ti jde (${cross.correct} z ${cross.seen}). To je ta nejtěžší část!`);
     else if (cross.pct < 65) watchOuts.push(`Přechod přes desítku dělá potíže – ${cross.correct} z ${cross.seen}.`);
   }
-  if (!posMode && !vetyMode && !vyznamMode && !uuMode && pct >= 80 && avgMs > 0 && avgMs < 7000) strengths.push('Počítáš rychle a přesně zároveň.');
+  if (!posMode && !vetyMode && !vyznamMode && !uuMode && !hudbaMode && pct >= 80 && avgMs > 0 && avgMs < 7000) strengths.push('Počítáš rychle a přesně zároveň.');
 
   if (tags.get('offOne') >= 2) watchOuts.push('Několikrát ti výsledek utekl jen o jedničku – vyplatí se na konci zkontrolovat.');
   if (tags.get('riddleSymbol') >= 1) watchOuts.push('U hádanky se občas napsalo, kolik je jeden obrázek. Poslední řádek chce součet celého řádku.');
@@ -347,6 +355,34 @@ export function analyze(state, config, attempts) {
       tips.push(harder
         ? `Šlo ti to skvěle – zkus příště ${harder} obtížnost, věty budou záludnější.`
         : 'Šlo ti to skvěle – tohle jsou nejtěžší věty. Zkus si dát víc vět v kole.');
+    }
+  } else if (hudbaMode) {
+    if (tags.get('hudbaSoused')) {
+      tips.push('Když se spleteš o jednu notu, počítej znovu od klíče po krocích: linka, mezera, linka… Každý krok je další písmeno.');
+    }
+    if (tags.get('hudbaKlic')) {
+      tips.push('Nejdřív se podívej, jaký je na začátku klíč. V basovém klíči leží noty jinde než v houslovém.');
+    }
+    if (tags.get('hudbaHodnota') || tags.get('hudbaZnak')) {
+      tips.push('Prázdné kolečko bez nožičky je celá nota, s nožičkou půlová. Celá pomlka visí pod linkou, půlová na lince sedí.');
+    }
+    if (tags.get('hudbaDoby')) {
+      tips.push('V taktu sčítej doby: celá 4, půlová 2, čtvrťová 1, dvě osminové dohromady 1.');
+    }
+    if (tags.get('hudbaPosuvka')) {
+      tips.push('Než klepneš na klávesu, podívej se, jestli před notou není křížek ♯ nebo béčko ♭.');
+    }
+    if (tags.get('hudbaSmer')) {
+      tips.push('Křížek ♯ posouvá o klávesu doprava, béčko ♭ doleva.');
+    }
+    if (tags.get('hudbaVyska')) {
+      tips.push('Vyšší nota sedí na osnově výš, nižší níž – jako na schodech.');
+    }
+    if (pct >= 90) {
+      const harder = { easy: 'střední', medium: 'těžkou' }[config.level];
+      tips.push(harder
+        ? `Šlo ti to skvěle – zkus příště ${harder} obtížnost.`
+        : 'Šlo ti to skvěle – tohle je nejtěžší obtížnost, obě osnovy najednou.');
     }
   } else if (vyznamMode) {
     if (tags.get('vyznamSynAnt')) {
