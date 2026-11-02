@@ -164,6 +164,7 @@ const KIND_LABEL = {
   'hudba:vyska': { all: 'všechny', acc: 'vyšší a nižší noty', gen: 'vyšších a nižších not' },
   'hudba:takt': { all: 'všechny', acc: 'takty', gen: 'taktů' },
   'hudba:klavir': { all: 'všechny', acc: 'noty na klavíru', gen: 'hledání not na klavíru' },
+  'hudba:sluch': { all: 'všechny', acc: 'tóny podle sluchu', gen: 'tónů podle sluchu' },
 };
 
 function starsFor(pct) {
@@ -196,7 +197,7 @@ const LEVEL_NAME = { easy: 'Lehké', medium: 'Střední', hard: 'Těžké' };
 
 /* Jak se v rozpadu podle obtížnosti pojmenuje jedna úloha daného režimu.
    Rod i číslo musí sedět na věty "Lehké mřížky ti jdou výborně". */
-const MODE_UNITS = { grid: 'mřížky', riddle: 'hádanky', over10: 'rozklady', pexeso: 'plochy', bigmul: 'příklady', abc: 'řady slov', pos: 'věty', vety: 'věty', vyznam: 'úlohy', uu: 'věty', hudba: 'úlohy', klavir: 'úlohy' };
+const MODE_UNITS = { grid: 'mřížky', riddle: 'hádanky', over10: 'rozklady', pexeso: 'plochy', bigmul: 'příklady', abc: 'řady slov', pos: 'věty', vety: 'věty', vyznam: 'úlohy', uu: 'věty', hudba: 'úlohy', klavir: 'úlohy', sluch: 'úlohy' };
 
 export function analyze(state, config, attempts) {
   const riddleMode = config.mode === 'riddle';
@@ -210,7 +211,7 @@ export function analyze(state, config, attempts) {
   const vyznamMode = config.mode === 'vyznam';
   const uuMode = config.mode === 'uu';
   // klavír je samostatná hra, ale úlohy i rady má společné s hudební naukou
-  const hudbaMode = config.mode === 'hudba' || config.mode === 'klavir';
+  const hudbaMode = config.mode === 'hudba' || config.mode === 'klavir' || config.mode === 'sluch';
   /* Režimy, kde se rozpad podle operací nehodí - hádanky, mřížky i pexeso
      mají `op: 'add'` jen jako zástupnou hodnotu a u rozkladu přes desítku je
      sčítání zase úplně všude, takže by "sčítání ti jde" nic neřeklo.
@@ -374,6 +375,9 @@ export function analyze(state, config, attempts) {
     }
     if (tags.get('hudbaSmer')) {
       tips.push('Křížek ♯ posouvá o klávesu doprava, béčko ♭ doleva.');
+    }
+    if (tags.get('hudbaSluch')) {
+      tips.push('Pusť si tóny klidně víckrát tlačítkem 🔊 a zkus si je potichu zazpívat. Pak se líp porovnávají.');
     }
     if (tags.get('hudbaVyska')) {
       tips.push('Vyšší nota sedí na osnově výš, nižší níž – jako na schodech.');

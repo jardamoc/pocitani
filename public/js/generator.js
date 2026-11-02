@@ -8,7 +8,7 @@ import { makePosRound, posAnswer, posExplain, posText } from './pos.js';
 import { makeVetyRound, vetyExplain, vetyText } from './vety.js';
 import { makeVyznamRound, vyznamExplain, vyznamText } from './vyznam.js';
 import { makeUuRound, uuExplain, uuText } from './uu.js';
-import { makeHudbaRound, makeKlavirRound, hudbaExplain, hudbaText, HUDBA_TAGS } from './hudba.js';
+import { makeHudbaRound, makeKlavirRound, makeSluchRound, hudbaExplain, hudbaText, HUDBA_TAGS } from './hudba.js';
 import { makeBigmul, bigmulExplain, bigmulText } from './bigmul.js';
 
 export const OPS = {
@@ -572,6 +572,18 @@ export function buildKlavirRound(config) {
     a: 0, b: 0, c: 0,
     cross: false,
     skill: `klavir:${p.form}`,
+    ...p,
+  }));
+}
+/* Sluch - stejně jako klavír: úlohy druhu `hudba`, `task` je `sluch`. */
+export function buildSluchRound(config) {
+  return makeSluchRound(config.level, config.sluchForms, config.sluchCount).map((p) => ({
+    op: 'add',
+    kind: 'hudba',
+    missing: 'sluch',
+    a: 0, b: 0, c: 0,
+    cross: false,
+    skill: `sluch:${p.form}`,
     ...p,
   }));
 }

@@ -73,6 +73,7 @@ export const SYMBOLS = {
   bass: 'basový klíč',
   'n:whole': 'celá nota',
   'n:half': 'půlová nota',
+  'n:dhalf': 'tečkovaná půlová nota',
   'n:quarter': 'čtvrťová nota',
   'n:eighth': 'osminová nota',
   'r:whole': 'celá pomlka',
@@ -83,7 +84,8 @@ export const SYMBOLS = {
 
 const SYMBOL_POOL = {
   easy: ['staff', 'treble', 'n:whole', 'n:half', 'n:quarter', 'n:eighth', 'r:whole', 'r:half', 'r:quarter'],
-  medium: Object.keys(SYMBOLS),
+  medium: Object.keys(SYMBOLS).filter((s) => s !== 'n:dhalf'),
+  // tečkovaná půlová patří k taktu 3/4 a ten je naplno až na těžké
   hard: Object.keys(SYMBOLS),
 };
 
@@ -95,7 +97,8 @@ const CONFUSE = {
   treble: ['bass', 'n:eighth', 'r:quarter'],
   bass: ['treble', 'r:quarter', 'n:eighth'],
   'n:whole': ['r:whole', 'n:half', 'n:quarter'],
-  'n:half': ['n:whole', 'r:half', 'n:quarter'],
+  'n:half': ['n:dhalf', 'n:whole', 'r:half', 'n:quarter'],
+  'n:dhalf': ['n:half', 'n:whole', 'n:quarter'],
   'n:quarter': ['n:eighth', 'n:half', 'r:quarter'],
   'n:eighth': ['n:quarter', 'r:eighth', 'n:half'],
   'r:whole': ['r:half', 'n:whole', 'r:quarter'],
@@ -120,6 +123,7 @@ const SYMBOL_RULE = {
   bass: 'Basový klíč vypadá jako obrácené **C** a má vedle sebe **dvě tečky** kolem čtvrté linky.',
   'n:whole': 'Celá nota je **prázdné kolečko bez nožičky**. Trvá **4 doby**.',
   'n:half': 'Půlová nota je **prázdné kolečko s nožičkou**. Trvá **2 doby**.',
+  'n:dhalf': 'Tečkovaná půlová nota je půlová nota s **tečkou** vedle. Tečka přidá ještě půlku délky: 2 + 1 = **3 doby**.',
   'n:quarter': 'Čtvrťová nota je **plné kolečko s nožičkou**. Trvá **1 dobu**.',
   'n:eighth': 'Osminová nota je plné kolečko s nožičkou a **praporkem**. Dvě osminové trvají **1 dobu**.',
   'r:whole': 'Celá pomlka je obdélníček, který **visí pod čtvrtou linkou**. Trvá **4 doby**.',
@@ -139,6 +143,7 @@ export const HUDBA_TAGS = {
   hudbaDoby: 'špatně spočítané doby',
   hudbaPosuvka: 'přehlédnutý křížek nebo béčko',
   hudbaSmer: 'záměna křížku a béčka',
+  hudbaSluch: 'špatně rozpoznaný tón',
 };
 
 /* ---------------- místa na osnově ---------------- */
@@ -302,9 +307,9 @@ export function noteName(letter, acc) {
 /* Klávesy jedné oktávy: osm bílých (c až c) a pět černých. `after` je
    index bílé klávesy, za kterou černá leží. */
 export const PIANO_KEYS = [
-  ...['c', 'd', 'e', 'f', 'g', 'a', 'h', 'c'].map((l, i) => ({ white: true, pos: i, pc: LETTER_PC[l], text: l })),
+  ...['c', 'd', 'e', 'f', 'g', 'a', 'h', 'c'].map((l, i) => ({ white: true, pos: i, pc: LETTER_PC[l], text: l, midi: 60 + (i === 7 ? 12 : LETTER_PC[l]) })),
   ...[[0, 'cis / des'], [1, 'dis / es'], [3, 'fis / ges'], [4, 'gis / as'], [5, 'ais / b']]
-    .map(([after, text]) => ({ white: false, pos: after, pc: LETTER_PC['cdefgah'[after]] + 1, text })),
+    .map(([after, text]) => ({ white: false, pos: after, pc: LETTER_PC['cdefgah'[after]] + 1, text, midi: 61 + LETTER_PC['cdefgah'[after]] })),
 ];
 
 const PIANO_ACC = { easy: [0, 1, 1], medium: [0, 1, -1], hard: [0, 1, -1] };
@@ -422,6 +427,7 @@ function klavirExplain(ex) {
 export const BAR_ITEMS = {
   'n:whole': { beats: 4, label: 'celá' },
   'n:half': { beats: 2, label: 'půlová' },
+  'n:dhalf': { beats: 3, label: 'tečkovaná půlová' },
   'n:quarter': { beats: 1, label: 'čtvrťová' },
   'n:eighth2': { beats: 1, label: 'dvě osminové' },
   'r:whole': { beats: 4, label: 'celá pomlka' },
@@ -431,12 +437,13 @@ export const BAR_ITEMS = {
 
 /* Noty padají třikrát častěji než pomlky. Celá nota nebo pomlka jen jako
    jediná věc v taktu o čtyřech dobách. */
-function fillBar(beats) {
+function fillBar(beats, dotted = false) {
   if (beats === 4 && Math.random() < 0.12) return [{ k: pick(['n:whole', 'n:whole', 'r:whole']), step: rnd(2, 6) }];
   const out = [];
   let left = beats;
   while (left > 0) {
-    const cand = Object.keys(BAR_ITEMS).filter((k) => BAR_ITEMS[k].beats <= left && BAR_ITEMS[k].beats < 4);
+    const cand = Object.keys(BAR_ITEMS).filter((k) => BAR_ITEMS[k].beats <= left && BAR_ITEMS[k].beats < 4
+      && (k !== 'n:dhalf' || dotted));
     const weighted = cand.flatMap((k) => (k.startsWith('n:') ? [k, k, k] : [k]));
     const k = pick(weighted);
     out.push({ k, step: rnd(1, 7) });
@@ -457,7 +464,7 @@ function taktExercise(level) {
 
   if (form === 'doby') {
     const sum = level === 'easy' ? pick([3, 4]) : rnd(2, 4);
-    const items = fillBar(sum);
+    const items = fillBar(sum, level === 'hard');
     const choices = [2, 3, 4, 5];
     return {
       level, task: 'takt', form, clef, items,
@@ -488,7 +495,7 @@ function taktExercise(level) {
   // chyba: tři takty, jeden má o dobu víc nebo míň
   const wrongIdx = rnd(0, 2);
   const wrongSum = meter === 3 ? pick([2, 4]) : pick([3, 5]);
-  const bars = [0, 1, 2].map((i) => fillBar(i === wrongIdx ? wrongSum : meter));
+  const bars = [0, 1, 2].map((i) => fillBar(i === wrongIdx ? wrongSum : meter, level === 'hard' && meter === 3));
   return {
     level, task: 'takt', form, clef, meter, bars, wrongIdx,
     text: `Takty jsou ve ${meter}/4. Který z nich nesedí?`,
@@ -547,6 +554,148 @@ export function makeKlavirRound(levelKey = 'easy', forms = KLAVIR_FORM_KEYS, cou
   });
 }
 
+/* ---------------- hra Sluch ----------------
+   Tóny hraje zvuk.js (syntéza v prohlížeči). Tady jsou jen čísla kláves
+   MIDI (c1 = 60) a úlohy. Absolutní sluch nemá skoro nikdo, proto úlohy,
+   kde se hledá konkrétní tón, nejdřív zahrají **c** jako kotvu. */
+export const SLUCH_FORMS = {
+  vyssi: { label: 'Vyšší, nebo nižší?', emoji: '↕️' },
+  odc: { label: 'Najdi tón od c', emoji: '🎹' },
+  melodie: { label: 'Zahraj, co slyšíš', emoji: '🎶' },
+  nota: { label: 'Která nota zazněla?', emoji: '🎼' },
+};
+export const SLUCH_FORM_KEYS = Object.keys(SLUCH_FORMS);
+
+export const SLUCH_LEVELS = {
+  easy: { label: 'Lehká', emoji: '🟢', note: 'velké skoky, jen bílé klávesy, melodie ze dvou tónů' },
+  medium: { label: 'Střední', emoji: '🟡', note: 'menší skoky, melodie ze tří tónů' },
+  hard: { label: 'Těžká', emoji: '🔴', note: 'i černé klávesy a tóny těsně vedle sebe' },
+};
+export const SLUCH_LEVEL_KEYS = Object.keys(SLUCH_LEVELS);
+
+const PC_NAME = ['c', 'cis', 'd', 'dis', 'e', 'f', 'fis', 'g', 'gis', 'a', 'ais', 'h'];
+export const midiName = (m) => PC_NAME[((m % 12) + 12) % 12];
+// horní c na klávesnici zní o oktávu výš než dolní - ve vysvětlení se nesmí plést
+export const toneName = (m) => (m === 72 ? 'vysoké c' : midiName(m));
+
+const keysFor = (level) => PIANO_KEYS.map((k, i) => ({ ...k, i })).filter((k) => k.white || level === 'hard');
+
+function sluchVyssi(level) {
+  const minGap = { easy: 5, medium: 3, hard: 1 }[level];
+  const a = rnd(57, 77);
+  let b = a;
+  if (Math.random() >= 0.2) {
+    do { b = a + pick([-1, 1]) * rnd(minGap, 12); } while (b < 55 || b > 81);
+  }
+  const rel = b > a ? 'up' : b < a ? 'down' : 'same';
+  const opts = [['up', '⬆️ vyšší'], ['down', '⬇️ nižší'], ['same', '🟰 stejný']];
+  return {
+    level, task: 'sluch', form: 'vyssi', tones: [a, b], rel,
+    text: 'Je druhý tón vyšší, nebo nižší než první?',
+    answer: opts.find((o) => o[0] === rel)[1].split(' ')[1],
+    options: opts.map(([key, text]) => ({ key, text, ok: key === rel, tag: key === rel ? null : 'hudbaSluch' })),
+    key: `sluch|vyssi|${a}|${b}`,
+  };
+}
+
+function sluchOdc(level) {
+  const pool = keysFor(level).filter((k) => k.midi !== 60);
+  const target = pick(pool);
+  return {
+    level, task: 'sluch', form: 'odc', tones: [60, target.midi], targetIdx: target.i, retry: true,
+    labels: level === 'easy',
+    text: `Najdi tón od c (${toneName(target.midi)})`,
+    answer: toneName(target.midi),
+    options: PIANO_KEYS.map((k) => ({ ...k, key: String(k.midi), ok: k.midi === target.midi, tag: k.midi === target.midi ? null : 'hudbaSluch' })),
+    key: `sluch|odc|${target.midi}`,
+  };
+}
+
+function sluchMelodie(level) {
+  const pool = keysFor(level);
+  const n = level === 'easy' ? 2 : 3;
+  const seq = [pick(pool)];
+  while (seq.length < n) {
+    const prev = seq[seq.length - 1];
+    const next = pick(pool.filter((k) => k.midi !== prev.midi && Math.abs(k.midi - prev.midi) <= 7));
+    seq.push(next);
+  }
+  const names = seq.map((k) => toneName(k.midi)).join(' – ');
+  return {
+    level, task: 'sluch', form: 'melodie', tones: seq.map((k) => k.midi), seq: seq.map((k) => k.i), retry: true,
+    labels: level === 'easy',
+    text: `Zahraj melodii (${names})`,
+    answer: names,
+    options: PIANO_KEYS.map((k) => ({ ...k, key: String(k.midi), ok: false, tag: 'hudbaSluch' })),
+    key: `sluch|melodie|${seq.map((k) => k.midi).join(',')}`,
+  };
+}
+
+function sluchNota(level) {
+  const whites = PIANO_KEYS.filter((k) => k.white && k.midi !== 60);
+  const target = pick(whites);
+  const n = level === 'easy' ? 2 : 3;
+  const minGap = { easy: 3, medium: 2, hard: 1 }[level];
+  const maxGap = level === 'hard' ? 2 : 7;
+  const others = shuffle(PIANO_KEYS.filter((k) => k.white && k.pos !== target.pos
+    && Math.abs(k.pos - target.pos) >= minGap && Math.abs(k.pos - target.pos) <= maxGap));
+  // dvě c (dole a nahoře) by měla na tlačítku stejné jméno - jen jedno
+  const picked = [];
+  for (const k of others) {
+    if (picked.length >= n - 1) break;
+    if (k.text === target.text || picked.some((p) => p.text === k.text)) continue;
+    picked.push(k);
+  }
+  const all = shuffle([target, ...picked]);
+  return {
+    level, task: 'sluch', form: 'nota', tones: [60, target.midi],
+    text: `Která nota zazněla? (${target.text})`,
+    answer: target.text,
+    options: all.map((k) => ({
+      text: k.text, key: String(k.pos), d: 28 + k.pos, midi: k.midi,
+      ok: k === target, tag: k === target ? null : 'hudbaSluch',
+    })),
+    key: `sluch|nota|${target.pos}|${all.map((k) => k.pos).join(',')}`,
+  };
+}
+
+const SLUCH_MAKERS = { vyssi: sluchVyssi, odc: sluchOdc, melodie: sluchMelodie, nota: sluchNota };
+
+export function makeSluchRound(levelKey = 'easy', forms = SLUCH_FORM_KEYS, count = 10) {
+  const level = SLUCH_LEVELS[levelKey] ? levelKey : 'easy';
+  const n = HUDBA_COUNTS.includes(count) ? count : HUDBA_COUNTS[1];
+  const use = forms.filter((f) => f in SLUCH_FORMS);
+  const keys = use.length ? use : ['vyssi'];
+  const plan = shuffle(Array.from({ length: n }, (_, i) => keys[i % keys.length]));
+  const seen = new Set();
+  return plan.map((form) => {
+    let ex = SLUCH_MAKERS[form](level);
+    for (let t = 0; t < 12 && seen.has(ex.key); t++) ex = SLUCH_MAKERS[form](level);
+    seen.add(ex.key);
+    return ex;
+  });
+}
+
+function sluchExplain(ex) {
+  const [a, b] = ex.tones;
+  if (ex.form === 'vyssi') {
+    return [
+      `První tón byl **${toneName(a)}**, druhý **${toneName(b)}**.`,
+      ex.rel === 'same' ? 'Byly to **stejné** tóny.'
+        : `Druhý byl **${ex.answer}** – na klavíru leží víc ${ex.rel === 'up' ? 'vpravo' : 'vlevo'}.`,
+      'Poslechni si je ještě jednou tlačítkem 🔊.',
+    ];
+  }
+  if (ex.form === 'melodie') {
+    return [`Melodie byla: **${ex.answer}**.`, 'Poslechni si ji tlačítkem 🔊 a zkus si ji potichu zazpívat.'];
+  }
+  const steps = [`Nejdřív zazněl tón **c**, potom tón **${ex.answer}**.`];
+  steps.push(b > 60 ? 'Druhý tón byl vyšší než c – na klavíru leží vpravo od něj. Čím dál vpravo, tím vyšší.' : '');
+  if (ex.form === 'nota') steps.push(`Nota **${ex.answer}** sedí na osnově ${placeText(stepOf('treble', ex.options.find((o) => o.ok).d))}.`);
+  steps.push('Poslechni si oba tóny ještě jednou tlačítkem 🔊.');
+  return steps.filter(Boolean);
+}
+
 /* ---------------- vysvětlení ---------------- */
 
 export function hudbaExplain(ex) {
@@ -556,6 +705,7 @@ export function hudbaExplain(ex) {
   }
   if (ex.task === 'nazev') return noteSteps(ex.clef, ex.d);
   if (ex.task === 'klavir') return klavirExplain(ex);
+  if (ex.task === 'sluch') return sluchExplain(ex);
   if (ex.task === 'umisti') {
     const right = ex.options.filter((o) => o.ok);
     const staves = [...new Set(right.map((o) => o.staff))];
@@ -574,7 +724,7 @@ export function hudbaExplain(ex) {
   // takt
   if (ex.form === 'doby') {
     return [
-      'Celá nota trvá 4 doby, půlová 2, čtvrťová 1 a dvě osminové dohromady 1. Pomlky trvají stejně jako noty.',
+      `Celá nota trvá 4 doby, ${ex.level === 'hard' ? 'tečkovaná půlová 3, ' : ''}půlová 2, čtvrťová 1 a dvě osminové dohromady 1. Pomlky trvají stejně jako noty.`,
       `Sečti to: ${barText(ex.items)}.`,
       `Takt trvá **${ex.answer}**.`,
     ];

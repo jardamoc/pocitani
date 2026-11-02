@@ -99,7 +99,9 @@ export function noteSVG(value, i, x, step, cls = '', acc = 0) {
   if (value === 'whole') {
     out += `<ellipse cx="${x}" cy="${y}" rx="7.2" ry="4.6" fill="none" stroke="currentColor" stroke-width="3" transform="rotate(-25 ${x} ${y})"/>`;
   } else {
-    out += head(x, y, value !== 'half');
+    out += head(x, y, value !== 'half' && value !== 'dhalf');
+    // tečka u tečkované půlové - vždycky v mezeře, na lince by splynula
+    if (value === 'dhalf') out += `<circle cx="${x + 10}" cy="${step % 2 === 0 ? y - 5 : y}" r="2.2" fill="currentColor"/>`;
     const sx = up ? x + 5.4 : x - 5.4;
     const sy = up ? y - 34 : y + 34;
     out += `<line x1="${sx}" y1="${y}" x2="${sx}" y2="${sy}" stroke="currentColor" stroke-width="1.6"/>`;

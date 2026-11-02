@@ -223,7 +223,7 @@ const kindWeight = (kind) => REWARD_RULES.speedKindMultiplier[kind] ?? 1;
 
 /* Druh, kterym nahradime ulohy bez rozpisu - stara ulozena data i souhrn,
    ktery `kindCounts` neposlal. */
-const DEFAULT_KIND_BY_MODE = { riddle: 'riddle', grid: 'grid', over10: 'over10', pexeso: 'pexeso', bigmul: 'bigmul', abc: 'abc', pos: 'pos', vety: 'vety', vyznam: 'vyznam', uu: 'uu', hudba: 'hudba', klavir: 'hudba' };
+const DEFAULT_KIND_BY_MODE = { riddle: 'riddle', grid: 'grid', over10: 'over10', pexeso: 'pexeso', bigmul: 'bigmul', abc: 'abc', pos: 'pos', vety: 'vety', vyznam: 'vyznam', uu: 'uu', hudba: 'hudba', klavir: 'hudba', sluch: 'hudba' };
 const defaultKind = (mode) => DEFAULT_KIND_BY_MODE[mode] || 'equation';
 
 /* Casovy rozpocet cele sady v sekundach. Kazda uloha si prispeje vlastnim
@@ -297,7 +297,7 @@ export function performanceTier(summary, dailyCorrect) {
 }
 
 /* Nazev jedne ulohy podle rezimu - do vety o rychlosti. */
-const UNIT_BY_MODE = { riddle: 'hádanku', grid: 'mřížku', over10: 'rozklad', pexeso: 'celou plochu', abc: 'celou řadu slov', pos: 'větu', vety: 'větu', vyznam: 'úlohu', uu: 'větu', hudba: 'úlohu', klavir: 'úlohu' };
+const UNIT_BY_MODE = { riddle: 'hádanku', grid: 'mřížku', over10: 'rozklad', pexeso: 'celou plochu', abc: 'celou řadu slov', pos: 'větu', vety: 'větu', vyznam: 'úlohu', uu: 'větu', hudba: 'úlohu', klavir: 'úlohu', sluch: 'úlohu' };
 const unitName = (mode) => UNIT_BY_MODE[mode] || 'příklad';
 
 /* Cesky duvod: rekne presne tu podminku, ktera dumplinga vynesla nejvys. */
@@ -312,7 +312,7 @@ function reasonFor(parts, summary, dailyCorrect) {
   if (summary.mode === 'abc') return 'Za slova seřazená bez jediné chyby';
   if (summary.mode === 'pos' || summary.mode === 'vety' || summary.mode === 'uu') return 'Za věty bez jediné chyby';
   if (summary.mode === 'vyznam') return 'Za slova bez jediné chyby';
-  if (summary.mode === 'hudba' || summary.mode === 'klavir') return 'Za noty bez jediné chyby';
+  if (summary.mode === 'hudba' || summary.mode === 'klavir' || summary.mode === 'sluch') return 'Za noty bez jediné chyby';
   return `Za počítání do ${summary.max} bez jediné chyby`;
 }
 

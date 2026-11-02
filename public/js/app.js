@@ -1,9 +1,11 @@
-import { OPS, COMPARES, EXTRA_KINDS, MISSING_LABEL, kindOps, buildRound, buildRiddleRound, buildGridRound, buildOver10Round, buildPexesoRound, buildBigmulRound, buildAbcRound, buildPosRound, buildVetyRound, buildVyznamRound, buildUuRound, buildHudbaRound, buildKlavirRound, explain, diagnose } from './generator.js';
+import { OPS, COMPARES, EXTRA_KINDS, MISSING_LABEL, kindOps, buildRound, buildRiddleRound, buildGridRound, buildOver10Round, buildPexesoRound, buildBigmulRound, buildAbcRound, buildPosRound, buildVetyRound, buildVyznamRound, buildUuRound, buildHudbaRound, buildKlavirRound, buildSluchRound, explain, diagnose } from './generator.js';
 import {
   HUDBA_TASKS, HUDBA_TASK_KEYS, HUDBA_COUNTS, HUDBA_LEVELS, HUDBA_LEVEL_KEYS, NOTE_LETTERS, CLEFS, stepOf, PIANO_KEYS,
   KLAVIR_FORMS, KLAVIR_FORM_KEYS, KLAVIR_LEVELS, KLAVIR_LEVEL_KEYS,
+  SLUCH_FORMS, SLUCH_FORM_KEYS, SLUCH_LEVELS, SLUCH_LEVEL_KEYS, toneName,
 } from './hudba.js';
 import { staffSVG, symbolSVG, barSVG, barWidth, pianoSVG } from './notace.js';
+import { playSeq, playNote } from './zvuk.js';
 import { POS_TYPES, POS_TYPE_KEYS, POS_COUNTS, POS_LEVELS, POS_LEVEL_KEYS, posCheck, posTag } from './pos.js';
 import {
   VETY_TYPES, VETY_TASKS, VETY_TASK_KEYS, VETY_COUNTS, VETY_LEVELS, VETY_LEVEL_KEYS, VETY_LETTERS, vetyListExplain,
@@ -60,6 +62,7 @@ const MODES = {
   uu: { subject: 'czech', label: 'Doplň u, ú, ů', icon: '✏️', sub: 'Které u patří do slova?' },
   hudba: { subject: 'music', label: 'Hudební nauka', icon: '🎼', sub: 'Noty, pomlky, klíče a takty' },
   klavir: { subject: 'music', label: 'Klavír', icon: '🎹', sub: 'Najdi notu na klávesách a klávesu na osnově' },
+  sluch: { subject: 'music', label: 'Sluch', icon: '👂', sub: 'Poznej tóny klavíru podle zvuku' },
 };
 
 const SUBJECTS = {
@@ -97,12 +100,12 @@ const HUDBA_COUNT_DEFAULT = 10;
    společné, takže `config.level` přežije přepnutí režimu. */
 const LEVEL_TABLES = {
   riddle: RIDDLE_LEVELS, grid: GRID_LEVELS, over10: OVER10_LEVELS, pexeso: PEXESO_LEVELS, bigmul: BIGMUL_LEVELS,
-  abc: ABC_LEVELS, pos: POS_LEVELS, vety: VETY_LEVELS, vyznam: VYZNAM_LEVELS, uu: UU_LEVELS, hudba: HUDBA_LEVELS, klavir: KLAVIR_LEVELS,
+  abc: ABC_LEVELS, pos: POS_LEVELS, vety: VETY_LEVELS, vyznam: VYZNAM_LEVELS, uu: UU_LEVELS, hudba: HUDBA_LEVELS, klavir: KLAVIR_LEVELS, sluch: SLUCH_LEVELS,
 };
 const LEVEL_KEYS = {
   riddle: RIDDLE_LEVEL_KEYS, grid: GRID_LEVEL_KEYS, over10: OVER10_LEVEL_KEYS, pexeso: PEXESO_LEVEL_KEYS,
   bigmul: BIGMUL_LEVEL_KEYS, abc: ABC_LEVEL_KEYS, pos: POS_LEVEL_KEYS, vety: VETY_LEVEL_KEYS,
-  vyznam: VYZNAM_LEVEL_KEYS, uu: UU_LEVEL_KEYS, hudba: HUDBA_LEVEL_KEYS, klavir: KLAVIR_LEVEL_KEYS,
+  vyznam: VYZNAM_LEVEL_KEYS, uu: UU_LEVEL_KEYS, hudba: HUDBA_LEVEL_KEYS, klavir: KLAVIR_LEVEL_KEYS, sluch: SLUCH_LEVEL_KEYS,
 };
 
 /* Společná množina klíčů obtížnosti. Tabulky výš ji musí mít všechny stejnou,
@@ -219,6 +222,7 @@ const VYCHOZI_CONFIG = () => ({
   uuCount: UU_COUNT_DEFAULT,
   hudbaTasks: [...HUDBA_TASK_KEYS], hudbaCount: HUDBA_COUNT_DEFAULT,
   klavirForms: [...KLAVIR_FORM_KEYS], klavirCount: HUDBA_COUNT_DEFAULT,
+  sluchForms: [...SLUCH_FORM_KEYS], sluchCount: HUDBA_COUNT_DEFAULT,
 });
 
 /* Stav se jen deklaruje. Naplni ho `boot()` na konci souboru, protoze
@@ -274,6 +278,7 @@ function normalizeConfig(raw) {
   const vyznamTasks = Array.isArray(raw.vyznamTasks) ? raw.vyznamTasks.filter((t) => VYZNAM_TASK_KEYS.includes(t)) : [];
   const hudbaTasks = Array.isArray(raw.hudbaTasks) ? raw.hudbaTasks.filter((t) => HUDBA_TASK_KEYS.includes(t)) : [];
   const klavirForms = Array.isArray(raw.klavirForms) ? raw.klavirForms.filter((t) => KLAVIR_FORM_KEYS.includes(t)) : [];
+  const sluchForms = Array.isArray(raw.sluchForms) ? raw.sluchForms.filter((t) => SLUCH_FORM_KEYS.includes(t)) : [];
   return {
     // starší uložené nastavení režim nezná a bylo vždycky "počítání"
     mode: raw.mode in MODES ? raw.mode : 'calc',
@@ -303,6 +308,8 @@ function normalizeConfig(raw) {
     hudbaCount: HUDBA_COUNTS.includes(Number(raw.hudbaCount)) ? Number(raw.hudbaCount) : HUDBA_COUNT_DEFAULT,
     klavirForms: klavirForms.length ? klavirForms : [...KLAVIR_FORM_KEYS],
     klavirCount: HUDBA_COUNTS.includes(Number(raw.klavirCount)) ? Number(raw.klavirCount) : HUDBA_COUNT_DEFAULT,
+    sluchForms: sluchForms.length ? sluchForms : [...SLUCH_FORM_KEYS],
+    sluchCount: HUDBA_COUNTS.includes(Number(raw.sluchCount)) ? Number(raw.sluchCount) : HUDBA_COUNT_DEFAULT,
   };
 }
 
@@ -327,8 +334,9 @@ const isVyznamMode = () => config.mode === 'vyznam';
 const isUuMode = () => config.mode === 'uu';
 const isHudbaMode = () => config.mode === 'hudba';
 const isKlavirMode = () => config.mode === 'klavir';
-/* Obě hry pod záložkou Hudba - stejné karty, žádný rozsah čísel. */
-const isMusicMode = () => isHudbaMode() || isKlavirMode();
+const isSluchMode = () => config.mode === 'sluch';
+/* Hry pod záložkou Hudba - stejné karty, žádný rozsah čísel. */
+const isMusicMode = () => isHudbaMode() || isKlavirMode() || isSluchMode();
 /* Druhy vět jen s listem „Označ písmenem“ - taky jediná úloha za kolo. */
 const isVetyBoardOnly = () => isVetyMode() && config.vetyTasks.every((t) => t === 'list');
 /* Význam slov se samotným spojováním je jedna plocha - počet úloh odpadá. */
@@ -530,7 +538,7 @@ function renderModeCards() {
 
   if (hudba) {
     el('levelNote').textContent = `${level.label} – ${level.note}.`;
-    opsNote.textContent = (isKlavirMode() ? config.klavirForms : config.hudbaTasks).length > 1
+    opsNote.textContent = (isKlavirMode() ? config.klavirForms : isSluchMode() ? config.sluchForms : config.hudbaTasks).length > 1
       ? 'Úlohy se budou v kole střídat – nad každou je napsané, co máš udělat.'
       : 'Můžeš si zapnout víc úloh naráz, pak se budou střídat.';
     opsNote.hidden = false;
@@ -659,6 +667,10 @@ function renderConfigScreen() {
     ? VYZNAM_TASK_KEYS
       .map((key) => chipHTML(key, `${VYZNAM_TASKS[key].emoji} ${VYZNAM_TASKS[key].label}`, config.vyznamTasks.includes(key)))
       .join('')
+    : isSluchMode()
+    ? SLUCH_FORM_KEYS
+      .map((key) => chipHTML(key, `${SLUCH_FORMS[key].emoji} ${SLUCH_FORMS[key].label}`, config.sluchForms.includes(key)))
+      .join('')
     : isKlavirMode()
     ? KLAVIR_FORM_KEYS
       .map((key) => chipHTML(key, `${KLAVIR_FORMS[key].emoji} ${KLAVIR_FORMS[key].label}`, config.klavirForms.includes(key)))
@@ -689,6 +701,8 @@ function renderConfigScreen() {
       ? HUDBA_COUNTS.map((n) => chipHTML(n, `${n} úloh`, config.hudbaCount === n)).join('')
       : isKlavirMode()
       ? HUDBA_COUNTS.map((n) => chipHTML(n, `${n} úloh`, config.klavirCount === n)).join('')
+      : isSluchMode()
+      ? HUDBA_COUNTS.map((n) => chipHTML(n, `${n} úloh`, config.sluchCount === n)).join('')
       : COUNT_PRESETS.map((n) => chipHTML(n, `${n} příkladů`, config.count === n)).join('');
 
   el('maxChips').innerHTML = MAX_PRESETS
@@ -847,8 +861,9 @@ el('opChips').addEventListener('click', (e) => {
   const vyznam = isVyznamMode();
   const hudba = isHudbaMode();
   const klavir = isKlavirMode();
+  const sluch = isSluchMode();
   const current = pos ? config.posTypes : vety ? config.vetyTasks : vyznam ? config.vyznamTasks
-    : hudba ? config.hudbaTasks : klavir ? config.klavirForms : over10 ? config.over10Ops : config.ops;
+    : hudba ? config.hudbaTasks : klavir ? config.klavirForms : sluch ? config.sluchForms : over10 ? config.over10Ops : config.ops;
   const next = current.includes(value) ? current.filter((o) => o !== value) : [...current, value];
   if (!next.length) {
     const err = el('opsError');
@@ -861,6 +876,7 @@ el('opChips').addEventListener('click', (e) => {
   else if (vyznam) config.vyznamTasks = next;
   else if (hudba) config.hudbaTasks = next;
   else if (klavir) config.klavirForms = next;
+  else if (sluch) config.sluchForms = next;
   else if (over10) config.over10Ops = next;
   else config.ops = next;
   saveConfig();
@@ -890,6 +906,7 @@ el('countChips').addEventListener('click', (e) => {
   else if (isUuMode()) config.uuCount = Number(chip.dataset.value);
   else if (isHudbaMode()) config.hudbaCount = Number(chip.dataset.value);
   else if (isKlavirMode()) config.klavirCount = Number(chip.dataset.value);
+  else if (isSluchMode()) config.sluchCount = Number(chip.dataset.value);
   else config.count = Number(chip.dataset.value);
   saveConfig();
   renderConfigScreen();
@@ -1080,6 +1097,7 @@ function startRound() {
     uu: () => buildUuRound(config),       // co věta, to úloha
     hudba: () => buildHudbaRound(config), // úloha po úloze
     klavir: () => buildKlavirRound(config), // taky
+    sluch: () => buildSluchRound(config),   // taky
   };
   round = (build[config.mode] || build.calc)();
   index = 0;
@@ -1164,6 +1182,7 @@ function renderExercise() {
   if (CHOICE_HTML[ex.kind]) choicePicked = null;
   choiceMiss = null;
   hudbaAcc = 0;
+  melodyTaps = [];
   el('exerciseBody').innerHTML = (BODY_HTML[ex.kind] || equationHTML)(ex);
   /* Mřížka 5×5 a plocha pexesa o čtyřech sloupcích jsou nejširší, co
      aplikace kreslí. Na úzkém telefonu jim uvolníme okraje, ať nemusíme
@@ -1187,6 +1206,8 @@ function renderExercise() {
   activeField = null;
 
   if (PAIR_BOARDS.has(ex.kind)) startPexeso(ex);
+  // hra Sluch zahraje tóny sama, jakmile se úloha ukáže
+  if (ex.task === 'sluch' && ex.kind === 'hudba') setTimeout(() => { if (round[index] === ex) playSeq(ex.tones); }, 400);
 
   /* U pexesa žádné políčko na odpověď není - `#answerInput` v DOM chybí
      a slepé sáhnutí na něj by tady spadlo. */
@@ -1241,7 +1262,7 @@ function hintFor(ex) {
       ? 'Která skupina zahrnuje všechna čtyři slova? Klepni na slovo nadřazené.'
       : 'Přečti si obě slova a rozmysli si, jak spolu souvisí. Pak klepni na správné slovo.';
   }
-  if (ex.kind === 'hudba') return HUDBA_HINT[ex.task === 'takt' || ex.task === 'klavir' ? `${ex.task}:${ex.form}` : ex.task] || '';
+  if (ex.kind === 'hudba') return HUDBA_HINT[ex.task === 'takt' || ex.task === 'klavir' || ex.task === 'sluch' ? `${ex.task}:${ex.form}` : ex.task] || '';
   if (ex.kind === 'bigmul') {
     return 'Rozlož si násobení na desítky a jednotky. V každém kroku klepni na tu možnost, která je správně.';
   }
@@ -2510,11 +2531,22 @@ const HUDBA_HINT = {
   nazev: 'Najdi klíč a od jeho noty počítej po krocích nahoru nebo dolů – linka, mezera, linka…',
   umisti: 'Klepni na linku nebo do mezery, kam nota patří. Když se spleteš, máš ještě jeden pokus.',
   vyska: 'Čím výš nota na osnově sedí, tím vyšší je tón. Klepni na správnou notu.',
+  'sluch:vyssi': 'Poslouchej pozorně. Tóny si můžeš pustit znovu, kolikrát chceš.',
+  'sluch:odc': 'Zazní c a po něm jiný tón. Je o hodně výš, nebo jen kousek? Klávesy při klepnutí zahrají.',
+  'sluch:melodie': 'Poslechni si melodii a zahraj ji tón po tónu. Když se spleteš, můžeš to zkusit ještě jednou.',
+  'sluch:nota': 'Zazní c a po něm jiný tón. Čím je tón vyšší, tím výš na osnově sedí.',
   'klavir:naosnovu': 'U černé klávesy si napřed vyber křížek ♯ nebo béčko ♭. Pak klepni na linku nebo mezeru, kam nota patří.',
   'klavir:naklavir': 'Přečti notu na osnově a klepni na její klávesu. Křížek ♯ posouvá o klávesu doprava, béčko ♭ doleva.',
   'takt:doby': 'Sečti doby: celá 4, půlová 2, čtvrťová 1, dvě osminové dohromady 1.',
   'takt:dopln': 'Spočítej, kolik dob v taktu už je, a kolik jich ještě chybí.',
   'takt:chyba': 'Spočítej doby v každém taktu zvlášť. Jeden jich má jinak, než říká předznamenání.',
+};
+
+const SLUCH_ASK = {
+  vyssi: 'Je druhý vyšší, nebo nižší?',
+  odc: 'Klepni na jeho klávesu.',
+  melodie: 'Zahraj ji na klávesách.',
+  nota: 'Která nota to byla?',
 };
 
 const HUDBA_ASK = {
@@ -2531,7 +2563,7 @@ function choiceState(o, i) {
 }
 
 function hudbaHTML(ex) {
-  const ask = (text) => `<p class="vt-ask"><span aria-hidden="true">${HUDBA_TASKS[ex.task]?.emoji ?? '🎹'}</span> ${text}</p>`;
+  const ask = (text) => `<p class="vt-ask"><span aria-hidden="true">${HUDBA_TASKS[ex.task]?.emoji ?? (ex.task === 'sluch' ? '👂' : '🎹')}</span> ${text}</p>`;
   const wrap = (inner, task = ex.task) => `<div class="vt hd" data-task="hd-${task}">${inner}</div>`;
   const dis = locked ? ' disabled' : '';
 
@@ -2563,6 +2595,34 @@ function hudbaHTML(ex) {
     }
     const svg = staffSVG({ staves: ex.staves, notes: marks, slots: locked ? null : ex.options, width: 170 });
     return wrap(`${ask(HUDBA_ASK.umisti(ex))}<div class="hd-figure hd-place">${svg}</div>`);
+  }
+
+  if (ex.task === 'sluch') {
+    const play = `<button type="button" class="hd-play"><span aria-hidden="true">🔊</span> Pusť znovu</button>`;
+    const intro = ex.form === 'vyssi' ? 'Zazní dva tóny.' : ex.form === 'melodie' ? 'Poslouchej melodii.' : 'Nejdřív zazní c, pak hledaný tón.';
+    const head = `${ask(`${intro} ${SLUCH_ASK[ex.form]}`)}<div class="hd-playrow">${play}</div>`;
+    if (ex.form === 'vyssi') {
+      return wrap(`${head}<div class="vt-opts">${choiceButtons(ex, (o) => o.text)}</div>`, 'sluch-vyssi');
+    }
+    if (ex.form === 'nota') {
+      const opts = ex.options.map((o, i) => `<button type="button" class="vt-opt hd-pic${choiceState(o, i)}" data-i="${i}"
+          aria-label="nota ${o.text}"${dis}>${staffSVG({ staves: ['treble'], notes: [{ staff: 'treble', step: stepOf('treble', o.d), value: 'whole' }], width: 80 })}</button>`).join('');
+      return wrap(`${head}<div class="vt-opts">${opts}</div>`, 'sluch-nota');
+    }
+    if (ex.form === 'melodie') {
+      // zahrané klávesy svítí; po vyhodnocení zelená správná melodie, červená vedle
+      const done = choicePicked !== null;
+      const state = (i) => {
+        if (done && ex.seq.includes(i)) return ' is-right';
+        if (melodyTaps.includes(i)) return done ? ' is-wrong' : ' is-lit';
+        return '';
+      };
+      const dots = ex.seq.map((_, i) => `<span class="hd-mdot${i < melodyTaps.length ? ' is-on' : ''}"></span>`).join('');
+      return wrap(`${head}<div class="hd-mdots" aria-label="zahráno ${melodyTaps.length} z ${ex.seq.length}">${dots}</div>
+        <div class="hd-figure hd-keys">${pianoSVG({ keys: PIANO_KEYS, labels: ex.labels, state })}</div>`, 'sluch-melodie');
+    }
+    const piano = pianoSVG({ keys: ex.options, labels: ex.labels, state: (i) => choiceState(ex.options[i], i) });
+    return wrap(`${head}<div class="hd-figure hd-keys">${piano}</div>`, 'sluch-odc');
   }
 
   if (ex.task === 'klavir' && ex.form === 'naosnovu') {
@@ -2632,6 +2692,8 @@ const CHOICE_HTML = { vety: vetyHTML, vyznam: vyznamHTML, hudba: hudbaHTML };
 let choiceMiss = null;
 /* Zvolená posuvka u klavíru obráceně (0 bez, 1 křížek, -1 béčko). */
 let hudbaAcc = 0;
+/* Klávesy zahrané v úloze „Zahraj, co slyšíš“. */
+let melodyTaps = [];
 
 function choiceTap(target) {
   const ex = round[index];
@@ -2641,11 +2703,22 @@ function choiceTap(target) {
     el('exerciseBody').innerHTML = CHOICE_HTML[ex.kind](ex);
     return;
   }
+  // přehrání tónů jde i po odpovědi - ať si dítě poslechne, co to bylo
+  if (target.closest('.hd-play')) {
+    playSeq(ex.tones);
+    return;
+  }
   const btn = target.closest('.vt-opt');
   if (locked || !CHOICE_HTML[ex?.kind] || !btn) return;
   const picked = Number(btn.dataset.i);
   const opt = ex.options[picked];
   if (!opt) return;
+  // klávesa klavíru při klepnutí zazní
+  if (opt.midi !== undefined && (ex.task === 'sluch' || ex.task === 'klavir')) playNote(opt.midi);
+  if (ex.task === 'sluch' && ex.form === 'melodie') {
+    melodyTap(ex, picked);
+    return;
+  }
 
   /* První chyba u úlohy s druhým pokusem jen zčervená a zatřese -
      řešení se ještě neukáže. */
@@ -2659,6 +2732,36 @@ function choiceTap(target) {
     return;
   }
 
+  choiceFinish(ex, picked, opt);
+}
+
+/* Melodie se hraje po klávesách. Po posledním tónu se vyhodnotí; první
+   chyba jen zatřese a smaže zahrané tóny (druhý pokus). */
+function melodyTap(ex, picked) {
+  melodyTaps.push(picked);
+  el('exerciseBody').innerHTML = CHOICE_HTML[ex.kind](ex);
+  if (melodyTaps.length < ex.seq.length) return;
+  const midi = (i) => PIANO_KEYS[i].midi;
+  const ok = melodyTaps.every((k, i) => midi(k) === midi(ex.seq[i]));
+  const played = melodyTaps.map((k) => toneName(PIANO_KEYS[k].midi)).join(' – ');
+  if (!ok && choiceMiss === null) {
+    choiceMiss = 0;
+    locked = true; // krátce, než se klávesy zase uvolní
+    setTimeout(() => {
+      locked = false;
+      melodyTaps = [];
+      el('exerciseBody').innerHTML = CHOICE_HTML[ex.kind](ex);
+      const fig = el('exerciseBody').querySelector('.hd-keys');
+      fig?.classList.add('is-shake');
+      setTimeout(() => fig?.classList.remove('is-shake'), 500);
+    }, 700);
+    beep('wrong');
+    return;
+  }
+  choiceFinish(ex, -1, { ok, text: played, tag: 'hudbaSluch' });
+}
+
+function choiceFinish(ex, picked, opt) {
   choicePicked = picked;
   const correct = Boolean(opt.ok);
   locked = true;
@@ -2691,7 +2794,7 @@ function choiceTap(target) {
   fb.dataset.state = 'wrong';
   fb.innerHTML = `
     <div class="fb-badge"><span aria-hidden="true">🤔</span> Tentokrát ne</div>
-    <p class="fb-retry-note">${ex.task === 'umisti' ? 'Zelené noty jsou správně, červené jsi umístila ty.' : ex.task === 'klavir' && ex.form === 'naosnovu' ? 'Zelené noty jsou správně, červené jsi umístila ty.' : ex.task === 'klavir' ? 'Zelená klávesa je správně, červenou jsi vybrala ty.' : 'Zelená možnost je správně, červenou jsi vybrala ty.'}</p>
+    <p class="fb-retry-note">${ex.task === 'sluch' && ex.form === 'melodie' ? 'Zelené klávesy hrají správnou melodii, červené jsi zahrála jinak.' : ex.task === 'umisti' ? 'Zelené noty jsou správně, červené jsi umístila ty.' : ex.task === 'klavir' && ex.form === 'naosnovu' ? 'Zelené noty jsou správně, červené jsi umístila ty.' : ex.task === 'klavir' ? 'Zelená klávesa je správně, červenou jsi vybrala ty.' : 'Zelená možnost je správně, červenou jsi vybrala ty.'}</p>
     <p class="fb-steps-title">Jak na to:</p>
     <ul class="fb-steps">${steps}</ul>
     <button type="button" class="btn btn-primary">Rozumím, další <span aria-hidden="true">➜</span></button>`;

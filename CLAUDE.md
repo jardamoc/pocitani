@@ -88,6 +88,7 @@ běžel. Vypadalo to jako chyba nasazení, a nebyla.
 | `public/js/vyznam.js` | Význam slov: ručně sepsaná slova a skupiny, tři úlohy, vysvětlení |
 | `public/js/uu.js` | Doplň u, ú, ů: ručně sepsané věty se zápisem `[ů]`, rozbor mezer, tag chyby, vysvětlení |
 | `public/js/hudba.js` | Hudební nauka a Klavír: tabulky, generátory úloh, vysvětlení — bez DOM |
+| `public/js/zvuk.js` | tóny klavíru pro hru Sluch — syntéza Web Audio, bez nahrávek |
 | `public/js/notace.js` | kreslení not jako SVG text (osnova, klíče, noty, pomlky, takty) — bez knihovny |
 | `public/js/stats.js` | rozbor kola, rady, `sanitizeState()` — **na úložiště nesahá** |
 | `public/js/storage.js` | **jediná vrstva nad úložištěm** — načtení, fronta zápisů, mazání, vyměnitelný backend |
@@ -166,7 +167,7 @@ Co z toho plyne pro psaní kódu:
 - **`mergePayload()` v `transfer.js` neukládá.** Slučování je čistá operace v paměti,
   která vrátí souhrn změn; zapisuje až `acceptIncoming()` v `app.js`.
 
-## Třináct režimů hry
+## Čtrnáct režimů hry
 
 Na úvodní obrazovce se vybírá karta **„Co si zahrajeme?"**. Nad kartami jsou tři
 záložky **🔢 Matematika / 📖 Čeština / 🎵 Hudba** (`SUBJECTS`, u každého režimu `subject` v `MODES`).
@@ -190,6 +191,7 @@ záložky.
 | **Doplň u, ú, ů** (Čeština) | `uu` | operace, „něco navíc", **rozsah**; počet = počet vět |
 | **Hudební nauka** (Hudba) | `hudba` | „něco navíc", **rozsah**; karta s operacemi vybírá úlohy; počet = počet úloh |
 | **Klavír** (Hudba) | `klavir` | „něco navíc", **rozsah**; karta s operacemi vybírá směr; počet = počet úloh |
+| **Sluch** (Hudba) | `sluch` | „něco navíc", **rozsah**; karta s operacemi vybírá úlohy; počet = počet úloh |
 
 Větve se rozcházejí až v `startRound()`, kde je tabulka builderů. Všechno ostatní —
 klávesnice, vyhodnocení, statistiky — je společné, protože každá úloha má stejný tvar:
@@ -772,6 +774,9 @@ Pár věcí, které se snadno rozbijí:
 - **Žádná desetinná čísla:** osminové noty jsou v taktech jen ve dvojici s trámcem
   (`n:eighth2` = 1 doba), osminová pomlka se v taktech nepoužívá. Celá nota/pomlka jen
   jako jediná věc v taktu 4/4.
+- **Tečkovaná půlová** (`n:dhalf`, 3 doby) jen na **těžké** úrovni: v taktech 3/4, v „Kolik
+  dob" a v „Co je to?". Uživatel ji chtěl do stávající těžké, ne do nové čtvrté úrovně.
+  Tečka se kreslí vždy do mezery.
 - Celá a půlová pomlka se liší **jen polohou** (visí pod 4. linkou × sedí na 3.), proto
   se značky kreslí na kousku osnovy. Osnova je mezi špatnými možnostmi jen u klíčů,
   jinak by „notová osnova" byla taky pravda.
@@ -803,6 +808,28 @@ krajní. Obtížnost: lehká houslová a jen křížky, střední basová s kř�
 - Druhý pokus v obou směrech (`ex.retry`).
 - Tři tlačítka posuvek jsou mřížka 3 × `minmax(0, 1fr)` s krátkými popisky — „bez posuvky"
   v volném řazení přeteklo na 320 px z karty.
+
+## Sluch
+
+Třetí hra pod záložkou Hudba (`config.mode` = `sluch`), stejný tvar jako Klavír:
+`ex.kind = 'hudba'`, `ex.task = 'sluch'`, úloha v `ex.form`, generátor `makeSluchRound()`
+v `hudba.js`. Úlohy (`config.sluchForms`, počet `config.sluchCount`):
+
+- `vyssi` — dva tóny, druhý je vyšší / nižší / stejný (stejný zhruba v 20 %).
+- `odc` — zazní c, pak jiný tón, dítě klepne na klávesu (druhý pokus).
+- `melodie` — 2 tóny (lehká) nebo 3, dítě je zahraje po klávesách (`melodyTap()`, druhý pokus).
+- `nota` — zazní c a tón, dítě vybere ze 2–3 not na osnově.
+
+**Hledaný tón se vždycky ohlašuje kotvou c** — absolutní sluch nemá skoro nikdo. Obtížnost:
+lehká velké skoky a jen bílé klávesy, střední menší skoky a melodie ze tří tónů, těžká i černé
+klávesy a tóny těsně vedle sebe.
+
+- **Zvuk je syntéza v prohlížeči** (`zvuk.js`, Web Audio), rozhodl uživatel; žádné nahrávky.
+  Tóny jsou čísla MIDI, klávesnice c1 = 60 až c2 = 72 (`PIANO_KEYS[].midi`).
+- Tóny hrají **i při vypnutém „Zvuku"** — ten patří efektům, bez tónů by hra nešla.
+- Úloha zahraje sama po zobrazení; tlačítko 🔊 (`.hd-play`) funguje i po odpovědi.
+- Horní c se ve vysvětlení jmenuje **„vysoké c"** (`toneName()`), jinak by „c" bylo dvojznačné.
+- Klávesy zahrají tón při klepnutí i ve hře Klavír.
 
 ## Doplň znaménko
 

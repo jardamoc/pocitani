@@ -1118,6 +1118,27 @@ body.is-dark { --pair-task: #93c5fd; --pair-result: #fdba74; }
 .hd-key.is-lit { cursor: default; }
 .hd-key.is-lit rect { fill: #8b5cf6; stroke: #5b21b6; }
 .hd-key.is-lit text { fill: #fff; }
+/* hra Sluch: tlačítko na přehrání, tečky zahraných tónů melodie */
+.hd-playrow { display: flex; justify-content: center; margin: 0 0 12px; }
+.hd-play {
+  font-family: 'Baloo 2', sans-serif; font-weight: 800; font-size: 1.15rem; cursor: pointer;
+  padding: 8px 18px; border-radius: 999px; border: 0;
+  background: linear-gradient(135deg, #c084fc, #7c3aed); color: #fff; box-shadow: var(--shadow);
+}
+.hd-play:focus-visible { outline: 3px solid var(--violet); outline-offset: 2px; }
+.hd-mdots { display: flex; justify-content: center; gap: 8px; margin: 0 0 10px; }
+.hd-mdot { width: 14px; height: 14px; border-radius: 50%; background: var(--surface-2); box-shadow: inset 0 0 0 2px var(--line); }
+.hd-mdot.is-on { background: var(--violet); box-shadow: none; }
+.hd[data-task="hd-sluch-vyssi"] .vt-opts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.hd[data-task="hd-sluch-vyssi"] .vt-opt { font-size: clamp(.95rem, 4.2vw, 1.2rem); padding: 6px 2px; min-width: 0; }
+.hd[data-task="hd-sluch-nota"] .vt-opts { grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); grid-auto-flow: column; }
+.hd[data-task="hd-sluch-nota"] .hd-pic .hd-svg { max-width: 120px; }
+.chips .chip.is-on[data-value="vyssi"] { background: linear-gradient(135deg, #fb923c, #ea580c); }
+.chips .chip.is-on[data-value="odc"] { background: linear-gradient(135deg, #475569, #0f172a); }
+.chips .chip.is-on[data-value="melodie"] { background: linear-gradient(135deg, #f472b6, #be185d); }
+.chips .chip.is-on[data-value="nota"] { background: linear-gradient(135deg, #60a5fa, #2563eb); }
+.chips-mode .chip.is-on[data-value="sluch"] { background: linear-gradient(135deg, #f472b6, #7c3aed); }
+
 /* Tři stejné sloupce - volné řazení na úzkém telefonu přeteklo z karty. */
 .hd-accs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 0 0 10px; }
 .hd-accbtn {
