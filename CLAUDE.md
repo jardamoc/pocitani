@@ -379,7 +379,11 @@ v odpovědi. Liší se jen `hint` v `OVER10_LEVELS`:
 | střední | `frame` | jen kroužky |
 | těžká | `none` | nic, počítá zpaměti |
 
-Nabídka čísel je tři správná plus dva věrohodní sousedé (`over10Choices()`), zamíchané.
+Nabídka čísel je **po políčkách** (`over10Choices()` vrací pole tří pětic v pořadí
+`OVER10_FIELDS`): správné číslo, typické chyby (u odčítání 18 − 9 doplněk 2 místo 8)
+a sousedé, seřazené. Klávesnice ukáže pětici pro políčko s kurzorem a po výběru se
+přepne na další (`fieldNumbers()`, překreslení ve `focusin` a v `handleKey`). Kytičky
+mají dál jednu společnou nabídku.
 Tlačítko posílá klíč **`num:13`** a `handleKey()` ho zapíše do políčka **celý naráz** —
 ne po číslicích jako běžná klávesnice. Sada se jmenuje `ex.numbers`, ne `choices`:
 tak se jmenuje nabídka operací u „Doplň znaménko" a míchat je dohromady by se vymstilo.

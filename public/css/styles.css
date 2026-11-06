@@ -999,7 +999,10 @@ body.is-quiz .wrap { padding-top: 18px; }
 .o10-sum > [hidden] { display: none; }
 .o10-round { justify-self: center; }
 .o10-tail { justify-self: start; }
-.o10-sum .ba-echo { display: inline-block; vertical-align: middle; }
+/* vyplněné číslo sedí na účaří jako okolní text (při `middle` padalo níž),
+   jen prázdný čárkovaný rámeček se centruje */
+.o10-sum .ba-echo { display: inline-block; vertical-align: baseline; }
+.o10-sum .ba-echo.is-empty { vertical-align: middle; }
 /* stejný rámeček jako kolem prvního čísla a doplňku nahoře (.o10b-box) */
 .o10-pair {
   display: inline-block; padding: 0 8px; border-radius: 12px;

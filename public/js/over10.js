@@ -62,15 +62,30 @@ export const OVER10_LEVELS = {
    z kladných celých čísel - záporná v aplikaci nejsou. */
 const CHOICE_COUNT = 5;
 
-function over10Choices({ a, b, ten, rest, c }) {
-  /* `ten` a `rest` můžou vyjít stejně (6 + 8 dělí osmičku na 4 a 4); dvakrát
-     tatáž čtyřka na klávesnici vypadá jako chyba, tak se nabídne jednou. */
-  const out = [...new Set([ten, rest, c])];
-  for (const n of shuffle([10, a, b, ten + 1, rest + 1, c - 1, c + 1])) {
+/* Nabídka pro jedno políčko: správné číslo, napřed typické chyby
+   (`typical`), pak sousedé. Vybírají se jen kladná celá čísla. */
+function fieldChoices(correct, typical, near) {
+  const out = [correct];
+  // záloha: když typických chyb a sousedů není dost, doplní se další blízká čísla
+  const spare = [2, -2, 3, -3, 4, -4].map((d) => correct + d);
+  for (const n of [...shuffle(typical), ...shuffle(near), ...spare]) {
     if (out.length >= CHOICE_COUNT) break;
-    if (n > 0 && !out.includes(n)) out.push(n);
+    if (Number.isInteger(n) && n > 0 && !out.includes(n)) out.push(n);
   }
-  return shuffle(out);
+  return out.sort((x, y) => x - y);
+}
+
+/* Každé políčko má vlastní nabídku (v pořadí OVER10_FIELDS) - po výběru
+   čísla se klávesnice přepne na nabídku dalšího políčka. Typická chyba
+   u doplňku je záměna jednotek a doplňku do deseti (18 − 9: 2 místo 8). */
+function over10Choices({ a, b, ten, rest, c, sum, op }) {
+  const unit = a % 10;
+  const swap = op === 'sub' ? 10 - unit : unit;
+  return [
+    fieldChoices(ten, [swap, b - swap], [ten - 1, ten + 1, b]),
+    fieldChoices(rest, [b - swap, ten], [rest - 1, rest + 1, b]),
+    fieldChoices(c, [sum, op === 'sub' ? c + 2 * rest : c - 2 * rest], [c - 1, c + 1, a]),
+  ];
 }
 
 export const OVER10_LEVEL_KEYS = Object.keys(OVER10_LEVELS);

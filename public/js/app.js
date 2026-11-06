@@ -3021,8 +3021,17 @@ function compareKeys() {
 /* Nabídka hotových čísel pro lehký rozklad přes desítku. Tlačítko píše celé
    číslo najednou (`num:`), ne po číslicích - dítě vybírá z možností, nezadává
    je. Fyzická klávesnice dál funguje beze změny. */
+/* `ex.numbers` je buď jedna společná nabídka, nebo pole nabídek po políčkách
+   (rozklad přes desítku) - pak se ukáže ta pro políčko, kde je kurzor. */
+function fieldNumbers(ex) {
+  const list = ex.numbers || [];
+  if (!Array.isArray(list[0])) return list;
+  const idx = Number(activeField?.isConnected ? activeField.dataset.idx : 0) || 0;
+  return list[idx] || list[0];
+}
+
 function numberKeys(ex) {
-  const btns = (ex.numbers || [])
+  const btns = fieldNumbers(ex)
     .map((n) => `<button type="button" class="key key-num" data-key="num:${n}">${n}</button>`)
     .join('');
   return `<div class="key-ops key-nums">${btns}</div>${DEL_KEY}${OK_KEY}`;
@@ -3090,6 +3099,7 @@ function handleKey(key) {
     if (hasParts(ex)) {
       const nextEmpty = partInputs(ex).find((i) => i.value === '');
       if (nextEmpty) { activeField = nextEmpty; nextEmpty.focus({ preventScroll: true }); }
+      if (Array.isArray(ex.numbers?.[0])) renderKeypad(ex);
     }
     return;
   }
@@ -3107,7 +3117,12 @@ function handleKey(key) {
 }
 
 el('exerciseBody').addEventListener('focusin', (e) => {
-  if (e.target.matches(FIELD_SEL)) activeField = e.target;
+  if (!e.target.matches(FIELD_SEL)) return;
+  const changed = activeField !== e.target;
+  activeField = e.target;
+  // nabídka po políčkách: klávesnice ukáže čísla pro to, kam dítě klepla
+  const ex = round[index];
+  if (changed && ex && ex.hint === 'choices' && Array.isArray(ex.numbers?.[0])) renderKeypad(ex);
 });
 
 // do odpovědi i do poznámek pustíme jen číslice - i při vložení ze schránky
