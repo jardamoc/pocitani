@@ -1507,7 +1507,7 @@ function over10HTML(ex) {
   /* Rámeček obepíná ta dvě čísla, která spolu dají rovnou desítku: u sčítání
      první číslo s levou větví, u odčítání výsledek s pravou větví. */
   return `${over10FrameHTML(ex)}
-    <div class="o10b" data-op="${ex.op}">
+    <div class="o10b" data-op="${ex.op}" style="--ad:${String(ex.a).length}">
       <span class="o10b-box" aria-hidden="true"></span>
       <span class="o10-num o10b-a">${ex.a}</span>
       <span class="o10-op o10b-op">${OPS[ex.op].symbol}</span>
@@ -1518,6 +1518,28 @@ function over10HTML(ex) {
       <span class="o10b-leg o10b-leg-r" aria-hidden="true"></span>
       ${cell('ten')}
       ${cell('rest')}
+    </div>
+    ${over10SumHTML(ex)}`;
+}
+
+/* Dva řádky pod větvičkou, které vysvětlují, proč se desítka dělá
+   (podoba podle uživatele):
+     [7 + 3] + 1 =          první dvojice v růžovém rámečku jako nahoře
+     10 + 1 = 11            výsledek je ozvěna políčka nahoře
+   Doplňky jsou ozvěna políček (`syncBigaddEcho`); druhý řádek se ukáže,
+   až je doplněk napsaný - rovná desítka by jinak napověděla. */
+function over10SumHTML(ex) {
+  // lehká a střední úroveň, na těžké se počítá bez nápovědy (přání uživatele)
+  if (ex.hint === 'none') return '';
+  const s = OPS[ex.op].symbol;
+  const round = ex.op === 'sub' ? ex.a - ex.ten : ex.a + ex.ten;
+  const echo = (key) => `<span class="ba-echo o10-echo is-empty" data-cell=".o10b-${key}"></span>`;
+  // dva sloupce: desítka stojí uprostřed pod rámečkem, „+ 4 =“ přesně pod sebou
+  return `<div class="o10-sum" aria-hidden="true">
+      <span class="o10-pair">${ex.a} ${s} ${echo('ten')}</span>
+      <span class="o10-tail">${s} ${echo('rest')} =</span>
+      <span class="o10-round" data-after=".o10b-ten" hidden>${round}</span>
+      <span class="o10-tail" data-after=".o10b-ten" hidden>${s} ${echo('rest')} = ${echo('c')}</span>
     </div>`;
 }
 
@@ -1550,15 +1572,32 @@ const BA_LABEL = {
   tens: 'Desítky druhého čísla', ones: 'Jednotky druhého čísla', mid: 'Výsledek po desítkách', c: 'Výsledek',
 };
 
+/* Kostičky druhého čísla: desítka je tyčka, jednotka kostička. Uživatel je
+   chce jen na lehké úrovni (ta jde krok po kroku přes `bigmulHTML`). */
+function bigaddBlocksHTML(ex) {
+  if (!ex.blocks) return '';
+  return `<div class="ba-blocks" aria-hidden="true">
+      <span class="ba-bars">${'<span class="ba-bar"></span>'.repeat(ex.tens / 10)}</span>
+      <span class="ba-cubes">${'<span class="ba-cube"></span>'.repeat(ex.ones)}</span>
+    </div>`;
+}
+
 /* Ozvěny v zápisu ukazují, co dítě napsalo do větvičky. Hodnota políčka
    se mění bez události `input` (klávesnice, druhý pokus, odhalení), proto
    se volá ze všech těch míst. Po odhalení už políčko není, čte se `.gval`. */
 function syncBigaddEcho() {
+  const valueOf = (sel) => {
+    const cell = document.querySelector(sel);
+    return (cell?.querySelector('input')?.value ?? cell?.querySelector('.gval')?.textContent ?? '').trim();
+  };
   document.querySelectorAll('.ba-echo').forEach((span) => {
-    const cell = document.querySelector(`.ba-parts .ba-${span.dataset.of}`);
-    const value = (cell?.querySelector('input')?.value ?? cell?.querySelector('.gval')?.textContent ?? '').trim();
+    const value = valueOf(span.dataset.cell || `.ba-parts .ba-${span.dataset.of}`);
     span.textContent = value;
     span.classList.toggle('is-empty', value === '');
+  });
+  // „Počítej přes 10“: rovná desítka až po napsaném doplňku
+  document.querySelectorAll('[data-after]').forEach((span) => {
+    span.hidden = valueOf(span.dataset.after) === '';
   });
 }
 const BA_DIGITS = { tens: 2, ones: 1, mid: 3, c: 3 };
@@ -1577,18 +1616,11 @@ function bigaddHTML(ex) {
   const echo = (key) => `<span class="o10-num ba-echo ba-echo-${key} is-empty" data-of="${key}"></span>`;
   const op = `<span class="o10-op">${sign}</span>`;
   const eq = '<span class="o10-op">=</span>';
-  const blocks = ex.blocks
-    ? `<div class="ba-blocks" aria-hidden="true">
-        <span class="ba-bars">${'<span class="ba-bar"></span>'.repeat(ex.tens / 10)}</span>
-        <span class="ba-cubes">${'<span class="ba-cube"></span>'.repeat(ex.ones)}</span>
-      </div>`
-    : '';
+  const blocks = bigaddBlocksHTML(ex);
   return `<div class="ba" data-op="${ex.op}">
       <div class="ba-top">
-        <span class="o10-num">${ex.a}</span>
-        <span class="o10-op">${sign}</span>
         <div class="ba-split">
-          <span class="o10-num">${ex.b}</span>
+          <span class="o10-num ba-b"><span class="ba-b-pre"><span class="o10-num">${ex.a}</span><span class="o10-op">${sign}</span></span>${ex.b}<span class="o10-op ba-b-eq">=</span></span>
           <svg class="ba-legs" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true">
             <line x1="50" y1="1" x2="23" y2="23" class="ba-leg-tens"/><line x1="50" y1="1" x2="77" y2="23" class="ba-leg-ones"/>
           </svg>
@@ -1598,8 +1630,7 @@ function bigaddHTML(ex) {
       </div>
       <div class="ba-rows">
         <div class="ba-row"><span class="o10-num">${ex.a}</span>${op}${echo('tens')}${op}${echo('ones')}${eq}</div>
-        <div class="ba-row">${cell('mid')}${op}${echo('ones')}${eq}</div>
-        <div class="ba-row">${cell('c')}</div>
+        <div class="ba-row">${cell('mid')}${op}${echo('ones')}${eq}${cell('c')}</div>
       </div>
     </div>`;
 }
@@ -1687,6 +1718,7 @@ function bigmulHTML(ex) {
 
   return `<div class="bigmul">
       <p class="bm-task">Vypočítej <b>${ex.task}</b></p>
+      ${ex.kind === 'bigaddstep' ? `<div class="ba bm-blocks">${bigaddBlocksHTML(ex)}</div>` : ''}
       <div class="bm-log">${done}</div>
       ${choices}
     </div>`;

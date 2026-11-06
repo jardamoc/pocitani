@@ -384,6 +384,23 @@ Tlačítko posílá klíč **`num:13`** a `handleKey()` ho zapíše do políčka
 ne po číslicích jako běžná klávesnice. Sada se jmenuje `ex.numbers`, ne `choices`:
 tak se jmenuje nabídka operací u „Doplň znaménko" a míchat je dohromady by se vymstilo.
 
+**U sčítání je doplněk do desítky pod prvním číslem v rámečku a zbytek přímo pod druhým
+číslem** (82 + 9: [8] pod 82, [1] pod 9), ne pod výsledkem — přání uživatele, „součet
+musí být 82 + 8“. Políčko zbytku se rozkládá přes sloupce `+`, číslo a `=`, aby nerozšířilo
+sloupec druhého čísla. Odčítání zůstává po staru (rámeček kolem výsledku a zbytku).
+
+**Na lehké a střední úrovni (ne na těžké) jsou pod větvičkou dva řádky** (`over10SumHTML()`, podoba podle uživatele):
+`[7 + 3] + 1 =` (dvojice v růžovém rámečku jako nahoře) a `10 + 1 = 11`. Jsou to dva
+sloupce (mřížka `.o10-sum`): 10 uprostřed pod rámečkem, „+ 1 =“ přesně pod sebou. Nic se do nich
+nepíše: čísla jsou ozvěna políček (`syncBigaddEcho()`, `data-cell`) a druhý řádek se ukáže
+až po napsání doplňku (`data-after`) — rovná desítka by jinak napověděla.
+
+**Mezery kolem `+` / `−` a `=` jsou stejné.** První číslo stojí **uprostřed rámečku**
+(uživatel to tak chce) ve sloupci širokém jako políčko pod ním, takže vpravo od něj zbývá
+volné místo `--slack` (počítá se z počtu číslic `--ad`). Stejnou mezeru navíc dostanou
+i ostatní znaménka. Přisunout číslo doprava se zkoušelo a uživatel ho chtěl zpátky na střed;
+záporný okraj znaménka ho zase posadí na okraj rámečku.
+
 Kroužky v zadání kreslí `over10FrameHTML()` v `app.js` (třída `.tenframe-hint`), což je
 něco jiného než `tenFrameHTML()` ve vysvětlení po chybě. Nad dvacet se nekreslí,
 tolik koleček se na dva řádky nevejde (u sčítání rozhoduje výsledek, u odčítání
@@ -418,11 +435,10 @@ Pár věcí, které se snadno rozbijí:
    47  +  25
           ╱ ╲              modrá = desítky, oranžová = jednotky
        [20]  [5]
-        ▮▮   ▪▪▪▪▪         kostičky (lehká a střední)
+        ▮▮   ▪▪▪▪▪         kostičky (jen lehká, tam pod zadáním)
 
 47 + 20 + 5 =        zápis po krocích (střední a těžká), jako na Umíme to
-[67] + 5 =
-[72]
+[67] + 5 = [72]      výsledek za rovná se, ne na zvláštním řádku (přání uživatele)
 ```
 
 Skoky po číselné ose tu byly a uživatel je nahradil zápisem po krocích — nevracet.
@@ -437,8 +453,9 @@ umimematiku.cz. **Lehká jde krok po kroku s výběrem ze dvou možností** (Roz
 56 + 40 + 4 → 56 + 40 = → 96 + 4 =), uživatel ji chtěl podle cvičení „Sčítání dvojciferných
 čísel s rozkladem" z Umíme to. Je to druh **`bigaddstep`** a jede přes ovladač velkého
 násobení (`STEP_KINDS`, `bigTap`, `bigmulHTML`). Na rozdíl od násobení je popisek kroku
-**nad** výsledkem — je to začátek věty („Rozdělíme 67 na:“), ne komentář. **Střední** je obrázek s větvičkou,
-kostičkami a psaním, přes desítku napůl; **těžká** vždycky přes desítku a bez kostiček.
+**nad** výsledkem — je to začátek věty („Rozdělíme 67 na:“), ne komentář. **Kostičky jsou jen na lehké**
+(pod zadáním, `bigaddBlocksHTML()`), uživatel je ze střední vyřadil. **Střední** je obrázek
+s větvičkou a psaním, přes desítku napůl; **těžká** totéž, ale vždycky přes desítku.
 Rozsah je strop, ale nejvýš 100. **V nastavení jsou jen chipy do 50 a do 100**
 (`BIGADD_MAX_PRESETS`); uložený menší rozsah z jiné hry se nemění, jen se ukáže jako
 „do 100“ (`bigaddMax`). Hláška o malém rozsahu tam byla a uživatel ji odmítl — nevracet.

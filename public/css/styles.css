@@ -808,13 +808,20 @@ body.is-quiz .wrap { padding-top: 18px; }
   display: grid; justify-content: center; align-items: center;
   grid-template-columns: repeat(5, auto);
   grid-template-rows: auto clamp(20px, 7vw, 34px) auto;
-  column-gap: clamp(4px, 1.6vw, 10px); row-gap: 4px;
+  column-gap: clamp(10px, 3.4vw, 16px); row-gap: 4px;
   min-width: 0; margin-top: 10px;
 }
+/* První číslo stojí uprostřed rámečku (sloupec široký jako políčko pod ním),
+   takže vpravo od něj zbývá volné místo `--slack`. Aby byly mezery kolem
+   znamének stejné, dostanou tutéž mezeru navíc i ostatní - znaménko pak
+   nevisí daleko od čísla. Přisunout číslo doprava uživatel nechtěl (není
+   pak uprostřed rámečku) a záporný okraj znaménka ho posadí na okraj rámečku.
+   `--ad` je počet číslic prvního čísla, číslice Baloo 2 má zhruba .52 em. */
+.o10b { --slack: calc((var(--cell) - var(--ad, 2) * .52 * var(--o10-font)) / 2); }
 .o10b-a    { grid-area: 1 / 1; justify-self: center; }
-.o10b-op   { grid-area: 1 / 2; }
+.o10b-op   { grid-area: 1 / 2; margin-right: var(--slack); }
 .o10b-b    { grid-area: 1 / 3; }
-.o10b-eq   { grid-area: 1 / 4; }
+.o10b-eq   { grid-area: 1 / 4; margin: 0 var(--slack); }
 .o10b-c    { grid-area: 1 / 5; }
 .o10b-ten  { grid-area: 3 / 1; }
 .o10b-rest { grid-area: 3 / 5; }
@@ -843,6 +850,23 @@ body.is-quiz .wrap { padding-top: 18px; }
 .o10b-leg-r {
   grid-area: 2 / 4 / 3 / 6; margin-right: calc(var(--cell) * .5);
   background: linear-gradient(to top right, transparent calc(50% - 1.5px),
+    var(--ink-soft) calc(50% - 1.5px), var(--ink-soft) calc(50% + 1.5px), transparent calc(50% + 1.5px));
+}
+
+/* Sčítání: zbytek stojí přímo pod druhým číslem, ne pod výsledkem - uživatel
+   to tak chtěl (82 + 9: osmička patří k 82 do rámečku, jednička pod devítku).
+   Levá čára vede ze středu druhého čísla k políčku pod prvním, pravá rovně dolů. */
+/* Políčko je širší než jednociferné číslo nad ním - kdyby stálo jen ve sloupci
+   druhého čísla, sloupec by se roztáhl a znaménka by odjela. Proto se rozkládá
+   přes sloupce znaménko–číslo–rovná se a stojí na jejich středu. Druhé číslo
+   je vždycky jednociferné, polovina číslice je zhruba .26 em. */
+.o10b[data-op="add"] .o10b-rest { grid-area: 3 / 2 / 4 / 5; justify-self: center; }
+/* levá čára je dlouhá, v nízkém řádku by byla skoro vodorovná */
+.o10b[data-op="add"] { grid-template-rows: auto clamp(30px, 10vw, 48px) auto; }
+.o10b[data-op="add"] .o10b-leg-l { grid-area: 2 / 1 / 3 / 4; margin-right: calc(var(--o10-font) * .26); }
+.o10b[data-op="add"] .o10b-leg-r {
+  grid-area: 2 / 3 / 3 / 4; margin: 0;
+  background: linear-gradient(to right, transparent calc(50% - 1.5px),
     var(--ink-soft) calc(50% - 1.5px), var(--ink-soft) calc(50% + 1.5px), transparent calc(50% + 1.5px));
 }
 
@@ -906,7 +930,24 @@ body.is-quiz .wrap { padding-top: 18px; }
   --ba-gap: 10px;
   margin-top: 6px; color: var(--ink);
 }
-.ba-top { display: flex; justify-content: center; align-items: baseline; gap: clamp(6px, 2vw, 12px); }
+/* Znaménko je menší písmem než čísla - zarovnané na účaří viselo dole.
+   Všechny tři kusy proto dostanou stejně vysoký řádek a znaménko se
+   vystředí na výšku (stejně jako v zápisu pod rozkladem). */
+.ba-top { display: flex; justify-content: center; --ba-op-gap: clamp(6px, 2vw, 12px); }
+.ba-split > .o10-num {
+  height: calc(var(--o10-font) * 1.1); display: flex; align-items: center; line-height: 1;
+}
+/* První číslo se znaménkem a „=“ visí po stranách druhého čísla mimo tok:
+   druhé číslo tak zůstane přesně nad větvičkou a mezery kolem znaménka
+   jsou na obou stranách stejné (s odhadnutým posunutím nebyly). */
+.ba-b { position: relative; }
+.ba-b-pre, .ba-b-eq {
+  position: absolute; top: 0; height: 100%; display: flex; align-items: center;
+  gap: var(--ba-op-gap);
+}
+.ba-b-pre { right: 100%; margin-right: var(--ba-op-gap); }
+.ba-b-eq { left: 100%; margin-left: var(--ba-op-gap); }
+.ba-b-pre .o10-num, .ba-b-pre .o10-op { line-height: 1; }
 .ba-split { display: flex; flex-direction: column; align-items: center; }
 .ba-legs {
   width: calc(var(--cell) * 2 + var(--ba-gap)); height: clamp(16px, 5vw, 26px);
@@ -921,6 +962,8 @@ body.is-quiz .wrap { padding-top: 18px; }
 
 /* kostičky: desítka je tyčka z deseti dílků, jednotka jedna kostička */
 .ba-blocks { display: flex; gap: var(--ba-gap); margin-top: 6px; }
+/* lehká úroveň: kostičky druhého čísla hned pod zadáním */
+.bm-blocks .ba-blocks { justify-content: center; margin: 0 0 10px; }
 .ba-bars, .ba-cubes { width: var(--cell); display: flex; justify-content: center; align-items: flex-end; }
 .ba-bars { gap: 2px; }
 .ba-bar {
@@ -932,8 +975,7 @@ body.is-quiz .wrap { padding-top: 18px; }
 
 /* zápis pod rozkladem (jako na Umíme to, rovná se na konci řádku):
      39 + 50 + 1 =
-     [89] + 1 =
-     [90]
+     [89] + 1 = [90]
    Desítky a jednotky jsou ozvěna toho, co dítě napsalo nahoře do
    větvičky (`syncBigaddEcho`); dokud nic nenapíše, je tam prázdný rámeček. */
 .ba-rows { display: flex; flex-direction: column; align-items: flex-start; width: max-content; max-width: 100%; margin: 14px auto 0; row-gap: 8px; }
@@ -944,6 +986,26 @@ body.is-quiz .wrap { padding-top: 18px; }
   display: inline-block; width: calc(var(--cell) * .55); height: calc(var(--o10-box) * .6);
   border: 2px dashed currentColor; border-radius: 8px; opacity: .55;
 }
+/* „Počítej přes 10“: (7 + 3) + 1 = 10 + 1 pod větvičkou */
+.o10-sum {
+  margin-top: 12px; text-align: center; color: var(--ink);
+  font-family: 'Baloo 2', sans-serif; font-weight: 800; font-size: clamp(1.15rem, 5.4vw, 1.7rem);
+  --cell: 44px; --o10-box: 44px;
+}
+.o10-sum {
+  display: grid; grid-template-columns: auto auto; justify-content: center;
+  align-items: center; column-gap: 8px; row-gap: 6px;
+}
+.o10-sum > [hidden] { display: none; }
+.o10-round { justify-self: center; }
+.o10-tail { justify-self: start; }
+.o10-sum .ba-echo { display: inline-block; vertical-align: middle; }
+/* stejný rámeček jako kolem prvního čísla a doplňku nahoře (.o10b-box) */
+.o10-pair {
+  display: inline-block; padding: 0 8px; border-radius: 12px;
+  border: 3px solid var(--accent-a);
+}
+.o10-sum .ba-echo.is-empty { width: 1.3em; height: 1.1em; }
 .ba-echo-tens { color: var(--pair-task); }
 .ba-echo-ones { color: var(--pair-result); }
 

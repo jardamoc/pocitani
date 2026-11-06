@@ -10,11 +10,10 @@ import { rnd } from './random.js';
           47  +  25
                  ╱ ╲
               [20]  [5]           větvička: rozklad druhého čísla
-                ▮▮   ▪▪▪▪▪        kostičky jako nápověda (lehká, střední)
+                ▮▮   ▪▪▪▪▪        kostičky jako nápověda (jen lehká)
 
        47 + 20 + 5 =                 zápis po krocích (jako na Umíme to)
-       [67] + 5 =
-       [72]
+       [67] + 5 = [72]
 
    Desítky jsou všude modré, jednotky oranžové - větev, kostičky i zápis.
    U odčítání je to stejné, jen se skáče dolů (72 − 25: 72 → 52 → 47).
@@ -36,9 +35,9 @@ export const BIGADD_FIELDS = ['tens', 'ones', 'mid', 'c'];
    „Sčítání dvojciferných čísel s rozkladem“ na umimematiku.cz) a ovládá ji
    ovladač velkého násobení - `ex.kind = 'bigaddstep'`. */
 export const BIGADD_LEVELS = {
-  easy: { label: 'Lehká', emoji: '🟢', note: 'krok po kroku, vybíráš ze dvou možností', carry: null, steps: true },
-  medium: { label: 'Střední', emoji: '🟡', note: 'rozklad a výpočet po krocích, s kostičkami', carry: null, blocks: true },
-  hard: { label: 'Těžká', emoji: '🔴', note: 'vždycky přes desítku a bez kostiček', carry: true, blocks: false },
+  easy: { label: 'Lehká', emoji: '🟢', note: 'krok po kroku s kostičkami, vybíráš ze dvou možností', carry: null, steps: true, blocks: true },
+  medium: { label: 'Střední', emoji: '🟡', note: 'rozklad a výpočet po krocích, píšeš sama', carry: null, blocks: false },
+  hard: { label: 'Těžká', emoji: '🔴', note: 'vždycky přes desítku', carry: true, blocks: false },
 };
 export const BIGADD_LEVEL_KEYS = Object.keys(BIGADD_LEVELS);
 
