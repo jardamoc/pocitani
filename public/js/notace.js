@@ -105,9 +105,12 @@ export function noteSVG(value, i, x, step, cls = '', acc = 0) {
     const sx = up ? x + 5.4 : x - 5.4;
     const sy = up ? y - 34 : y + 34;
     out += `<line x1="${sx}" y1="${y}" x2="${sx}" y2="${sy}" stroke="currentColor" stroke-width="1.6"/>`;
-    if (value === 'eighth') {
-      const dir = up ? 1 : -1;
-      out += `<path d="M${sx} ${sy} C${sx + 1} ${sy + 8 * dir} ${sx + 10} ${sy + 11 * dir} ${sx + 7} ${sy + 22 * dir}" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>`;
+    // osminová má jeden praporek, šestnáctinová dva nad sebou
+    const flags = value === 'eighth' ? 1 : value === 'sixteenth' ? 2 : 0;
+    const dir = up ? 1 : -1;
+    for (let f = 0; f < flags; f++) {
+      const fy = sy + f * 9 * dir;
+      out += `<path d="M${sx} ${fy} C${sx + 1} ${fy + 8 * dir} ${sx + 10} ${fy + 11 * dir} ${sx + 7} ${fy + 22 * dir}" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>`;
     }
   }
   return `<g class="hd-note${cls ? ` ${cls}` : ''}">${out}</g>`;
@@ -136,6 +139,14 @@ export function restSVG(value, i, x) {
     return `<path class="hd-rest" d="M${x - 3} ${y0} L${x + 3} ${y0 + 8} L${x - 2} ${y0 + 15} L${x + 3} ${y0 + 22} C${x - 4} ${y0 + 19} ${x - 5} ${y0 + 26} ${x - 1} ${y0 + 30}" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>`;
   }
   const y = yOf(i, 5);
+  if (value === 'sixteenth') {
+    // jako osminová, jen má dvě tečky a čárka je delší (sahá pod osnovu)
+    const y3 = yOf(i, 3);
+    return `<g class="hd-rest"><circle cx="${x - 1}" cy="${y}" r="2.4" fill="currentColor"/>`
+      + `<circle cx="${x - 4}" cy="${y3}" r="2.4" fill="currentColor"/>`
+      + `<path d="M${x - 1} ${y + 1.5} C${x + 2} ${y + 4} ${x + 4} ${y + 2} ${x + 5} ${y - 1} L${x - 3} ${yOf(i, -1)}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>`
+      + `<path d="M${x - 4} ${y3 + 1.5} C${x - 1} ${y3 + 4} ${x + 1} ${y3 + 2} ${r1(x + 2.2)} ${y3 - 1}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></g>`;
+  }
   return `<g class="hd-rest"><circle cx="${x - 3}" cy="${y}" r="2.4" fill="currentColor"/>`
     + `<path d="M${x - 3} ${y + 1.5} C${x} ${y + 4} ${x + 3} ${y + 2} ${x + 4} ${y - 1} L${x - 1} ${yOf(i, 1)}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></g>`;
 }

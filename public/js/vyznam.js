@@ -62,7 +62,7 @@ export const VYZNAM_RELS = {
 };
 export const VYZNAM_REL_KEYS = Object.keys(VYZNAM_RELS);
 
-export const VYZNAM_COUNTS = [5, 10, 15];
+export const VYZNAM_COUNTS = [10, 20, 30];
 
 export const VYZNAM_LEVELS = {
   easy: { label: 'Lehká', emoji: '🟢', note: 'slova souznačná a protikladná, známé skupiny jako ovoce nebo dny' },
@@ -299,7 +299,7 @@ function spojExercise(level, used) {
    je kolo jediná plocha. */
 export function makeVyznamRound(levelKey = 'easy', tasks = VYZNAM_TASK_KEYS, count = 10) {
   const level = VYZNAM_LEVELS[levelKey] ? levelKey : 'easy';
-  const n = VYZNAM_COUNTS.includes(count) ? count : VYZNAM_COUNTS[1];
+  const n = VYZNAM_COUNTS.includes(count) ? count : VYZNAM_COUNTS[0];
   const use = tasks.filter((t) => t in VYZNAM_TASKS);
   const used = new Set();
   const usedCats = new Set();

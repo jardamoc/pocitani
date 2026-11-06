@@ -38,7 +38,7 @@ export const POS_TYPES = {
 };
 export const POS_TYPE_KEYS = Object.keys(POS_TYPES);
 
-export const POS_COUNTS = [5, 10, 15];
+export const POS_COUNTS = [10, 20, 30];
 
 export const POS_LEVELS = {
   easy: { label: 'Lehká', emoji: '🟢', note: 'krátké věty, kdo a co dělá' },
@@ -266,7 +266,7 @@ function targetsFor(types, n) {
    přes padesát vět, takže se v kole nic neopakuje. */
 export function makePosRound(levelKey = 'easy', types = ['verb'], count = 10) {
   const level = POS_LEVELS[levelKey] ? levelKey : 'easy';
-  const n = POS_COUNTS.includes(count) ? count : POS_COUNTS[1];
+  const n = POS_COUNTS.includes(count) ? count : POS_COUNTS[0];
   const pool = shuffle(POS_SENTENCES[level]).slice(0, n);
   const targets = targetsFor(types, pool.length);
   return pool.map((src, i) => {

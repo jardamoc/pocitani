@@ -57,7 +57,7 @@ export const HUDBA_TASKS = {
 };
 export const HUDBA_TASK_KEYS = Object.keys(HUDBA_TASKS);
 
-export const HUDBA_COUNTS = [5, 10, 15];
+export const HUDBA_COUNTS = [10, 20, 30];
 
 export const HUDBA_LEVELS = {
   easy: { label: 'Lehká', emoji: '🟢', note: 'houslová osnova a takt 4/4' },
@@ -76,10 +76,12 @@ export const SYMBOLS = {
   'n:dhalf': 'tečkovaná půlová nota',
   'n:quarter': 'čtvrťová nota',
   'n:eighth': 'osminová nota',
+  'n:sixteenth': 'šestnáctinová nota',
   'r:whole': 'celá pomlka',
   'r:half': 'půlová pomlka',
   'r:quarter': 'čtvrťová pomlka',
   'r:eighth': 'osminová pomlka',
+  'r:sixteenth': 'šestnáctinová pomlka',
 };
 
 const SYMBOL_POOL = {
@@ -100,11 +102,13 @@ const CONFUSE = {
   'n:half': ['n:dhalf', 'n:whole', 'r:half', 'n:quarter'],
   'n:dhalf': ['n:half', 'n:whole', 'n:quarter'],
   'n:quarter': ['n:eighth', 'n:half', 'r:quarter'],
-  'n:eighth': ['n:quarter', 'r:eighth', 'n:half'],
+  'n:eighth': ['n:sixteenth', 'n:quarter', 'r:eighth', 'n:half'],
+  'n:sixteenth': ['n:eighth', 'r:sixteenth', 'n:quarter'],
   'r:whole': ['r:half', 'n:whole', 'r:quarter'],
   'r:half': ['r:whole', 'n:half', 'r:quarter'],
   'r:quarter': ['r:eighth', 'n:quarter', 'r:half'],
-  'r:eighth': ['r:quarter', 'n:eighth', 'r:half'],
+  'r:eighth': ['r:sixteenth', 'r:quarter', 'n:eighth', 'r:half'],
+  'r:sixteenth': ['r:eighth', 'n:sixteenth', 'r:quarter'],
 };
 
 const isClef = (s) => s === 'treble' || s === 'bass';
@@ -129,7 +133,9 @@ const SYMBOL_RULE = {
   'r:whole': 'Celá pomlka je obdélníček, který **visí pod čtvrtou linkou**. Trvá **4 doby**.',
   'r:half': 'Půlová pomlka je obdélníček, který **sedí na prostřední lince**. Trvá **2 doby**.',
   'r:quarter': 'Čtvrťová pomlka je **klikatá čárka** jako blesk. Trvá **1 dobu**.',
+  'n:sixteenth': 'Šestnáctinová nota je plné kolečko s nožičkou a **dvěma praporky**. Čtyři šestnáctinové trvají **1 dobu**.',
   'r:eighth': 'Osminová pomlka je **tečka s šikmou čárkou** jako číslice 7. Dvě osminové pomlky trvají **1 dobu**.',
+  'r:sixteenth': 'Šestnáctinová pomlka má **dvě tečky** na šikmé čárce. Čtyři šestnáctinové pomlky trvají **1 dobu**.',
 };
 
 /* Tagy chyb - popisky jsou v `TAGS` v generator.js. */
@@ -509,7 +515,7 @@ const MAKERS = { znak: znakExercise, nazev: nazevExercise, umisti: umistiExercis
 
 export function makeHudbaRound(levelKey = 'easy', tasks = HUDBA_TASK_KEYS, count = 10) {
   const level = HUDBA_LEVELS[levelKey] ? levelKey : 'easy';
-  const n = HUDBA_COUNTS.includes(count) ? count : HUDBA_COUNTS[1];
+  const n = HUDBA_COUNTS.includes(count) ? count : HUDBA_COUNTS[0];
   const use = tasks.filter((t) => t in HUDBA_TASKS);
   const keys = use.length ? use : ['nazev'];
   const plan = shuffle(Array.from({ length: n }, (_, i) => keys[i % keys.length]));
@@ -541,7 +547,7 @@ export const KLAVIR_LEVEL_KEYS = Object.keys(KLAVIR_LEVELS);
 
 export function makeKlavirRound(levelKey = 'easy', forms = KLAVIR_FORM_KEYS, count = 10) {
   const level = KLAVIR_LEVELS[levelKey] ? levelKey : 'easy';
-  const n = HUDBA_COUNTS.includes(count) ? count : HUDBA_COUNTS[1];
+  const n = HUDBA_COUNTS.includes(count) ? count : HUDBA_COUNTS[0];
   const use = forms.filter((f) => f in KLAVIR_FORMS);
   const keys = use.length ? use : ['naklavir'];
   const plan = shuffle(Array.from({ length: n }, (_, i) => keys[i % keys.length]));
@@ -631,31 +637,21 @@ function sluchMelodie(level) {
   };
 }
 
+/* Na jedné houslové osnově stojí všechny noty c1 až c2 bez posuvek
+   (stupnice zleva doprava) a dítě klepne na tu, která zazněla. */
 function sluchNota(level) {
-  const whites = PIANO_KEYS.filter((k) => k.white && k.midi !== 60);
-  const target = pick(whites);
-  const n = level === 'easy' ? 2 : 3;
-  const minGap = { easy: 3, medium: 2, hard: 1 }[level];
-  const maxGap = level === 'hard' ? 2 : 7;
-  const others = shuffle(PIANO_KEYS.filter((k) => k.white && k.pos !== target.pos
-    && Math.abs(k.pos - target.pos) >= minGap && Math.abs(k.pos - target.pos) <= maxGap));
-  // dvě c (dole a nahoře) by měla na tlačítku stejné jméno - jen jedno
-  const picked = [];
-  for (const k of others) {
-    if (picked.length >= n - 1) break;
-    if (k.text === target.text || picked.some((p) => p.text === k.text)) continue;
-    picked.push(k);
-  }
-  const all = shuffle([target, ...picked]);
+  const whites = PIANO_KEYS.filter((k) => k.white);
+  const target = pick(whites.filter((k) => k.midi !== 60));
+  const name = (k) => toneName(k.midi);
   return {
     level, task: 'sluch', form: 'nota', tones: [60, target.midi],
-    text: `Která nota zazněla? (${target.text})`,
-    answer: target.text,
-    options: all.map((k) => ({
-      text: k.text, key: String(k.pos), d: 28 + k.pos, midi: k.midi,
+    text: `Která nota zazněla? (${name(target)})`,
+    answer: name(target),
+    options: whites.map((k) => ({
+      text: name(k), key: String(k.pos), d: 28 + k.pos, midi: k.midi,
       ok: k === target, tag: k === target ? null : 'hudbaSluch',
     })),
-    key: `sluch|nota|${target.pos}|${all.map((k) => k.pos).join(',')}`,
+    key: `sluch|nota|${target.pos}`,
   };
 }
 
@@ -663,7 +659,7 @@ const SLUCH_MAKERS = { vyssi: sluchVyssi, odc: sluchOdc, melodie: sluchMelodie, 
 
 export function makeSluchRound(levelKey = 'easy', forms = SLUCH_FORM_KEYS, count = 10) {
   const level = SLUCH_LEVELS[levelKey] ? levelKey : 'easy';
-  const n = HUDBA_COUNTS.includes(count) ? count : HUDBA_COUNTS[1];
+  const n = HUDBA_COUNTS.includes(count) ? count : HUDBA_COUNTS[0];
   const use = forms.filter((f) => f in SLUCH_FORMS);
   const keys = use.length ? use : ['vyssi'];
   const plan = shuffle(Array.from({ length: n }, (_, i) => keys[i % keys.length]));

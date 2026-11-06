@@ -288,7 +288,7 @@ function normalizeConfig(raw) {
     ops,
     over10Ops: over10Ops.length ? over10Ops : ['add'],
     kinds,
-    count: clamp(Number(raw.count) || 10, 3, 60),
+    count: clamp(Number(raw.count) || 10, 10, 60),
     max: clamp(Number(raw.max) || 20, 5, 1000),
     // starší uložené nastavení abecedu nezná
     abcCount: ABC_COUNTS.includes(Number(raw.abcCount)) ? Number(raw.abcCount) : ABC_COUNT_DEFAULT,
@@ -937,7 +937,7 @@ function bindCustomField(inputId, chipsId, key, min, max) {
   input.addEventListener('blur', () => renderConfigScreen());
 }
 
-bindCustomField('countCustom', 'countChips', 'count', 3, 60);
+bindCustomField('countCustom', 'countChips', 'count', 10, 60);
 bindCustomField('maxCustom', 'maxChips', 'max', 5, 1000);
 
 el('soundBtn').addEventListener('click', () => {
@@ -1082,7 +1082,7 @@ async function acceptIncoming() {
 function startRound() {
   gameId = rewards.makeGameId();
   config.max = clamp(config.max, 5, 1000);
-  config.count = clamp(config.count, 3, 60);
+  config.count = clamp(config.count, 10, 60);
   const build = {
     calc: () => buildRound(config, state.missed),
     riddle: () => buildRiddleRound(config),
@@ -2605,9 +2605,12 @@ function hudbaHTML(ex) {
       return wrap(`${head}<div class="vt-opts">${choiceButtons(ex, (o) => o.text)}</div>`, 'sluch-vyssi');
     }
     if (ex.form === 'nota') {
-      const opts = ex.options.map((o, i) => `<button type="button" class="vt-opt hd-pic${choiceState(o, i)}" data-i="${i}"
-          aria-label="nota ${o.text}"${dis}>${staffSVG({ staves: ['treble'], notes: [{ staff: 'treble', step: stepOf('treble', o.d), value: 'whole' }], width: 80 })}</button>`).join('');
-      return wrap(`${head}<div class="vt-opts">${opts}</div>`, 'sluch-nota');
+      // jedna osnova s houslovým klíčem na začátku a všemi notami c až c
+      const notes = ex.options.map((o, i) => ({
+        staff: 'treble', step: stepOf('treble', o.d), value: 'whole', hit: i,
+        cls: choiceState(o, i).trim(),
+      }));
+      return wrap(`${head}<div class="hd-figure hd-scale">${staffSVG({ staves: ['treble'], notes, width: 330 })}</div>`, 'sluch-nota');
     }
     if (ex.form === 'melodie') {
       // zahrané klávesy svítí; po vyhodnocení zelená správná melodie, červená vedle

@@ -61,7 +61,7 @@ export const VETY_LETTERS = { ozn: 'O', taz: 'T', roz: 'R', pra: 'P' };
 /* Kolik vět je na listu „Označ písmenem“. */
 export const VETY_LIST_SIZE = 10;
 
-export const VETY_COUNTS = [5, 10, 15];
+export const VETY_COUNTS = [10, 20, 30];
 
 export const VETY_LEVELS = {
   easy: { label: 'Lehká', emoji: '🟢', note: 'krátké věty, druh se pozná podle znaménka na konci' },
@@ -285,7 +285,7 @@ function listExercise(level, usedBase, pool) {
 
 export function makeVetyRound(levelKey = 'easy', tasks = ['type', 'ask'], count = 10) {
   const level = VETY_LEVELS[levelKey] ? levelKey : 'easy';
-  const n = VETY_COUNTS.includes(count) ? count : VETY_COUNTS[1];
+  const n = VETY_COUNTS.includes(count) ? count : VETY_COUNTS[0];
   const use = tasks.filter((t) => t in VETY_TASKS);
   const rest = use.filter((t) => t !== 'list');
 

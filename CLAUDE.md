@@ -1,4 +1,4 @@
-﻿# Počítání pro Alžbětu
+# Počítání pro Alžbětu
 
 Hravý trenažér matematiky pro **konkrétní dítě** — dceru majitele repozitáře, školačku
 **1. až 3. třídy**. Není to obecný produkt; když se rozhoduješ mezi „správně obecně" a
@@ -570,7 +570,7 @@ tak, aby šla slova podle abecedy. **Jedna plocha = jedno kolo**, stejně jako m
 Vlastní řazení nepiš. Plocha, kde by dvě slova byla stejná v základním porovnání
 (liší se jen čárkou), se zahodí.
 
-**Obtížnost = záludnost slov, počet slov se volí zvlášť** (`config.abcCount`, 9/12/16/20/25,
+**Obtížnost = záludnost slov, počet slov se volí zvlášť** (`config.abcCount`, 10/20,
 vlastní klíč — `config.count` patří příkladům). Lehká: každé slovo jiným písmenem, bez pastí.
 Střední: aspoň čtvrtina slov sdílí první písmeno, rozhoduje druhé. Těžká: navíc pasti
 c/č, r/ř, s/š, z/ž, h/ch. Různých prvních písmen bez pastí je jen 21 (`ABC_SAFE_LETTERS`),
@@ -597,7 +597,7 @@ Pár věcí, které se snadno rozbijí:
 Druhá hra pod záložkou Čeština (`config.mode` = `pos`). Ukáže se věta a dítě v ní klepne
 na **všechna slovesa**, nebo na **všechna podstatná jména**, a dá Hotovo. Předlohou byly
 „Rozbory – určování sloves / podstatných jmen" na umimecesky.cz. **Co věta, to úloha**
-(na rozdíl od abecedy) — kolo má 5 / 10 / 15 vět (`config.posCount`, vlastní klíč).
+(na rozdíl od abecedy) — kolo má 10 / 20 / 30 vět (`config.posCount`, vlastní klíč).
 
 **Věty jsou ručně sepsané a ručně určené** v `pos.js` (asi 60 na každou úroveň). Uživatel
 zvolil tuhle cestu místo skládání vět ze šablon (kostrbatá čeština) i místo jazykového
@@ -640,7 +640,7 @@ Pár věcí, které se snadno rozbijí:
 Třetí hra pod záložkou Čeština (`config.mode` = `vety`). Tři úlohy (třetí je list
 „Označ písmenem", viz níž), vybírají se na kartě s operacemi (nadpis „Co budeme dělat?",
 vlastní klíč `config.vetyTasks`, **do `config.ops` nepatří**); když jsou zapnuté první
-dvě, kolo se rozdělí půl na půl. Počet vět 5 / 10 / 15
+dvě, kolo se rozdělí půl na půl. Počet vět 10 / 20 / 30
 (`config.vetyCount`). Co věta, to úloha.
 
 - **Urči druh věty** (`task: 'type'`) — čtyři školní druhy: oznamovací, tázací,
@@ -698,7 +698,7 @@ obarví špatná okénka, druhé ukáže řešení (oprava napodruhé se počít
 Pátá hra pod záložkou Čeština (`config.mode` = `uu`), předlohou cvičení „Doplň u, ú, ů"
 ze sešitu. Věta s mezerami, **dítě klepne na mezeru a pak na u / ú / ů**; výběr pak sám
 skočí na další prázdnou mezeru. Hotovo až se vším vyplněným, jedna oprava jako u listu.
-Co věta, to úloha, počet 5 / 10 / 15 (`config.uuCount`).
+Co věta, to úloha, počet 10 / 20 / 30 (`config.uuCount`).
 
 **Věty jsou ručně sepsané** v `uu.js`, doplňované písmeno je v hranatých závorkách:
 `'Ve vlak[u] [u]kaž pr[ů]kazk[u].'`. Velké písmeno (`[Ú]stí`) se doplňuje velké.
@@ -715,7 +715,7 @@ Tagy chyb: `uuStart` (začátek slova), `uuMark` (ú × ů), `uuLength` (krátk�
 
 Čtvrtá hra pod záložkou Čeština (`config.mode` = `vyznam`), předlohou byla cvičení
 na umimecesky.cz. Tři úlohy na kartě „Co budeme dělat?" (`config.vyznamTasks`,
-**do `config.ops` nepatří**), počet 5 / 10 / 15 (`config.vyznamCount`):
+**do `config.ops` nepatří**), počet 10 / 20 / 30 (`config.vyznamCount`):
 
 - **Doplň vztah** (`vztah`) — „Slovo **savec** je ___ slovu **zvíře**." a tlačítka se
   vztahy ve středním rodě (souznačné, protikladné, nadřazené, podřazené, souřadné,
@@ -750,11 +750,11 @@ Vztah i nadřazené slovo jdou přes společný ovladač s druhy vět (`choiceTa
 Jediná hra pod záložkou Hudba (`config.mode` = `hudba`, `ex.kind` = `hudba`). Předlohou
 byly musictheory.net (poznej notu / umísti notu) a sešity ZUŠ pro 1. ročník (doplň takt,
 najdi chybný takt). Pět úloh na kartě „Co budeme dělat?" (`config.hudbaTasks`,
-**do `config.ops` nepatří**), počet 5 / 10 / 15 (`config.hudbaCount`):
+**do `config.ops` nepatří**), počet 10 / 20 / 30 (`config.hudbaCount`):
 
 | `task` | úloha | ovládání |
 |---|---|---|
-| `znak` | Co je to? — osnova, klíče, noty a pomlky celá–osminová; obrázek → název, nebo naopak | výběr |
+| `znak` | Co je to? — osnova, klíče, noty a pomlky celá–šestnáctinová (šestnáctinové až od střední); obrázek → název, nebo naopak | výběr |
 | `nazev` | Poznej notu — tlačítka c d e f g a h | výběr |
 | `umisti` | Umísti notu — klepnutí na linku/mezeru, **jediná s druhým pokusem** (`ex.retry`) | pruhy v SVG |
 | `vyska` | Která nota je vyšší/nižší — klepe se přímo na notu | výběr |
@@ -818,7 +818,7 @@ v `hudba.js`. Úlohy (`config.sluchForms`, počet `config.sluchCount`):
 - `vyssi` — dva tóny, druhý je vyšší / nižší / stejný (stejný zhruba v 20 %).
 - `odc` — zazní c, pak jiný tón, dítě klepne na klávesu (druhý pokus).
 - `melodie` — 2 tóny (lehká) nebo 3, dítě je zahraje po klávesách (`melodyTap()`, druhý pokus).
-- `nota` — zazní c a tón, dítě vybere ze 2–3 not na osnově.
+- `nota` — zazní c a tón, na jedné houslové osnově (klíč na začátku) stojí všech osm not c až vysoké c bez posuvek, dítě klepne na tu, která zazněla.
 
 **Hledaný tón se vždycky ohlašuje kotvou c** — absolutní sluch nemá skoro nikdo. Obtížnost:
 lehká velké skoky a jen bílé klávesy, střední menší skoky a melodie ze tří tónů, těžká i černé

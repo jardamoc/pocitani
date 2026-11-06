@@ -23,7 +23,7 @@ import { shuffle } from './random.js';
 
 export const UU_LETTERS = ['u', 'ú', 'ů'];
 
-export const UU_COUNTS = [5, 10, 15];
+export const UU_COUNTS = [10, 20, 30];
 
 export const UU_LEVELS = {
   easy: { label: 'Lehká', emoji: '🟢', note: 'krátké věty, v každé jedno nebo dvě písmena' },
@@ -188,7 +188,7 @@ export function parseUu(src) {
 
 export function makeUuRound(levelKey = 'easy', count = 10) {
   const level = UU_LEVELS[levelKey] ? levelKey : 'easy';
-  const n = UU_COUNTS.includes(count) ? count : UU_COUNTS[1];
+  const n = UU_COUNTS.includes(count) ? count : UU_COUNTS[0];
   return shuffle(SENTENCES[level]).slice(0, n).map((src) => {
     const p = parseUu(src);
     return { level, ...p, answer: p.gaps.map((g) => g.answer).join(', '), key: src };

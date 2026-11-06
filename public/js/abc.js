@@ -62,7 +62,7 @@ export const WORDS = [
   'žába', 'žirafa', 'želva', 'žížala', 'židle', 'žalud',
 ];
 
-export const ABC_COUNTS = [9, 12, 16, 20, 25];
+export const ABC_COUNTS = [10, 20];
 
 export const ABC_LEVELS = {
   easy: { label: 'Lehká', emoji: '🟢', note: 'každé slovo začíná jiným písmenem' },
@@ -188,7 +188,7 @@ function unambiguous(words) {
   return true;
 }
 
-export function makeAbc(levelKey = 'easy', count = 9) {
+export function makeAbc(levelKey = 'easy', count = 10) {
   const level = ABC_LEVELS[levelKey] ? levelKey : 'easy';
   const n = ABC_COUNTS.includes(count) ? count : ABC_COUNTS[0];
   for (let attempt = 0; attempt < 200; attempt++) {
