@@ -1634,8 +1634,10 @@ function bigaddHTML(ex) {
         </div>
       </div>
       <div class="ba-rows">
-        <div class="ba-row"><span class="o10-num">${ex.a}</span>${op}${echo('tens')}${op}${echo('ones')}${eq}</div>
-        <div class="ba-row">${cell('mid')}${op}${echo('ones')}${eq}${cell('c')}</div>
+        <span class="ba-head"><span class="o10-num">${ex.a}</span>${op}${echo('tens')}</span>
+        <span class="ba-tail">${op}${echo('ones')}${eq}</span>
+        <span class="ba-head">${cell('mid')}</span>
+        <span class="ba-tail">${op}${echo('ones')}${eq}${cell('c')}</span>
       </div>
     </div>`;
 }

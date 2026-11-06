@@ -978,8 +978,16 @@ body.is-quiz .wrap { padding-top: 18px; }
      [89] + 1 = [90]
    Desítky a jednotky jsou ozvěna toho, co dítě napsalo nahoře do
    větvičky (`syncBigaddEcho`); dokud nic nenapíše, je tam prázdný rámeček. */
-.ba-rows { display: flex; flex-direction: column; align-items: flex-start; width: max-content; max-width: 100%; margin: 14px auto 0; row-gap: 8px; }
-.ba-row { display: flex; align-items: center; gap: clamp(4px, 1.6vw, 8px); }
+/* Dva sloupce: vlevo „55 + 10“ a pod tím mezivýsledek (uprostřed),
+   vpravo „+ 6 =“ v obou řádcích přesně pod sebou. */
+.ba-rows {
+  display: grid; grid-template-columns: auto auto; align-items: center;
+  width: max-content; max-width: 100%; margin: 14px auto 0;
+  row-gap: 8px; column-gap: clamp(4px, 1.6vw, 8px);
+}
+.ba-head, .ba-tail { display: flex; align-items: center; gap: clamp(4px, 1.6vw, 8px); }
+.ba-head { justify-self: center; }
+.ba-tail { justify-self: start; }
 .ba-rows .o10-num, .ba-rows .o10-op { line-height: 1; }
 .ba-echo { min-width: 1.2ch; text-align: center; }
 .ba-echo.is-empty {
