@@ -1531,8 +1531,7 @@ function over10HTML(ex) {
    Doplňky jsou ozvěna políček (`syncBigaddEcho`); druhý řádek se ukáže,
    až je doplněk napsaný - rovná desítka by jinak napověděla. */
 function over10SumHTML(ex, cell) {
-  // lehká a střední úroveň, na těžké se počítá bez nápovědy (přání uživatele)
-  if (ex.hint === 'none') return '';
+  // na všech úrovních, i na těžké (přání uživatele)
   const s = OPS[ex.op].symbol;
   /* Rovnou desítku doplní dítě samo (políčko `sum`), proto už nemusí čekat
      schovaná, až bude doplněk napsaný - nic neprozradí. */

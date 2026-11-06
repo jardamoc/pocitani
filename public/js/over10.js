@@ -35,10 +35,10 @@ import { rnd, shuffle } from './random.js';
    ============================================================ */
 
 /* Doplňovaná políčka - pořadí je zároveň pořadím hodnot v odpovědi; `app.js`
-   je čte setříděné podle `data-idx`. Těžká úroveň má jen tři, lehká a střední
-   navíc rovnou desítku (`sum`) v zápisu pod větvičkou (28 − 8 − 1 = / [20] − 1). */
-export const OVER10_FIELDS = ['ten', 'rest', 'c'];
+   je čte setříděné podle `data-idx`. Na všech úrovních včetně těžké je mezi
+   nimi rovná desítka (`sum`) v zápisu pod větvičkou (28 − 8 − 1 = / [20] − 1). */
 export const OVER10_FIELDS_STEPS = ['ten', 'rest', 'sum', 'c'];
+export const OVER10_FIELDS = OVER10_FIELDS_STEPS;
 
 /* `hint` řídí, co dostane dítě k ruce:
      choices - kroužky v desítkovém rámci a k tomu nabídka čísel
@@ -154,8 +154,8 @@ export function makeOver10(max, levelKey = 'easy', op = 'add') {
 
   const parts = { ten, rest, sum, c };
   const hint = OVER10_LEVELS[level].hint;
-  // na lehké a střední dítě doplní i rovnou desítku v zápisu pod větvičkou
-  const fields = hint === 'none' ? OVER10_FIELDS.slice() : OVER10_FIELDS_STEPS.slice();
+  // na všech úrovních dítě doplní i rovnou desítku v zápisu pod větvičkou
+  const fields = OVER10_FIELDS_STEPS.slice();
   const ex = {
     a, b, c, ten, rest, sum, level, hint, op: sub ? 'sub' : 'add',
     hidden: fields,

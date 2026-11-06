@@ -369,9 +369,9 @@ nebyl srozumitelný. Obrázek s větvičkou říká totéž a dítě z něj hned
 druhé číslo dělí zrovna takhle.
 
 **Obtížnost = kolik nápovědy dítě dostane**, ne kolik políček doplňuje ani jak velká
-jsou čísla (ta řídí výhradně rozsah). Těžká má tři políčka (`OVER10_FIELDS` = `ten`,
-`rest`, `c`), lehká a střední čtyři (`OVER10_FIELDS_STEPS`, navíc rovná desítka `sum`
-v zápisu pod větvičkou — dítě ji doplní samo, přání uživatele). Pořadí je zároveň
+jsou čísla (ta řídí výhradně rozsah). Všechny úrovně mají čtyři políčka
+(`OVER10_FIELDS_STEPS` = `ten`, `rest`, `sum`, `c`; `sum` je rovná desítka v zápisu pod
+větvičkou — dítě ji doplní samo, přání uživatele). Zápis pod větvičkou je i na těžké. Pořadí je zároveň
 pořadím hodnot v odpovědi. Nápovědu řídí `hint` v `OVER10_LEVELS`:
 
 | úroveň | `hint` | co dítě vidí navíc |
@@ -394,7 +394,7 @@ tak se jmenuje nabídka operací u „Doplň znaménko" a míchat je dohromady b
 musí být 82 + 8“. Políčko zbytku se rozkládá přes sloupce `+`, číslo a `=`, aby nerozšířilo
 sloupec druhého čísla. Odčítání zůstává po staru (rámeček kolem výsledku a zbytku).
 
-**Na lehké a střední úrovni (ne na těžké) jsou pod větvičkou dva řádky** (`over10SumHTML()`, podoba podle uživatele):
+**Na všech úrovních (od 6. 11. 2026 i na těžké) jsou pod větvičkou dva řádky** (`over10SumHTML()`, podoba podle uživatele):
 `[7 + 3] + 1 =` (dvojice v růžovém rámečku jako nahoře) a `10 + 1 = 11`. Jsou to dva
 sloupce (mřížka `.o10-sum`): 10 uprostřed pod rámečkem, „+ 1 =“ přesně pod sebou. Píše se jen
 rovná desítka (políčko `sum`, vidět hned); ostatní čísla jsou ozvěna políček
