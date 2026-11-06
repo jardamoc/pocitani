@@ -41,6 +41,7 @@ const screens = {
 
 const COUNT_PRESETS = [10, 20, 30];
 const MAX_PRESETS = [10, 15, 20, 30, 50, 100];
+const BIGADD_MAX_PRESETS = [50, 100];
 
 /* Režimy hry. Počítání je původní trénink, ostatní tři mají místo výběru
    druhů úloh vlastní obtížnost. Společné zůstává "kolik příkladů" a
@@ -734,14 +735,20 @@ function renderConfigScreen() {
       ? HUDBA_COUNTS.map((n) => chipHTML(n, `${n} úloh`, config.sluchCount === n)).join('')
       : COUNT_PRESETS.map((n) => chipHTML(n, `${n} příkladů`, config.count === n)).join('');
 
-  el('maxChips').innerHTML = MAX_PRESETS
-    .map((n) => chipHTML(n, `do ${n}`, config.max === n))
+  /* Velké sčítání má smysl jen od 40 výš - malé rozsahy se tam vůbec
+     nenabízejí. `config.max` je společný s ostatními hrami, proto se nemění;
+     zapnutý chip ukazuje, do kolika se doopravdy počítá (`bigaddMax`). */
+  const bigaddRange = isBigaddMode();
+  const maxPresets = bigaddRange ? BIGADD_MAX_PRESETS : MAX_PRESETS;
+  const maxShown = bigaddRange ? bigaddMax(config.max) : config.max;
+  el('maxChips').innerHTML = maxPresets
+    .map((n) => chipHTML(n, `do ${n}`, maxShown === n))
     .join('');
 
   renderKindNote();
 
   el('countCustom').value = COUNT_PRESETS.includes(config.count) ? '' : config.count;
-  el('maxCustom').value = MAX_PRESETS.includes(config.max) ? '' : config.max;
+  el('maxCustom').value = maxPresets.includes(maxShown) ? '' : maxShown;
 
   const soundBtn = el('soundBtn');
   soundBtn.textContent = state.sound ? '🔊 Zvuk' : '🔇 Zvuk';
@@ -1268,8 +1275,8 @@ function hintFor(ex) {
       + `kolik chybí. Pak klepni na ✓.`;
   }
   if (ex.kind === 'bigadd') {
-    return `Rozlož druhé číslo na desítky a jednotky. Pak skákej po ose: nejdřív o desítky, `
-      + `potom o jednotky – ${ex.op === 'sub' ? 'dolů' : 'nahoru'}. Nakonec klepni na ✓.`;
+    return `Rozlož druhé číslo na desítky a jednotky. Pak ${ex.op === 'sub' ? 'odečti' : 'přičti'} `
+      + 'nejdřív desítky a potom jednotky. Nakonec klepni na ✓.';
   }
   if (ex.kind === 'pexeso') {
     return 'Ke každému příkladu najdi jeho výsledek a klepni na obě kartičky. '
@@ -1537,11 +1544,23 @@ function over10FrameHTML(ex) {
 
 /* Velké sčítání: nahoře příklad a pod druhým číslem větvička na desítky
    (modrá) a jednotky (oranžová), pod ní kostičky jako nápověda. Dole
-   číselná osa se dvěma skoky stejných barev: od prvního čísla o desítky
-   do mezivýsledku a od něj o jednotky do výsledku. */
+   zápis po krocích jako na Umíme to (uživatel to tak chtěl místo skoků
+   po číselné ose): 39 + 50 + 1 → = [89] + 1 → = [90]. */
 const BA_LABEL = {
-  tens: 'Desítky druhého čísla', ones: 'Jednotky druhého čísla', mid: 'Číslo po skoku o desítky', c: 'Výsledek',
+  tens: 'Desítky druhého čísla', ones: 'Jednotky druhého čísla', mid: 'Výsledek po desítkách', c: 'Výsledek',
 };
+
+/* Ozvěny v zápisu ukazují, co dítě napsalo do větvičky. Hodnota políčka
+   se mění bez události `input` (klávesnice, druhý pokus, odhalení), proto
+   se volá ze všech těch míst. Po odhalení už políčko není, čte se `.gval`. */
+function syncBigaddEcho() {
+  document.querySelectorAll('.ba-echo').forEach((span) => {
+    const cell = document.querySelector(`.ba-parts .ba-${span.dataset.of}`);
+    const value = (cell?.querySelector('input')?.value ?? cell?.querySelector('.gval')?.textContent ?? '').trim();
+    span.textContent = value;
+    span.classList.toggle('is-empty', value === '');
+  });
+}
 const BA_DIGITS = { tens: 2, ones: 1, mid: 3, c: 3 };
 
 function bigaddHTML(ex) {
@@ -1554,11 +1573,10 @@ function bigaddHTML(ex) {
       inputmode="none" autocomplete="off" data-idx="${idx}" maxlength="${BA_DIGITS[key]}"
       aria-label="${BA_LABEL[key]}"></span>`;
   };
-  // oblouček s šipkou - jeden skok po číselné ose
-  const jump = (key, word) => `<span class="ba-jump ba-jump-${key}" aria-hidden="true">
-      <span class="ba-jlabel">${sign} ${word}</span>
-      <svg viewBox="0 0 60 24" preserveAspectRatio="none"><path d="M3 23 Q30 -6 57 23"/><path d="M49 17 L57 23 L58 13"/></svg>
-    </span>`;
+  // ozvěna políčka z větvičky - číslo, které tam dítě napsalo
+  const echo = (key) => `<span class="o10-num ba-echo ba-echo-${key} is-empty" data-of="${key}"></span>`;
+  const op = `<span class="o10-op">${sign}</span>`;
+  const eq = '<span class="o10-op">=</span>';
   const blocks = ex.blocks
     ? `<div class="ba-blocks" aria-hidden="true">
         <span class="ba-bars">${'<span class="ba-bar"></span>'.repeat(ex.tens / 10)}</span>
@@ -1578,12 +1596,10 @@ function bigaddHTML(ex) {
           ${blocks}
         </div>
       </div>
-      <div class="ba-line">
-        <span class="o10-num ba-start">${ex.a}</span>
-        ${jump('tens', 'desítky')}
-        ${cell('mid')}
-        ${jump('ones', 'jednotky')}
-        ${cell('c')}
+      <div class="ba-rows">
+        <div class="ba-row"><span class="o10-num">${ex.a}</span>${op}${echo('tens')}${op}${echo('ones')}${eq}</div>
+        <div class="ba-row">${cell('mid')}${op}${echo('ones')}${eq}</div>
+        <div class="ba-row">${cell('c')}</div>
       </div>
     </div>`;
 }
@@ -3008,6 +3024,8 @@ function currentField() {
 
 function handleKey(key) {
   if (locked) return;
+  // velké sčítání: ozvěna desítek a jednotek v zápisu, až se políčko změní
+  queueMicrotask(syncBigaddEcho);
   if (key === 'ok') return submit();
 
   // volba znaménka - vybraná operace se drží v datasetu, aby ji submit našel
@@ -3068,6 +3086,7 @@ document.addEventListener('input', (e) => {
   if (digits !== e.target.value) e.target.value = digits;
   // jakmile dítě začne přepisovat, červená z políčka zmizí
   e.target.closest('.gcell, .o10-cell, .kv-petal')?.classList.remove('is-wrong');
+  syncBigaddEcho();
 });
 
 /* Znaménka jdou zadat i z fyzické klávesnice; `x` a `:` bereme taky,
@@ -3273,6 +3292,7 @@ function partRetry(ex) {
   fb.hidden = false;
   beep('wrong');
   partInputs(ex)[0]?.focus({ preventScroll: true });
+  syncBigaddEcho();
 }
 
 /* Špatná odpověď u hádanky ještě neznamená konec - políčko se vyprázdní
@@ -3350,6 +3370,7 @@ function revealParts(ex) {
       ? `<span class="gval">${right}</span>`
       : `<span class="gval">${right}</span><span class="gwas">${mine}</span>`;
   });
+  syncBigaddEcho();
 }
 
 function riddleRevealHTML(ex) {

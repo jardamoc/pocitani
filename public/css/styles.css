@@ -930,22 +930,22 @@ body.is-quiz .wrap { padding-top: 18px; }
 .ba-cubes { display: grid; grid-template-columns: repeat(5, 6px); gap: 2px; justify-content: center; align-content: end; }
 .ba-cube { width: 6px; height: 6px; border-radius: 1px; background: var(--pair-result); }
 
-/* číselná osa: start, skok o desítky, mezivýsledek, skok o jednotky, výsledek */
-.ba-line { display: flex; justify-content: center; align-items: flex-end; margin-top: 14px; }
-.ba-start { height: var(--o10-box); display: flex; align-items: center; padding: 0 4px; }
-.ba-jump {
-  display: flex; flex-direction: column; align-items: center;
-  width: clamp(58px, 17vw, 88px); margin: 0 calc(var(--cell) * -.18) calc(var(--o10-box) * .6);
-  pointer-events: none; position: relative; z-index: 1;
+/* zápis pod rozkladem (jako na Umíme to, rovná se na konci řádku):
+     39 + 50 + 1 =
+     [89] + 1 =
+     [90]
+   Desítky a jednotky jsou ozvěna toho, co dítě napsalo nahoře do
+   větvičky (`syncBigaddEcho`); dokud nic nenapíše, je tam prázdný rámeček. */
+.ba-rows { display: flex; flex-direction: column; align-items: flex-start; width: max-content; max-width: 100%; margin: 14px auto 0; row-gap: 8px; }
+.ba-row { display: flex; align-items: center; gap: clamp(4px, 1.6vw, 8px); }
+.ba-rows .o10-num, .ba-rows .o10-op { line-height: 1; }
+.ba-echo { min-width: 1.2ch; text-align: center; }
+.ba-echo.is-empty {
+  display: inline-block; width: calc(var(--cell) * .55); height: calc(var(--o10-box) * .6);
+  border: 2px dashed currentColor; border-radius: 8px; opacity: .55;
 }
-.ba-jump svg {
-  width: 100%; height: clamp(18px, 5vw, 26px); overflow: visible;
-  fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round;
-}
-.ba-jump path { vector-effect: non-scaling-stroke; }
-.ba-jlabel { font-size: .72rem; font-weight: 800; line-height: 1; white-space: nowrap; margin-bottom: 3px; }
-.ba-jump-tens { color: var(--pair-task); }
-.ba-jump-ones { color: var(--pair-result); }
+.ba-echo-tens { color: var(--pair-task); }
+.ba-echo-ones { color: var(--pair-result); }
 
 /* ---------- kytičky ----------
    Lístky jsou rozmístěné otočením kolem středu (`--i`-tý z `--n`),

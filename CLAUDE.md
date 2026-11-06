@@ -420,8 +420,15 @@ Pár věcí, které se snadno rozbijí:
        [20]  [5]
         ▮▮   ▪▪▪▪▪         kostičky (lehká a střední)
 
-47 ⌒+ desítky⌒ [67] ⌒+ jednotky⌒ [72]     skoky po číselné ose
+47 + 20 + 5 =        zápis po krocích (střední a těžká), jako na Umíme to
+[67] + 5 =
+[72]
 ```
+
+Skoky po číselné ose tu byly a uživatel je nahradil zápisem po krocích — nevracet.
+Desítky a jednotky v zápisu jsou **ozvěna** políček z větvičky (`syncBigaddEcho()`
+v `app.js`); hodnota políčka se mění bez události `input`, proto se volá z `handleKey`,
+`partRetry` i `revealParts`.
 
 Sčítání a odčítání dvojciferných čísel do 100 tak, jak se učí ve 2.–3. třídě: druhé
 číslo se rozloží na desítky a jednotky a jde se po krocích (nejdřív desítky, pak
@@ -432,7 +439,9 @@ umimematiku.cz. **Lehká jde krok po kroku s výběrem ze dvou možností** (Roz
 násobení (`STEP_KINDS`, `bigTap`, `bigmulHTML`). Na rozdíl od násobení je popisek kroku
 **nad** výsledkem — je to začátek věty („Rozdělíme 67 na:“), ne komentář. **Střední** je obrázek s větvičkou,
 kostičkami a psaním, přes desítku napůl; **těžká** vždycky přes desítku a bez kostiček.
-Rozsah je strop, ale nejvýš 100; pod 40 se počítá do 100 a `bigaddRangeNote()` to napíše.
+Rozsah je strop, ale nejvýš 100. **V nastavení jsou jen chipy do 50 a do 100**
+(`BIGADD_MAX_PRESETS`); uložený menší rozsah z jiné hry se nemění, jen se ukáže jako
+„do 100“ (`bigaddMax`). Hláška o malém rozsahu tam byla a uživatel ji odmítl — nevracet.
 
 - Stejný tvar jako rozklad přes desítku: čtyři políčka `tens, ones, mid, c`
   (`BIGADD_FIELDS`), odpovědí je řetězec hodnot. Řádek v `PART_SEL` má vlastní třídu

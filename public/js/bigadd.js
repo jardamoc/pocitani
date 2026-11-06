@@ -12,9 +12,11 @@ import { rnd } from './random.js';
               [20]  [5]           větvička: rozklad druhého čísla
                 ▮▮   ▪▪▪▪▪        kostičky jako nápověda (lehká, střední)
 
-       47 ⌒+desítky⌒ [67] ⌒+jednotky⌒ [72]      skoky po číselné ose
+       47 + 20 + 5 =                 zápis po krocích (jako na Umíme to)
+       [67] + 5 =
+       [72]
 
-   Desítky jsou všude modré, jednotky oranžové - větev, kostičky i skok.
+   Desítky jsou všude modré, jednotky oranžové - větev, kostičky i zápis.
    U odčítání je to stejné, jen se skáče dolů (72 − 25: 72 → 52 → 47).
 
    Doplňují se vždycky tatáž čtyři políčka (`BIGADD_FIELDS`), jejich
@@ -23,7 +25,8 @@ import { rnd } from './random.js';
    OBTÍŽNOST: lehká bez přechodu přes desítku (42 + 35), střední s přechodem
    (47 + 25), těžká s přechodem a bez kostiček. Jak velká čísla vyjdou,
    řídí rozsah - ale hra je na čísla do 100, takže víc než 100 se nepočítá
-   a pod `BIGADD_MIN_MAX` se počítá do 100 (`bigaddRangeNote()` to řekne).
+   a pod `BIGADD_MIN_MAX` se počítá do 100. V nastavení jsou jen chipy
+   do 50 a do 100 (`BIGADD_MAX_PRESETS` v app.js).
    ============================================================ */
 
 export const BIGADD_FIELDS = ['tens', 'ones', 'mid', 'c'];
@@ -34,7 +37,7 @@ export const BIGADD_FIELDS = ['tens', 'ones', 'mid', 'c'];
    ovladač velkého násobení - `ex.kind = 'bigaddstep'`. */
 export const BIGADD_LEVELS = {
   easy: { label: 'Lehká', emoji: '🟢', note: 'krok po kroku, vybíráš ze dvou možností', carry: null, steps: true },
-  medium: { label: 'Střední', emoji: '🟡', note: 'rozklad a skoky po ose, s kostičkami', carry: null, blocks: true },
+  medium: { label: 'Střední', emoji: '🟡', note: 'rozklad a výpočet po krocích, s kostičkami', carry: null, blocks: true },
   hard: { label: 'Těžká', emoji: '🔴', note: 'vždycky přes desítku a bez kostiček', carry: true, blocks: false },
 };
 export const BIGADD_LEVEL_KEYS = Object.keys(BIGADD_LEVELS);
@@ -47,11 +50,10 @@ export const BIGADD_TOP = 100;
 
 export const bigaddMax = (max) => (max < BIGADD_MIN_MAX ? BIGADD_TOP : Math.min(max, BIGADD_TOP));
 
+/* Rozsahy pod `BIGADD_MIN_MAX` se v nastavení nenabízejí (chipy jsou jen
+   do 50 a do 100) a zapnutý je rovnou chip „do 100“ - hláška o malém
+   rozsahu by jen mátla, uživatel ji odmítl. */
 export function bigaddRangeNote(max) {
-  if (max < BIGADD_MIN_MAX) {
-    return `Do ${max} by vyšlo jen pár příkladů s dvěma dvojcifernými čísly. `
-      + `Počítat budeme do ${BIGADD_TOP} – nebo si rozsah zvedni sama.`;
-  }
   if (max > BIGADD_TOP) return `Velké sčítání je na čísla do ${BIGADD_TOP}, víc se tu nepočítá.`;
   return null;
 }
