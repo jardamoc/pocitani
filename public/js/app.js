@@ -1707,7 +1707,9 @@ function bigmulHTML(ex) {
   const done = ex.steps
     .slice(0, bigStep)
     .map((s) => {
-      const value = `<span class="bm-value">${s.correct}</span>`;
+      const value = s.expr
+        ? `<span class="bm-sum"><span class="bm-expr">${s.expr}</span> <span class="bm-value">${s.correct}</span></span>`
+        : `<span class="bm-value">${s.correct}</span>`;
       const label = `<span class="bm-label">${s.label}</span>`;
       return `<div class="bm-line">${labelFirst ? label + value : value + label}</div>`;
     })
@@ -1715,7 +1717,7 @@ function bigmulHTML(ex) {
 
   const step = ex.steps[bigStep];
   const choices = step
-    ? `<p class="bm-ask">${step.label}</p>
+    ? `<p class="bm-ask">${step.label}${step.expr ? ` ${step.expr}` : ''}</p>
        <div class="bm-choices">${step.options
          .map((text) => `<button type="button" class="bm-opt" data-text="${text}">${text}</button>`)
          .join('')}</div>`
@@ -3127,7 +3129,8 @@ function handleKey(key) {
    (doplněk → zbytek → desítka → výsledek). Dítě nemusí klepat na okénka. */
 function autoAdvance(input) {
   const ex = round[index];
-  if (ex?.kind !== 'over10' || !input.matches('.o10-input')) return;
+  // rozklad přes desítku i velké sčítání (desítky → jednotky → mezivýsledek → výsledek)
+  if (!['over10', 'bigadd'].includes(ex?.kind) || !input.matches('.o10-input')) return;
   const idx = Number(input.dataset.idx);
   if (input.value.length < String(ex.values[idx]).length) return;
   const inputs = partInputs(ex);

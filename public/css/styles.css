@@ -1460,6 +1460,13 @@ span.uu-gap { cursor: default; }
      uvnitř členu je úzká U+2009, na kterou `word-spacing` nesahá. */
   word-spacing: .45em;
 }
+/* velké sčítání: „53 − 40 = [13]“ - příklad a zelený výsledek v jednom řádku */
+.bm-sum {
+  justify-self: start; display: flex; align-items: center; gap: .4em;
+  font-family: 'Baloo 2', sans-serif; font-weight: 800; color: var(--ink);
+  font-size: clamp(1.1rem, 5.2vw, 1.5rem); word-spacing: .2em;
+}
+.bm-sum .bm-value { font-size: 1em; }
 .bm-label {
   justify-self: start; padding: 3px 10px; border-radius: 10px;
   background: var(--surface-2); color: var(--ink-soft);

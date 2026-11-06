@@ -128,15 +128,17 @@ function bigaddSteps({ a, b, c, tens, ones, mid, op }) {
   if (wrongMid <= 0 || wrongMid === mid) wrongMid = mid + 10;
   let wrongC = c - 1;
   if (wrongC <= 0) wrongC = c + 1;
-  const step = (label, correct, wrong, tag) => ({
-    label, correct, wrong, tag, options: Math.random() < 0.5 ? [correct, wrong] : [wrong, correct],
+  /* `expr` (nepovinný) je příklad, který se v hotovém kroku vypíše před
+     zelený výsledek („53 − 40 = 13“); popisek nad ním je pak jen začátek věty. */
+  const step = (label, correct, wrong, tag, expr) => ({
+    label, expr, correct, wrong, tag, options: Math.random() < 0.5 ? [correct, wrong] : [wrong, correct],
   });
   return [
     // „4 a 4“ místo „40 a 4“ - ztracená nula u desítek; u 11 až 19 by to bylo „1 a 5“
     step(`Rozdělíme ${b} na:`, `${tens} a ${ones}`, `${t} a ${ones}`, 'bigaddSplit'),
     step('Takže v příkladu máme:', `${a} ${s} ${tens} ${s} ${ones}`, `${a} ${s} ${t} ${s} ${ones}`, 'bigaddSplit'),
-    step(`${sub ? 'Odečteme' : 'Přičteme'} nejdřív desítky: ${a} ${s} ${tens} =`, String(mid), String(wrongMid), 'bigaddTens'),
-    step(`Ještě zbývá ${sub ? 'odečíst' : 'přičíst'} jednotky: ${mid} ${s} ${ones} =`, String(c), String(wrongC), 'bigaddOnes'),
+    step(`${sub ? 'Odečteme' : 'Přičteme'} nejdřív desítky:`, String(mid), String(wrongMid), 'bigaddTens', `${a} ${s} ${tens} =`),
+    step(`Ještě zbývá ${sub ? 'odečíst' : 'přičíst'} jednotky:`, String(c), String(wrongC), 'bigaddOnes', `${mid} ${s} ${ones} =`),
   ];
 }
 
