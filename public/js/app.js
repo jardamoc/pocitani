@@ -1,4 +1,4 @@
-import { OPS, COMPARES, EXTRA_KINDS, MISSING_LABEL, kindOps, buildRound, buildRiddleRound, buildGridRound, buildOver10Round, buildPexesoRound, buildBigmulRound, buildAbcRound, buildPosRound, buildVetyRound, buildVyznamRound, buildUuRound, buildHudbaRound, buildKlavirRound, buildSluchRound, explain, diagnose } from './generator.js';
+import { OPS, COMPARES, EXTRA_KINDS, MISSING_LABEL, kindOps, buildRound, buildRiddleRound, buildGridRound, buildOver10Round, buildBigaddRound, buildKvetRound, buildPexesoRound, buildBigmulRound, buildAbcRound, buildPosRound, buildVetyRound, buildVyznamRound, buildUuRound, buildHudbaRound, buildKlavirRound, buildSluchRound, explain, diagnose } from './generator.js';
 import {
   HUDBA_TASKS, HUDBA_TASK_KEYS, HUDBA_COUNTS, HUDBA_LEVELS, HUDBA_LEVEL_KEYS, NOTE_LETTERS, CLEFS, stepOf, PIANO_KEYS,
   KLAVIR_FORMS, KLAVIR_FORM_KEYS, KLAVIR_LEVELS, KLAVIR_LEVEL_KEYS,
@@ -20,6 +20,8 @@ import {
 import { RIDDLE_LEVELS, RIDDLE_LEVEL_KEYS } from './riddle.js';
 import { GRID_LEVELS, GRID_LEVEL_KEYS, gridOpsNote, gridRangeNote } from './grid.js';
 import { OVER10_LEVELS, OVER10_LEVEL_KEYS, over10RangeNote } from './over10.js';
+import { BIGADD_LEVELS, BIGADD_LEVEL_KEYS, bigaddMax, bigaddRangeNote } from './bigadd.js';
+import { KVET_LEVELS, KVET_LEVEL_KEYS, kvetTarget, kvetRangeNote } from './kvet.js';
 import { PEXESO_LEVELS, PEXESO_LEVEL_KEYS, pexesoRangeNote } from './pexeso.js';
 import { BIGMUL_LEVELS, BIGMUL_LEVEL_KEYS, bigmulMax, bigmulRangeNote } from './bigmul.js';
 import * as store from './stats.js';
@@ -47,6 +49,8 @@ const MAX_PRESETS = [10, 15, 20, 30, 50, 100];
 const MODES = {
   calc: { subject: 'math', label: 'Počítání', icon: '🧮', sub: 'Příklady, slovní úlohy, pyramidy' },
   over10: { subject: 'math', label: 'Počítej přes 10', icon: '🔟', sub: 'Rozlož si příklad krok za krokem' },
+  bigadd: { subject: 'math', label: 'Velké sčítání', icon: '➕', sub: 'Do 100 po desítkách a jednotkách' },
+  kvet: { subject: 'math', label: 'Kytičky', icon: '🌼', sub: 'Doplň lístek, ať kytička sedí' },
   riddle: { subject: 'math', label: 'Obrázkové hádanky', icon: '🧩', sub: 'Zjisti, kolik je který obrázek' },
   grid: { subject: 'math', label: 'Mřížka', icon: '🔳', sub: 'Doplň čísla, ať sedí doprava i dolů' },
   /* Vnitřní klíč zůstal `pexeso` z doby, kdy kartičky ležely lícem dolů.
@@ -99,11 +103,11 @@ const HUDBA_COUNT_DEFAULT = 10;
 /* Tabulky obtížností podle režimu - klíče (easy/medium/hard) jsou schválně
    společné, takže `config.level` přežije přepnutí režimu. */
 const LEVEL_TABLES = {
-  riddle: RIDDLE_LEVELS, grid: GRID_LEVELS, over10: OVER10_LEVELS, pexeso: PEXESO_LEVELS, bigmul: BIGMUL_LEVELS,
+  riddle: RIDDLE_LEVELS, grid: GRID_LEVELS, over10: OVER10_LEVELS, bigadd: BIGADD_LEVELS, kvet: KVET_LEVELS, pexeso: PEXESO_LEVELS, bigmul: BIGMUL_LEVELS,
   abc: ABC_LEVELS, pos: POS_LEVELS, vety: VETY_LEVELS, vyznam: VYZNAM_LEVELS, uu: UU_LEVELS, hudba: HUDBA_LEVELS, klavir: KLAVIR_LEVELS, sluch: SLUCH_LEVELS,
 };
 const LEVEL_KEYS = {
-  riddle: RIDDLE_LEVEL_KEYS, grid: GRID_LEVEL_KEYS, over10: OVER10_LEVEL_KEYS, pexeso: PEXESO_LEVEL_KEYS,
+  riddle: RIDDLE_LEVEL_KEYS, grid: GRID_LEVEL_KEYS, over10: OVER10_LEVEL_KEYS, bigadd: BIGADD_LEVEL_KEYS, kvet: KVET_LEVEL_KEYS, pexeso: PEXESO_LEVEL_KEYS,
   bigmul: BIGMUL_LEVEL_KEYS, abc: ABC_LEVEL_KEYS, pos: POS_LEVEL_KEYS, vety: VETY_LEVEL_KEYS,
   vyznam: VYZNAM_LEVEL_KEYS, uu: UU_LEVEL_KEYS, hudba: HUDBA_LEVEL_KEYS, klavir: KLAVIR_LEVEL_KEYS, sluch: SLUCH_LEVEL_KEYS,
 };
@@ -119,15 +123,17 @@ const OVER10_OPS = ['add', 'sub'];
 
 /* Hádanka, mřížka i rozklad přes desítku se luští déle než příklad, tak na ně
    dáváme jeden pokus navíc - první špatná odpověď ještě neukáže řešení. */
-const RETRY_KINDS = new Set(['riddle', 'grid', 'over10']);
+const RETRY_KINDS = new Set(['riddle', 'grid', 'over10', 'bigadd', 'kvet']);
 
 /* Políčka, do kterých píše klávesnice. Kromě odpovědi jsou to poznámky pod
    hádankou, kolečka mřížky a políčka rozkladu. */
-const FIELD_SEL = '#answerInput, .riddle-note-input, .grid-input, .o10-input';
+const FIELD_SEL = '#answerInput, .riddle-note-input, .grid-input, .o10-input, .kv-input';
 
 /* Úlohy, které místo jednoho políčka na odpověď mají několik dílčích.
    Odpovědí je u nich řetězec hodnot spojený ', ' v pořadí `ex.hidden`. */
-const PART_SEL = { grid: '.grid-input', over10: '.o10-input' };
+/* Velké sčítání má políčka v témže vzhledu jako rozklad (`.o10-input`),
+   vlastní třída `.ba-input` je jen pro výběr. */
+const PART_SEL = { grid: '.grid-input', over10: '.o10-input', bigadd: '.ba-input', kvet: '.kv-input' };
 
 /* `start` je ikona na tlacitku Zacit. Zamerne to neni maskot - ten uz kouka
    z hlavicky, tady se hodi neco, co znamena "jdeme". */
@@ -325,6 +331,11 @@ function saveConfig() {
 const isRiddleMode = () => config.mode === 'riddle';
 const isGridMode = () => config.mode === 'grid';
 const isOver10Mode = () => config.mode === 'over10';
+const isBigaddMode = () => config.mode === 'bigadd';
+/* Hry, kde karta s operacemi nabízí jen sčítání a odčítání. Sdílejí
+   klíč `config.over10Ops` - obě se ptají na totéž, jen s jinými čísly. */
+const isAddSubMode = () => isOver10Mode() || isBigaddMode();
+const isKvetMode = () => config.mode === 'kvet';
 const isPexesoMode = () => config.mode === 'pexeso';
 const isBigmulMode = () => config.mode === 'bigmul';
 const isAbcMode = () => config.mode === 'abc';
@@ -464,7 +475,7 @@ function renderModeCards() {
   const vyznam = isVyznamMode();
   const uu = isUuMode();
   const hudba = isMusicMode();
-  el('card-ops').hidden = isRiddleMode() || bigmul || abc || uu;
+  el('card-ops').hidden = isRiddleMode() || bigmul || abc || uu || isKvetMode();
   el('card-kinds').hidden = usesLevel();
   el('card-level').hidden = !usesLevel();
   // jedna mřížka i jedna plocha pexesa jsou celé kolo - počet příkladů odpadá
@@ -571,6 +582,24 @@ function renderModeCards() {
     return;
   }
 
+  if (isKvetMode()) {
+    maxNote.textContent = kvetRangeNote(config.max)
+      || 'Rozsah je číslo uprostřed kytičky – tolik musí dát všechny lístky dohromady.';
+    el('levelNote').textContent = `${level.label} – ${level.note}. Uprostřed kytičky bude ${kvetTarget(config.max)}.`;
+    return;
+  }
+
+  if (isBigaddMode()) {
+    maxNote.textContent = bigaddRangeNote(config.max)
+      || 'Rozsah řídí, jak velká čísla budou. Jestli se půjde přes desítku, si vybíráš výš u obtížnosti.';
+    el('levelNote').textContent = `${level.label} – ${level.note}. Čísla do ${bigaddMax(config.max)}.`;
+    opsNote.textContent = config.over10Ops.length > 1
+      ? 'Sčítání i odčítání se budou v kole střídat.'
+      : 'Můžeš si zapnout obě naráz, příklady se pak střídají.';
+    opsNote.hidden = false;
+    return;
+  }
+
   if (bigmul) {
     /* Hláška o malém rozsahu patří k rozsahu, ne k operacím - karta
        s operacemi je v tomhle režimu schovaná, stejně jako u over10. */
@@ -651,8 +680,8 @@ function renderConfigScreen() {
 
   /* V rozkladu přes desítku se vybírá jen směr (sčítání / odčítání) a bere
      se z vlastního klíče `over10Ops`; jinde je to celá nabídka operací. */
-  const opKeys = isOver10Mode() ? OVER10_OPS : Object.keys(OPS);
-  const opOn = isOver10Mode() ? config.over10Ops : config.ops;
+  const opKeys = isAddSubMode() ? OVER10_OPS : Object.keys(OPS);
+  const opOn = isAddSubMode() ? config.over10Ops : config.ops;
   /* Ve slovních druzích se v téže kartě vybírá, co se hledá - z vlastního
      klíče `posTypes`. */
   el('opChips').innerHTML = isPosMode()
@@ -794,7 +823,7 @@ function renderLastHint() {
       ? ' Noty se pokaždé vylosují jiné.'
     : isOver10Mode()
       ? ' Každý rozklad je pokaždé nový.'
-      : isBigmulMode()
+      : isBigmulMode() || isBigaddMode()
         ? ' Každý příklad je pokaždé nový.'
         : state.missed.length
         ? ` Do dalšího kola zařadím ${Math.min(state.missed.length, 12)} podobných příkladů, které minule nevyšly.`
@@ -855,7 +884,7 @@ el('opChips').addEventListener('click', (e) => {
   const chip = e.target.closest('.chip');
   if (!chip) return;
   const value = chip.dataset.value;
-  const over10 = isOver10Mode();
+  const over10 = isAddSubMode();
   const pos = isPosMode();
   const vety = isVetyMode();
   const vyznam = isVyznamMode();
@@ -1088,6 +1117,8 @@ function startRound() {
     riddle: () => buildRiddleRound(config),
     grid: () => buildGridRound(config),   // jedna mřížka je celé kolo
     over10: () => buildOver10Round(config),
+    bigadd: () => buildBigaddRound(config),
+    kvet: () => buildKvetRound(config),
     pexeso: () => buildPexesoRound(config), // jedna plocha je celé kolo
     bigmul: () => buildBigmulRound(config),
     abc: () => buildAbcRound(config),     // jedna řada slov je celé kolo
@@ -1171,7 +1202,7 @@ function renderExercise() {
   el('exerciseHint').textContent = hintFor(ex);
   /* Zápis velkého násobení roste podle toho, kolik kroků je za námi -
      stav se proto musí vynulovat dřív, než se tělo úlohy vykreslí. */
-  if (ex.kind === 'bigmul') resetBigmul();
+  if (STEP_KINDS.has(ex.kind)) resetBigmul();
   // plocha abecedy se kreslí ze stavu, ten musí být nový dřív než HTML
   if (ex.kind === 'abc') resetAbc(ex);
   // u věty taky - označená slova jsou stav, ze kterého se kreslí
@@ -1189,7 +1220,7 @@ function renderExercise() {
      zmenšovat kolečka a kartičky pod dotykový cíl. */
   document.body.classList.toggle(
     'is-wide-grid',
-    (ex.kind === 'grid' && ex.size >= 5) || (ex.kind === 'pexeso' && ex.cols >= 4) || ex.kind === 'abc',
+    (ex.kind === 'grid' && ex.size >= 5) || (ex.kind === 'pexeso' && ex.cols >= 4) || ex.kind === 'abc' || ex.kind === 'bigadd' || ex.kind === 'kvet',
   );
   // sloupce abecedy se řídí skutečnou šířkou plochy, ta je známá až teď
   if (ex.kind === 'abc') fitAbc();
@@ -1228,6 +1259,17 @@ function hintFor(ex) {
         + 'vpravo zbytek. Ten uber od desítky a nahoře doplň výsledek. Pak klepni na ✓.'
       : 'Rozděl druhé číslo na dvě části: do rámečku dej tolik, aby s prvním číslem byla rovná desítka, '
         + 'vedle zbytek. Nahoře doplň výsledek a klepni na ✓.';
+  }
+  if (ex.kind === 'bigaddstep') {
+    return 'Rozlož druhé číslo na desítky a jednotky a počítej po krocích. V každém kroku klepni na tu možnost, která je správně.';
+  }
+  if (ex.kind === 'kvet') {
+    return `Čísla na lístcích dají dohromady číslo uprostřed kytičky. Klepni na prázdný lístek a doplň, `
+      + `kolik chybí. Pak klepni na ✓.`;
+  }
+  if (ex.kind === 'bigadd') {
+    return `Rozlož druhé číslo na desítky a jednotky. Pak skákej po ose: nejdřív o desítky, `
+      + `potom o jednotky – ${ex.op === 'sub' ? 'dolů' : 'nahoru'}. Nakonec klepni na ✓.`;
   }
   if (ex.kind === 'pexeso') {
     return 'Ke každému příkladu najdi jeho výsledek a klepni na obě kartičky. '
@@ -1493,6 +1535,92 @@ function over10FrameHTML(ex) {
   return `<div class="tenframe tenframe-hint" aria-hidden="true">${cells.join('')}</div>`;
 }
 
+/* Velké sčítání: nahoře příklad a pod druhým číslem větvička na desítky
+   (modrá) a jednotky (oranžová), pod ní kostičky jako nápověda. Dole
+   číselná osa se dvěma skoky stejných barev: od prvního čísla o desítky
+   do mezivýsledku a od něj o jednotky do výsledku. */
+const BA_LABEL = {
+  tens: 'Desítky druhého čísla', ones: 'Jednotky druhého čísla', mid: 'Číslo po skoku o desítky', c: 'Výsledek',
+};
+const BA_DIGITS = { tens: 2, ones: 1, mid: 3, c: 3 };
+
+function bigaddHTML(ex) {
+  const sign = OPS[ex.op].symbol;
+  const cell = (key) => {
+    const idx = ex.hidden.indexOf(key);
+    const slotId = idx === 0 ? ' id="answerSlot"' : '';
+    const inputId = idx === 0 ? ' id="answerInput"' : '';
+    return `<span class="o10-cell slot ba-cell ba-${key}"${slotId}><input${inputId} class="o10-input ba-input" type="text"
+      inputmode="none" autocomplete="off" data-idx="${idx}" maxlength="${BA_DIGITS[key]}"
+      aria-label="${BA_LABEL[key]}"></span>`;
+  };
+  // oblouček s šipkou - jeden skok po číselné ose
+  const jump = (key, word) => `<span class="ba-jump ba-jump-${key}" aria-hidden="true">
+      <span class="ba-jlabel">${sign} ${word}</span>
+      <svg viewBox="0 0 60 24" preserveAspectRatio="none"><path d="M3 23 Q30 -6 57 23"/><path d="M49 17 L57 23 L58 13"/></svg>
+    </span>`;
+  const blocks = ex.blocks
+    ? `<div class="ba-blocks" aria-hidden="true">
+        <span class="ba-bars">${'<span class="ba-bar"></span>'.repeat(ex.tens / 10)}</span>
+        <span class="ba-cubes">${'<span class="ba-cube"></span>'.repeat(ex.ones)}</span>
+      </div>`
+    : '';
+  return `<div class="ba" data-op="${ex.op}">
+      <div class="ba-top">
+        <span class="o10-num">${ex.a}</span>
+        <span class="o10-op">${sign}</span>
+        <div class="ba-split">
+          <span class="o10-num">${ex.b}</span>
+          <svg class="ba-legs" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true">
+            <line x1="50" y1="1" x2="23" y2="23" class="ba-leg-tens"/><line x1="50" y1="1" x2="77" y2="23" class="ba-leg-ones"/>
+          </svg>
+          <div class="ba-parts">${cell('tens')}${cell('ones')}</div>
+          ${blocks}
+        </div>
+      </div>
+      <div class="ba-line">
+        <span class="o10-num ba-start">${ex.a}</span>
+        ${jump('tens', 'desítky')}
+        ${cell('mid')}
+        ${jump('ones', 'jednotky')}
+        ${cell('c')}
+      </div>
+    </div>`;
+}
+
+/* Kytičky na louce: lístky kolem středu, uprostřed číslo, kolik mají dát
+   dohromady. Prázdný lístek je políčko. Čísla na lístcích se otáčí zpátky
+   na výšku, aby nebyla vzhůru nohama. Každá kytička má svou barvu
+   (`data-c`), pod nimi stonek s listem a pruh trávy. */
+function kvetHTML(ex) {
+  const n = ex.flowers[0].values.length;
+  const digits = String(ex.target).length;
+  const flowers = ex.flowers.map((f, i) => {
+    const petals = f.values.map((v, k) => {
+      if (k !== f.empty) {
+        return `<span class="kv-petal" style="--i:${k}"><span class="kv-pv">${v}</span></span>`;
+      }
+      const ids = i === 0 ? [' id="answerSlot"', ' id="answerInput"'] : ['', ''];
+      return `<span class="kv-petal slot"${ids[0]} style="--i:${k}"><input${ids[1]} class="kv-input kv-pv" type="text"
+        inputmode="none" autocomplete="off" data-idx="${i}" maxlength="${digits}"
+        aria-label="Prázdný lístek ${i + 1}. kytičky"></span>`;
+    }).join('');
+    return `<div class="kv-flower" data-c="${i}">
+        <div class="kv-head" style="--n:${n}">${petals}<span class="kv-center">${ex.target}</span></div>
+        <svg class="kv-stem" viewBox="0 0 40 70" aria-hidden="true">
+          <path d="M20 0 C16 22 26 40 20 70" class="kv-stalk"/>
+          <path d="M21 42 C30 30 40 34 38 38 C34 44 26 44 21 42 Z" class="kv-leaf"/>
+        </svg>
+      </div>`;
+  }).join('');
+  return `<div class="kv">
+      <div class="kv-row">${flowers}</div>
+      <svg class="kv-grass" viewBox="0 0 300 26" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M0 26 L0 14 L6 4 L10 15 L16 2 L21 14 L27 6 L31 16 L38 1 L43 15 L50 5 L54 16 L61 3 L66 15 L72 7 L77 16 L84 2 L89 14 L95 6 L100 16 L107 1 L112 14 L118 5 L123 16 L130 3 L135 15 L141 6 L146 16 L153 2 L158 14 L164 7 L169 16 L176 1 L181 15 L187 5 L192 16 L199 3 L204 14 L210 6 L215 16 L222 2 L227 15 L233 7 L238 16 L245 1 L250 14 L256 5 L261 16 L268 3 L273 15 L279 6 L284 16 L291 2 L296 14 L300 8 L300 26 Z"/>
+      </svg>
+    </div>`;
+}
+
 /* Najdi dvojice: všechny kartičky jsou vidět od začátku a dítě klepnutím
    spojuje příklad s jeho výsledkem. **Není to paměťová hra a kartičky se
    neotáčejí** - uživatel si to takhle výslovně vyžádal a otáčení už
@@ -1520,12 +1648,17 @@ function pexesoHTML(ex) {
    a dole dvě možnosti na celou šířku POD SEBOU - vedle sebe se text
    `80 · 5 + 5 · 5` na 320 px nevejde. */
 function bigmulHTML(ex) {
+  /* U velkého násobení je popisek komentář pod hotovým krokem („Rozdělíme
+     si to.“), u velkého sčítání je to začátek věty („Rozdělíme 67 na:“),
+     takže patří nad výsledek. */
+  const labelFirst = ex.kind === 'bigaddstep';
   const done = ex.steps
     .slice(0, bigStep)
-    .map((s) => `<div class="bm-line">
-        <span class="bm-value">${s.correct}</span>
-        <span class="bm-label">${s.label}</span>
-      </div>`)
+    .map((s) => {
+      const value = `<span class="bm-value">${s.correct}</span>`;
+      const label = `<span class="bm-label">${s.label}</span>`;
+      return `<div class="bm-line">${labelFirst ? label + value : value + label}</div>`;
+    })
     .join('');
 
   const step = ex.steps[bigStep];
@@ -1545,13 +1678,13 @@ function bigmulHTML(ex) {
 
 const BODY_HTML = {
   bond: bondHTML, word: wordHTML, riddle: riddleHTML, sign: signHTML, grid: gridHTML,
-  compare: compareHTML, over10: over10HTML, pexeso: pexesoHTML, bigmul: bigmulHTML, abc: abcHTML,
+  compare: compareHTML, over10: over10HTML, bigadd: bigaddHTML, bigaddstep: bigmulHTML, kvet: kvetHTML, pexeso: pexesoHTML, bigmul: bigmulHTML, abc: abcHTML,
   pos: posHTML, vety: vetyHTML, vyznam: vyznamHTML, slova: pexesoHTML, vetylist: vetyListHTML, uu: uuHTML,
   hudba: hudbaHTML,
 };
 
 /* Druhy, které se ovládají jen klepáním - bez klávesnice a bez `submit()`. */
-const TAP_ONLY = new Set(['pexeso', 'bigmul', 'abc', 'pos', 'vety', 'vyznam', 'slova', 'vetylist', 'uu', 'hudba']);
+const TAP_ONLY = new Set(['pexeso', 'bigmul', 'bigaddstep', 'abc', 'pos', 'vety', 'vyznam', 'slova', 'vetylist', 'uu', 'hudba']);
 
 /* Plochy se spojováním dvojic: čísla v „Najdi dvojice“ a souřadná slova
    ve „Význam slov“. Ovladač je pro obě tentýž. */
@@ -1565,6 +1698,9 @@ const PAIR_BOARDS = new Set(['pexeso', 'slova']);
    Druhý pokus se řeší uvnitř kroku: špatná možnost zčervená a přestane
    fungovat, dítě musí klepnout na tu druhou. Do `RETRY_KINDS` tenhle druh
    nepatří - ta cesta počítá s políčkem na odpověď. */
+/* Druhy, které jedou krok po kroku přes tenhle ovladač: velké násobení
+   a lehká úroveň velkého sčítání. */
+const STEP_KINDS = new Set(['bigmul', 'bigaddstep']);
 let bigStep = 0;      // kolik kroků je hotových
 let bigMiss = 0;      // kolikrát se kleplo vedle
 let bigWrong = null;  // text první špatné volby (do výpisu k procvičení)
@@ -1579,7 +1715,7 @@ function resetBigmul() {
 
 function bigTap(btn) {
   const ex = round[index];
-  if (locked || ex?.kind !== 'bigmul' || btn.disabled) return;
+  if (locked || !STEP_KINDS.has(ex?.kind) || btn.disabled) return;
   const step = ex.steps[bigStep];
   if (!step) return;
 
@@ -2848,7 +2984,8 @@ const CHOICE_KINDS = new Set(['sign', 'compare']);
 
 function renderKeypad(ex) {
   const keypad = el('keypad');
-  const numbers = ex.kind === 'over10' && ex.hint === 'choices';
+  // nabídka čísel místo číslic - rozklad, velké sčítání i kytičky na lehčí úrovni
+  const numbers = ex.hint === 'choices' && Array.isArray(ex.numbers);
   keypad.dataset.mode = CHOICE_KINDS.has(ex.kind) || numbers ? 'sign' : 'digits';
   if (ex.kind === 'sign') keypad.innerHTML = signKeys(ex);
   else if (ex.kind === 'compare') keypad.innerHTML = compareKeys();
@@ -2896,7 +3033,14 @@ function handleKey(key) {
     const slot = currentField();
     if (!slot) return;
     slot.value = key.slice(4);
-    slot.closest('.gcell, .o10-cell')?.classList.remove('is-wrong');
+    slot.closest('.gcell, .o10-cell, .kv-petal')?.classList.remove('is-wrong');
+    /* U úloh s víc políčky skočí výběr na další prázdné - dítě nemusí
+       mezi každým číslem klepat na políčko. */
+    const ex = round[index];
+    if (hasParts(ex)) {
+      const nextEmpty = partInputs(ex).find((i) => i.value === '');
+      if (nextEmpty) { activeField = nextEmpty; nextEmpty.focus({ preventScroll: true }); }
+    }
     return;
   }
 
@@ -2923,7 +3067,7 @@ document.addEventListener('input', (e) => {
   const digits = e.target.value.replace(/\D+/g, '').slice(0, cap);
   if (digits !== e.target.value) e.target.value = digits;
   // jakmile dítě začne přepisovat, červená z políčka zmizí
-  e.target.closest('.gcell, .o10-cell')?.classList.remove('is-wrong');
+  e.target.closest('.gcell, .o10-cell, .kv-petal')?.classList.remove('is-wrong');
 });
 
 /* Znaménka jdou zadat i z fyzické klávesnice; `x` a `:` bereme taky,
@@ -2956,7 +3100,7 @@ document.addEventListener('keydown', (e) => {
     } else if (!locked && CHOICE_HTML[round[index].kind] && !round[index].retry && /^[1-7]$/.test(e.key)) {
       el('exerciseBody').querySelectorAll('.vt-opt')[Number(e.key) - 1]?.click();
       e.preventDefault();
-    } else if (!locked && round[index].kind === 'bigmul' && (e.key === '1' || e.key === '2')) {
+    } else if (!locked && STEP_KINDS.has(round[index].kind) && (e.key === '1' || e.key === '2')) {
       el('exerciseBody').querySelectorAll('.bm-opt')[Number(e.key) - 1]?.click();
       e.preventDefault();
     }
@@ -3102,6 +3246,15 @@ const RETRY_NOTE = {
     return `${wrong} ${policka} (červená). Začni rámečkem: kolik chybí prvnímu číslu do desítky?
       Přesně tolik si uber z toho druhého a zbytek napiš do pravé větve.`;
   },
+  kvet: (wrong, ex) => {
+    const kyticky = wrong === 1 ? 'Jedna kytička ještě nesedí' : 'Obě kytičky ještě nesedí';
+    return `${kyticky} (červená). Sečti čísla na plných lístcích a zjisti, kolik chybí do ${ex.target}.`;
+  },
+  bigadd: (wrong, ex) => {
+    const policka = wrong === 1 ? 'políčko ještě nesedí' : wrong <= 4 ? 'políčka ještě nesedí' : 'políček ještě nesedí';
+    return `${wrong} ${policka} (červená). Modrá větev jsou desítky čísla ${ex.b}, oranžová jednotky.
+      Od ${ex.a} skoč nejdřív o desítky, a od toho čísla o jednotky.`;
+  },
 };
 
 function partRetry(ex) {
@@ -3145,7 +3298,7 @@ function softRetry(given) {
    Zlom řádku je přesně desítka, takže je vidět přechod přes ni. */
 function tenFrameHTML(ex) {
   // mřížka, porovnávání i pexeso mají op:'add' jen zástupně - rámec by byl nesmysl
-  if (ex.kind === 'grid' || ex.kind === 'compare' || ex.kind === 'pexeso') return '';
+  if (ex.kind === 'grid' || ex.kind === 'compare' || ex.kind === 'pexeso' || ex.kind === 'kvet') return '';
   // u hádanky jen tehdy, když je poslední řádek prostý součet dvou obrázků
   if (ex.kind === 'riddle' && !ex.simpleSum) return '';
   const relation = ex.kind === 'bond' ? ex.family : ex.op === 'add' || ex.op === 'sub' ? 'add' : null;
@@ -3184,7 +3337,7 @@ function tenFrameHTML(ex) {
 /* Po druhé chybě řešení dopíšeme rovnou do políček - dítě ho tak vidí na
    místě, kde ho hledalo, a ne jako seznam čísel pod tím. Vlastní špatnou
    hodnotu ukážeme pod správnou, přeškrtnutou. */
-const REVEAL_CLASS = { grid: 'gnum', over10: 'o10-revealed' };
+const REVEAL_CLASS = { grid: 'gnum', over10: 'o10-revealed', bigadd: 'o10-revealed', kvet: 'kv-revealed' };
 
 function revealParts(ex) {
   partInputs(ex).forEach((input, i) => {
@@ -3231,6 +3384,8 @@ function renderFeedback(ex, given, correct) {
   const PARTS_HEAD = {
     grid: 'Takhle měla mřížka vyjít – doplnila jsem ji nahoře.',
     over10: 'Takhle se příklad rozloží – doplnila jsem ho nahoře.',
+    bigadd: 'Takhle se příklad rozloží – doplnila jsem ho nahoře.',
+    kvet: 'Správná čísla jsem doplnila do lístků nahoře.',
   };
   const head = hasParts(ex)
     ? `<div class="fb-answer">${PARTS_HEAD[ex.kind]}</div>`
@@ -3465,7 +3620,7 @@ function renderResult(r) {
     ? 'Příště přijdou nové hádanky s jinými obrázky.'
     : isOver10Mode()
       ? 'Příště přijdou nové příklady na rozklad.'
-      : isBigmulMode()
+      : isBigmulMode() || isBigaddMode() || isKvetMode()
         ? 'Příště přijdou nová čísla.'
         : isPosMode() || isVetyMode() || isUuMode()
           ? 'Příště se vylosují jiné věty.'

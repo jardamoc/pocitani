@@ -80,6 +80,8 @@ běžel. Vypadalo to jako chyba nasazení, a nebyla.
 | `public/js/riddle.js` | generátor obrázkových hádanek (samostatný, generator.js si ho importuje) |
 | `public/js/grid.js` | generátor mřížek (stejně samostatný jako `riddle.js`) |
 | `public/js/over10.js` | generátor rozkladů přes desítku (stejně samostatný jako `grid.js`) |
+| `public/js/bigadd.js` | generátor velkého sčítání do 100 — rozklad na desítky a jednotky, skoky po ose |
+| `public/js/kvet.js` | generátor Kytiček — lístky, které dají dohromady číslo uprostřed |
 | `public/js/pexeso.js` | generátor ploch pro „Najdi dvojice" (stejně samostatný jako `grid.js`) |
 | `public/js/bigmul.js` | generátor velkého násobení — rozklad a tři kroky s dvojí volbou |
 | `public/js/abc.js` | Abeceda: seznam slov, výběr podle obtížnosti, čisté funkce přesunu kartiček |
@@ -120,7 +122,7 @@ na neexistující soubor. Když je tam někdy mít chceš, přidej napřed vlast
 | `package.json` | jen ty tři zkratky a `"type": "module"`; žádné závislosti |
 
 Prosté ES moduly, žádný framework, žádné závislosti. Závislosti jdou jedním směrem:
-`random.js → riddle.js / grid.js / over10.js / pexeso.js / bigmul.js / abc.js / pos.js / vety.js / vyznam.js / uu.js / hudba.js → generator.js → app.js`
+`random.js → riddle.js / grid.js / over10.js / bigadd.js / kvet.js / pexeso.js / bigmul.js / abc.js / pos.js / vety.js / vyznam.js / uu.js / hudba.js → generator.js → app.js`
 (`notace.js → app.js` nezávisle, nic neimportuje)
 (`stats.js` si z `vety.js` a `vyznam.js` bere jen názvy pro výpis chyb)
 (`app.js` si z `abc.js` bere navíc funkce přesunu a z `pos.js` tabulky a `posCheck` / `posTag`),
@@ -167,7 +169,7 @@ Co z toho plyne pro psaní kódu:
 - **`mergePayload()` v `transfer.js` neukládá.** Slučování je čistá operace v paměti,
   která vrátí souhrn změn; zapisuje až `acceptIncoming()` v `app.js`.
 
-## Čtrnáct režimů hry
+## Šestnáct režimů hry
 
 Na úvodní obrazovce se vybírá karta **„Co si zahrajeme?"**. Nad kartami jsou tři
 záložky **🔢 Matematika / 📖 Čeština / 🎵 Hudba** (`SUBJECTS`, u každého režimu `subject` v `MODES`).
@@ -180,6 +182,8 @@ záložky.
 |---|---|---|
 | **Počítání** | `calc` | — (vybírají se operace i druhy úloh navíc) |
 | **Počítej přes 10** | `over10` | „něco navíc" (v operacích zůstává jen ➕ a ➖) |
+| **Velké sčítání** | `bigadd` | „něco navíc" (v operacích jen ➕ a ➖, sdílí `config.over10Ops`) |
+| **Kytičky** | `kvet` | operace, „něco navíc"; rozsah = číslo uprostřed kytičky (nejvýš 100) |
 | **Obrázkové hádanky** | `riddle` | operace, „něco navíc" |
 | **Mřížka** | `grid` | „něco navíc", **počet příkladů** (jedna mřížka = jedno kolo) |
 | **Najdi dvojice** | `pexeso` | „něco navíc", **počet příkladů** (jedna plocha = jedno kolo) |
@@ -407,6 +411,57 @@ Pár věcí, které se snadno rozbijí:
   „sčítání ti jde" by u režimu, kde je sčítání úplně všude, neřeklo nic.
 - **Vlastní hodnota po druhé chybě je v toku pod správnou**, ne absolutně umístěná jako
   u mřížky. Políčko rozkladu je nižší než kolečko mřížky a obě čísla by se překryla.
+
+## Velké sčítání
+
+```
+   47  +  25
+          ╱ ╲              modrá = desítky, oranžová = jednotky
+       [20]  [5]
+        ▮▮   ▪▪▪▪▪         kostičky (lehká a střední)
+
+47 ⌒+ desítky⌒ [67] ⌒+ jednotky⌒ [72]     skoky po číselné ose
+```
+
+Sčítání a odčítání dvojciferných čísel do 100 tak, jak se učí ve 2.–3. třídě: druhé
+číslo se rozloží na desítky a jednotky a jde se po krocích (nejdřív desítky, pak
+jednotky). Pořadí obtížností odpovídá modulu „Sčítání a odčítání do 100“ na
+umimematiku.cz. **Lehká jde krok po kroku s výběrem ze dvou možností** (Rozdělíme 44 na: →
+56 + 40 + 4 → 56 + 40 = → 96 + 4 =), uživatel ji chtěl podle cvičení „Sčítání dvojciferných
+čísel s rozkladem" z Umíme to. Je to druh **`bigaddstep`** a jede přes ovladač velkého
+násobení (`STEP_KINDS`, `bigTap`, `bigmulHTML`). Na rozdíl od násobení je popisek kroku
+**nad** výsledkem — je to začátek věty („Rozdělíme 67 na:“), ne komentář. **Střední** je obrázek s větvičkou,
+kostičkami a psaním, přes desítku napůl; **těžká** vždycky přes desítku a bez kostiček.
+Rozsah je strop, ale nejvýš 100; pod 40 se počítá do 100 a `bigaddRangeNote()` to napíše.
+
+- Stejný tvar jako rozklad přes desítku: čtyři políčka `tens, ones, mid, c`
+  (`BIGADD_FIELDS`), odpovědí je řetězec hodnot. Řádek v `PART_SEL` má vlastní třídu
+  `.ba-input`, vzhled políček je půjčený z rozkladu (`.o10-cell`, `.o10-revealed`).
+- **Směr + / − sdílí s „Počítej přes 10“ klíč `config.over10Ops`** (`isAddSubMode()`).
+- Obě čísla jsou dvojciferná a nikdy nekončí nulou u prvního čísla — „přes desítku
+  po kouscích“ ve vysvětlení by jinak bylo „− 0“.
+- Tagy chyb `bigaddSplit` / `bigaddTens` / `bigaddOnes` podle prvního špatného kroku.
+- Barvy desítek a jednotek jsou `--pair-task` / `--pair-result` (mimo témata).
+## Kytičky
+
+Dvě kytičky na louce, uprostřed každé číslo (= rozsah, nejvýš 100) a čísla na lístcích
+ho dají dohromady. Jeden lístek je prázdný, dítě doplní, kolik chybí. Předlohou byly
+čtyřlístky z Umíme to; uživatel chtěl **jiný obrázek, aby to nebylo stejné** — proto
+kytička s barevnými lístky, žlutým středem, stonkem a trávou.
+
+- Lehká 3 lístky po desítkách, střední 4 po desítkách — obě s nabídkou šesti čísel
+  (`ex.numbers`, klávesa `num:`); těžká 4 lístky s libovolnými čísly a psaní. Po desítkách
+  jen při součtu dělitelném deseti a aspoň 40. Nabídka má **vždycky šest tlačítek** — do 40
+  po desítkách existuje jen pět čísel, takže se jedno špatné zopakuje (přání uživatele).
+- Stejná cesta jako rozklad: jedno políčko na kytičku, `PART_SEL.kvet = '.kv-input'`.
+  `op: 'add'` je **jen zástupné** — kytičky proto musí ven z `tenFrameHTML()` a jsou
+  v `PLACEHOLDER_OP` ve `stats.js`.
+- Lístky se rozmísťují otočením kolem středu a obsah se otáčí zpátky (`--back`).
+  **Třesení prázdného lístku je vypnuté** — animace `shake` přepisuje `transform`
+  a lístek by uskočil do středu.
+- Barvy lístků jsou pevné a světlé i v tmavém režimu, text na nich je vždycky tmavý.
+- Výběr čísla z nabídky (`num:`) u všech úloh s víc políčky skočí na další prázdné
+  políčko — platí i pro „Počítej přes 10".
 
 ## Najdi dvojice
 

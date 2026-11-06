@@ -2,6 +2,8 @@ import { rnd, pick, chance, shuffle } from './random.js';
 import { makeRiddle, riddleExplain, riddleText } from './riddle.js';
 import { makeGrid, gridExplain, gridText } from './grid.js';
 import { makeOver10, over10Explain, over10Text } from './over10.js';
+import { makeBigadd, bigaddExplain, bigaddText, bigaddTag } from './bigadd.js';
+import { makeKvet, kvetExplain, kvetText } from './kvet.js';
 import { makePexeso, pexesoExplain, pexesoText } from './pexeso.js';
 import { makeAbc, abcExplain, abcText } from './abc.js';
 import { makePosRound, posAnswer, posExplain, posText } from './pos.js';
@@ -141,6 +143,7 @@ export function signature(ex) {
   if (ex.kind === 'grid') return `grid|${ex.key}`;
   // pexeso taky ne - podpisem je otisk všech dvojic na ploše
   if (ex.kind === 'pexeso') return `pexeso|${ex.key}`;
+  if (ex.kind === 'kvet') return `kvet|${ex.key}`;
   if (ex.kind === 'abc') return `abc|${ex.key}`;
   if (ex.kind === 'pos') return `pos|${ex.key}`;
   if (ex.kind === 'vety' || ex.kind === 'vetylist') return `vety|${ex.key}`;
@@ -149,6 +152,7 @@ export function signature(ex) {
   if (ex.kind === 'hudba') return `hudba|${ex.key}`;
   // velké násobení je dané dvojicí činitelů, ne trojicí a, b, c
   if (ex.kind === 'bigmul') return `bigmul|${ex.key}`;
+  if (ex.kind === 'bigaddstep') return `bigaddstep|${ex.key}`;
   return `${ex.op}|${ex.kind}|${ex.missing}|${ex.a}|${ex.b}`;
 }
 
@@ -619,6 +623,65 @@ export function buildBigmulRound(config) {
   return items;
 }
 
+/* Velké sčítání: stejný tvar jako rozklad přes desítku - čtyři políčka,
+   odpovědí je řetězec jejich hodnot. Směr (+ / −) sdílí s rozkladem
+   klíč `config.over10Ops`, obě hry se ptají na totéž. */
+function bigaddExercise(config) {
+  const ops = config.over10Ops?.length ? config.over10Ops : ['add'];
+  const o = makeBigadd(config.max, config.level, pick(ops));
+  /* Lehká úroveň jde krok po kroku přes ovladač velkého násobení - je to
+     jiný druh úlohy (`bigaddstep`) a odpovědí je jen výsledek. */
+  const steps = Array.isArray(o.steps);
+  return {
+    ...o,
+    kind: steps ? 'bigaddstep' : 'bigadd',
+    missing: 'c',
+    cross: o.carry,
+    skill: `bigadd:${o.level}`,
+    answer: steps ? String(o.c) : o.values.join(', '),
+  };
+}
+
+export function buildBigaddRound(config) {
+  const items = [];
+  const seen = new Set();
+  for (let i = 0; i < config.count; i++) {
+    let ex = bigaddExercise(config);
+    for (let t = 0; t < 8 && seen.has(ex.key); t++) ex = bigaddExercise(config);
+    seen.add(ex.key);
+    items.push(ex);
+  }
+  return items;
+}
+
+/* Kytičky: `op` je jen zástupné 'add' (jako u mřížky), aby `OPS[ex.op]`
+   nikde nespadlo - proto musí vypadnout z desítkového rámce i z rozpadu
+   podle operací. */
+function kvetExercise(config) {
+  const k = makeKvet(config.max, config.level);
+  return {
+    ...k,
+    op: 'add',
+    kind: 'kvet',
+    missing: 'c',
+    cross: false,
+    skill: `kvet:${k.level}`,
+    answer: k.values.join(', '),
+  };
+}
+
+export function buildKvetRound(config) {
+  const items = [];
+  const seen = new Set();
+  for (let i = 0; i < config.count; i++) {
+    let ex = kvetExercise(config);
+    for (let t = 0; t < 8 && seen.has(ex.key); t++) ex = kvetExercise(config);
+    seen.add(ex.key);
+    items.push(ex);
+  }
+  return items;
+}
+
 export function buildOver10Round(config) {
   const items = [];
   const seen = new Set();
@@ -634,6 +697,8 @@ export function buildOver10Round(config) {
 export function exToText(ex, reveal = false) {
   if (ex.kind === 'grid') return gridText(ex, reveal);
   if (ex.kind === 'over10') return over10Text(ex, reveal);
+  if (ex.kind === 'bigadd' || ex.kind === 'bigaddstep') return bigaddText(ex, reveal);
+  if (ex.kind === 'kvet') return kvetText(ex, reveal);
   if (ex.kind === 'pexeso') return pexesoText(ex, reveal);
   if (ex.kind === 'abc') return abcText(ex, reveal);
   if (ex.kind === 'pos') return posText(ex, reveal);
@@ -697,6 +762,8 @@ export function explain(ex) {
 
   if (kind === 'grid') return gridExplain(ex);
   if (kind === 'over10') return over10Explain(ex);
+  if (kind === 'bigadd' || kind === 'bigaddstep') return bigaddExplain(ex);
+  if (kind === 'kvet') return kvetExplain(ex);
   if (kind === 'pexeso') return pexesoExplain(ex);
   if (kind === 'abc') return abcExplain(ex);
   if (kind === 'pos') return posExplain(ex);
@@ -831,6 +898,10 @@ export const TAGS = {
   riddleSymbol: 'hodnota obrázku místo součtu',
   gridPartial: 'část mřížky správně',
   over10Partial: 'část rozkladu správně',
+  kvetPartial: 'část kytiček správně',
+  bigaddSplit: 'chyba v rozkladu na desítky a jednotky',
+  bigaddTens: 'chyba při počítání s desítkami',
+  bigaddOnes: 'chyba při počítání s jednotkami',
   pexesoMiss: 'moc chybných otočení',
   abcMiss: 'slova ve špatném pořadí',
   posSwap: 'záměna podstatného jména a slovesa',
@@ -867,6 +938,10 @@ export function diagnose(ex, given) {
   /* Rozklad přes desítku musí ven ze stejného důvodu - odpovědí je řetězec
      hodnot všech políček, ne jedno číslo. */
   if (kind === 'over10') return 'over10Partial';
+  if (kind === 'bigadd') return bigaddTag(ex, given);
+  // krokovou úlohu vyhodnocuje ovladač v app.js a tag kroku si zapíše sám
+  if (kind === 'bigaddstep') return 'bigaddSplit';
+  if (kind === 'kvet') return 'kvetPartial';
 
   /* Pexeso musí ven ze stejného důvodu - "odpovědí" je počet chybných
      otočení, ne výsledek příkladu. */

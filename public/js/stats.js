@@ -76,7 +76,7 @@ export function sanitizeState(raw) {
 }
 
 /* Druhy úloh, které se nedají z descriptoru znovu poskládat. */
-const NO_REPEAT = new Set(['riddle', 'grid', 'over10', 'pexeso', 'bigmul', 'abc', 'pos', 'vety', 'vetylist', 'vyznam', 'slova', 'uu', 'hudba']);
+const NO_REPEAT = new Set(['riddle', 'grid', 'over10', 'bigadd', 'bigaddstep', 'kvet', 'pexeso', 'bigmul', 'abc', 'pos', 'vety', 'vetylist', 'vyznam', 'slova', 'uu', 'hudba']);
 
 const descriptor = (ex) => ({
   op: ex.op,
@@ -149,6 +149,9 @@ const KIND_LABEL = {
   'compare:rel': { acc: 'porovnávání čísel', gen: 'porovnávání čísel' },
   'grid:c': { acc: 'mřížky', gen: 'mřížek' },
   'over10:c': { acc: 'rozklady přes desítku', gen: 'rozkladů přes desítku' },
+  'kvet:c': { acc: 'kytičky', gen: 'kytiček' },
+  'bigadd:c': { acc: 'velká sčítání', gen: 'velkých sčítání' },
+  'bigaddstep:c': { acc: 'velká sčítání po krocích', gen: 'velkých sčítání po krocích' },
   'pexeso:c': { acc: 'plochy s dvojicemi', gen: 'ploch s dvojicemi' },
   'bigmul:c': { acc: 'velká násobení', gen: 'velkých násobení' },
   'abc:c': { acc: 'řady slov', gen: 'řad slov' },
@@ -197,12 +200,14 @@ const LEVEL_NAME = { easy: 'Lehké', medium: 'Střední', hard: 'Těžké' };
 
 /* Jak se v rozpadu podle obtížnosti pojmenuje jedna úloha daného režimu.
    Rod i číslo musí sedět na věty "Lehké mřížky ti jdou výborně". */
-const MODE_UNITS = { grid: 'mřížky', riddle: 'hádanky', over10: 'rozklady', pexeso: 'plochy', bigmul: 'příklady', abc: 'řady slov', pos: 'věty', vety: 'věty', vyznam: 'úlohy', uu: 'věty', hudba: 'úlohy', klavir: 'úlohy', sluch: 'úlohy' };
+const MODE_UNITS = { grid: 'mřížky', riddle: 'hádanky', over10: 'rozklady', bigadd: 'příklady', kvet: 'kytičky', pexeso: 'plochy', bigmul: 'příklady', abc: 'řady slov', pos: 'věty', vety: 'věty', vyznam: 'úlohy', uu: 'věty', hudba: 'úlohy', klavir: 'úlohy', sluch: 'úlohy' };
 
 export function analyze(state, config, attempts) {
   const riddleMode = config.mode === 'riddle';
   const gridMode = config.mode === 'grid';
   const over10Mode = config.mode === 'over10';
+  const bigaddMode = config.mode === 'bigadd';
+  const kvetMode = config.mode === 'kvet';
   const pexesoMode = config.mode === 'pexeso';
   const bigmulMode = config.mode === 'bigmul';
   const abcMode = config.mode === 'abc';
@@ -217,7 +222,7 @@ export function analyze(state, config, attempts) {
      sčítání zase úplně všude, takže by "sčítání ti jde" nic neřeklo.
      Ve všech pěti jedeme podle obtížnosti. U velkého násobení je zase
      násobení úplně všude, takže by rozpad podle operací neřekl nic. */
-  const levelMode = riddleMode || gridMode || over10Mode || pexesoMode || bigmulMode || abcMode || posMode || vetyMode || vyznamMode || uuMode || hudbaMode;
+  const levelMode = riddleMode || gridMode || over10Mode || bigaddMode || kvetMode || pexesoMode || bigmulMode || abcMode || posMode || vetyMode || vyznamMode || uuMode || hudbaMode;
   const total = attempts.length;
   const correct = attempts.filter((a) => a.correct).length;
   const pct = total ? Math.round((correct / total) * 100) : 0;
@@ -225,7 +230,7 @@ export function analyze(state, config, attempts) {
   /* Porovnávání a pexeso mají `op: 'add'` jen zástupně - do rozpadu podle
      operací ani do přechodu přes desítku nepatří, jinak by "sčítání ti jde"
      stálo z půlky na úlohách, kde se nic nesčítá. */
-  const PLACEHOLDER_OP = new Set(['compare', 'pexeso', 'abc', 'pos', 'vety', 'vetylist', 'vyznam', 'slova', 'uu', 'hudba']);
+  const PLACEHOLDER_OP = new Set(['compare', 'pexeso', 'kvet', 'abc', 'pos', 'vety', 'vetylist', 'vyznam', 'slova', 'uu', 'hudba']);
   const scored = attempts.filter((a) => !PLACEHOLDER_OP.has(a.ex.kind));
   const byOp = group(scored, (a) => a.ex.op).sort((x, y) => y.seen - x.seen);
   const byLevel = group(attempts, (a) => a.ex.level || null)
@@ -432,6 +437,22 @@ export function analyze(state, config, attempts) {
       tips.push(harder
         ? `Šlo ti to skvěle – zkus příště ${harder} obtížnost, čísla budou větší.`
         : 'Šlo ti to skvěle – tohle je nejtěžší velké násobení. Zkus si dát víc příkladů v kole.');
+    }
+  } else if (bigaddMode) {
+    if (tags.get('bigaddSplit')) {
+      tips.push('Rozklad je první krok: 25 jsou 2 desítky a 5 jednotek, tedy 20 a 5.');
+    }
+    if (tags.get('bigaddTens')) {
+      tips.push('U desítek se mění jen první číslice: 47 + 20 – ke 4 desítkám přidej 2, máš 6 desítek, tedy 67.');
+    }
+    if (tags.get('bigaddOnes')) {
+      tips.push('U jednotek si pomoz desítkou: 67 + 5 → 67 + 3 = 70, pak 70 + 2 = 72.');
+    }
+    if (pct >= 90) {
+      const harder = { easy: 'střední', medium: 'těžkou' }[config.level];
+      tips.push(harder
+        ? `Šlo ti to skvěle – zkus příště ${harder} obtížnost.`
+        : 'Šlo ti to skvěle – zkus si zapnout i odčítání.');
     }
   } else if (over10Mode) {
     if (pct < 100) {

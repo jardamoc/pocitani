@@ -419,6 +419,8 @@ h1, h2, h3, .num, .box-value, .key, .score-big { font-family: 'Baloo 2', 'Nunito
 .chips-mode .chip.is-on[data-value="riddle"] { background: linear-gradient(135deg, #fb923c, #db2777); }
 .chips-mode .chip.is-on[data-value="grid"] { background: linear-gradient(135deg, #34d399, #0891b2); }
 .chips-mode .chip.is-on[data-value="over10"] { background: linear-gradient(135deg, #facc15, #ea580c); }
+.chips-mode .chip.is-on[data-value="bigadd"] { background: linear-gradient(135deg, #3b82f6, #f97316); }
+.chips-mode .chip.is-on[data-value="kvet"] { background: linear-gradient(135deg, #ec4899, #16a34a); }
 .chips-mode .chip.is-on[data-value="pexeso"] { background: linear-gradient(135deg, #f472b6, #7c3aed); }
 .chips-mode .chip.is-on[data-value="bigmul"] { background: linear-gradient(135deg, #60a5fa, #1d4ed8); }
 .chips-mode .chip.is-on[data-value="abc"] { background: linear-gradient(135deg, #f87171, #be123c); }
@@ -890,6 +892,113 @@ body.is-quiz .wrap { padding-top: 18px; }
 }
 .o10-revealed .gval { font-size: calc(var(--cell) * .40); }
 .o10-revealed .gwas { position: static; font-size: calc(var(--cell) * .22); margin-top: 2px; }
+
+/* ---------- velké sčítání ----------
+   Nahoře příklad s větvičkou pod druhým číslem, dole číselná osa se
+   dvěma skoky. Políčka si berou vzhled z rozkladu přes desítku
+   (`.o10-cell`, `.o10-input`, `.o10-revealed`), tady se jen nastaví
+   rozměry a barvy: desítky modré, jednotky oranžové (barvy dvojic,
+   čitelné ve všech tématech i v tmavém režimu). */
+.ba {
+  --cell: clamp(48px, 14vw, 72px);
+  --o10-box: calc(var(--cell) * .84);
+  --o10-font: clamp(1.4rem, 6.5vw, 2.3rem);
+  --ba-gap: 10px;
+  margin-top: 6px; color: var(--ink);
+}
+.ba-top { display: flex; justify-content: center; align-items: baseline; gap: clamp(6px, 2vw, 12px); }
+.ba-split { display: flex; flex-direction: column; align-items: center; }
+.ba-legs {
+  width: calc(var(--cell) * 2 + var(--ba-gap)); height: clamp(16px, 5vw, 26px);
+  overflow: visible; stroke-width: 3; stroke-linecap: round;
+}
+.ba-legs line { vector-effect: non-scaling-stroke; }
+.ba-leg-tens { stroke: var(--pair-task); }
+.ba-leg-ones { stroke: var(--pair-result); }
+.ba-parts { display: flex; gap: var(--ba-gap); }
+.ba-cell.ba-tens.slot:not(.is-correct):not(.is-wrong) { border-color: var(--pair-task); }
+.ba-cell.ba-ones.slot:not(.is-correct):not(.is-wrong) { border-color: var(--pair-result); }
+
+/* kostičky: desítka je tyčka z deseti dílků, jednotka jedna kostička */
+.ba-blocks { display: flex; gap: var(--ba-gap); margin-top: 6px; }
+.ba-bars, .ba-cubes { width: var(--cell); display: flex; justify-content: center; align-items: flex-end; }
+.ba-bars { gap: 2px; }
+.ba-bar {
+  width: 4px; height: 34px; border-radius: 2px;
+  background: repeating-linear-gradient(to bottom, var(--pair-task) 0 3px, transparent 3px 3.4px);
+}
+.ba-cubes { display: grid; grid-template-columns: repeat(5, 6px); gap: 2px; justify-content: center; align-content: end; }
+.ba-cube { width: 6px; height: 6px; border-radius: 1px; background: var(--pair-result); }
+
+/* číselná osa: start, skok o desítky, mezivýsledek, skok o jednotky, výsledek */
+.ba-line { display: flex; justify-content: center; align-items: flex-end; margin-top: 14px; }
+.ba-start { height: var(--o10-box); display: flex; align-items: center; padding: 0 4px; }
+.ba-jump {
+  display: flex; flex-direction: column; align-items: center;
+  width: clamp(58px, 17vw, 88px); margin: 0 calc(var(--cell) * -.18) calc(var(--o10-box) * .6);
+  pointer-events: none; position: relative; z-index: 1;
+}
+.ba-jump svg {
+  width: 100%; height: clamp(18px, 5vw, 26px); overflow: visible;
+  fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round;
+}
+.ba-jump path { vector-effect: non-scaling-stroke; }
+.ba-jlabel { font-size: .72rem; font-weight: 800; line-height: 1; white-space: nowrap; margin-bottom: 3px; }
+.ba-jump-tens { color: var(--pair-task); }
+.ba-jump-ones { color: var(--pair-result); }
+
+/* ---------- kytičky ----------
+   Lístky jsou rozmístěné otočením kolem středu (`--i`-tý z `--n`),
+   obsah lístku se otáčí zpátky (`--back`), aby čísla nebyla vzhůru
+   nohama. Barvy lístků jsou pevné a světlé ve světlém i tmavém režimu,
+   text na nich je proto vždycky tmavý. */
+.kv { --fs: clamp(128px, 40vw, 180px); margin-top: 4px; }
+.kv-row { display: flex; justify-content: center; gap: clamp(8px, 3vw, 28px); }
+.kv-flower { display: flex; flex-direction: column; align-items: center; }
+.kv-flower[data-c="0"] { --kv-petal: #fce7f3; --kv-edge: #db2777; }
+.kv-flower[data-c="1"] { --kv-petal: #e0f2fe; --kv-edge: #0284c7; }
+.kv-head { position: relative; width: var(--fs); height: var(--fs); }
+.kv-petal {
+  --pw: calc(var(--fs) * .36); --ph: calc(var(--fs) * .42);
+  --rot: calc(360deg / var(--n) * var(--i)); --back: calc(-1 * var(--rot));
+  position: absolute; left: 50%; top: 50%; box-sizing: border-box;
+  width: var(--pw); height: var(--ph); margin: calc(var(--ph) / -2) 0 0 calc(var(--pw) / -2);
+  transform: rotate(var(--rot)) translateY(calc(var(--ph) * -.62));
+  border-radius: 50% 50% 46% 46% / 60% 60% 40% 40%;
+  background: var(--kv-petal); border: 3px solid var(--kv-edge);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.kv-petal > * { transform: rotate(var(--back)); }
+.kv-pv { font-family: 'Baloo 2', sans-serif; font-weight: 800; font-size: calc(var(--fs) * .15); line-height: 1; color: #1f2937; }
+/* Prázdný lístek je políčko. Specificita přebije obecné `.slot`, ale barvy
+   správně / špatně (`.slot.is-correct` / `.is-wrong`) nechává být.
+   Třesení je vypnuté: animuje `transform` a lístek by uskočil do středu. */
+.kv .kv-petal.slot {
+  min-width: 0; width: var(--pw); height: var(--ph); border-width: 3px;
+  border-radius: 50% 50% 46% 46% / 60% 60% 40% 40%;
+}
+.kv .kv-petal.slot:not(.is-correct):not(.is-wrong) { background: #fff; }
+.kv .kv-petal.slot.is-wrong { animation: none; }
+.kv .kv-petal.slot:focus-within { box-shadow: 0 0 0 4px rgba(124, 92, 255, .45); }
+.kv .kv-input {
+  width: 100%; height: 100%; min-width: 0; padding: 0; border: 0; background: transparent;
+  text-align: center; color: #5b21b6; line-height: var(--ph);
+}
+.kv .kv-input:focus { outline: none; }
+.kv-revealed { background: #fff; border-color: #1f2937; }
+.kv-revealed .gval { font-family: 'Baloo 2', sans-serif; font-size: calc(var(--fs) * .14); color: #1f2937; }
+.kv-revealed .gwas { position: static; font-size: calc(var(--fs) * .09); }
+.kv-center {
+  position: absolute; left: 50%; top: 50%; z-index: 1;
+  width: calc(var(--fs) * .32); height: calc(var(--fs) * .32); margin: calc(var(--fs) * -.16) 0 0 calc(var(--fs) * -.16);
+  border-radius: 50%; background: #fde047; border: 3px solid #ca8a04; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Baloo 2', sans-serif; font-weight: 800; font-size: calc(var(--fs) * .13); color: #1f2937;
+}
+.kv-stem { width: calc(var(--fs) * .3); height: calc(var(--fs) * .45); margin-top: calc(var(--fs) * -.08); overflow: visible; }
+.kv-stalk { fill: none; stroke: #16a34a; stroke-width: 3.5; stroke-linecap: round; }
+.kv-leaf { fill: #22c55e; }
+.kv-grass { display: block; width: 100%; height: 22px; margin-top: -10px; fill: #22c55e; }
 
 /* ---------- najdi dvojice ----------
    Všechny kartičky jsou vidět od začátku, dítě klepnutím spojuje příklad
