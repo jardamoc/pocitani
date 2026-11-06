@@ -998,6 +998,12 @@ body.is-quiz .wrap { padding-top: 18px; }
 }
 .o10-sum > [hidden] { display: none; }
 .o10-round { justify-self: center; }
+/* políčko na rovnou desítku v zápisu - velké písmo jako okolní text */
+.o10-sum .o10-cell.slot { width: 2.4em; height: 1.6em; border-radius: 12px; }
+.o10-sum .o10-cell .o10-input { font-size: 1em; line-height: calc(1.6em - 8px); }
+.o10-sum .o10-revealed { width: 2.4em; height: auto; min-height: 1.6em; }
+.o10-sum .o10-revealed .gval { font-size: 1em; }
+.o10-sum .o10-revealed .gwas { font-size: .55em; }
 .o10-tail { justify-self: start; }
 /* vyplněné číslo sedí na účaří jako okolní text (při `middle` padalo níž),
    jen prázdný čárkovaný rámeček se centruje */

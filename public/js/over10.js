@@ -34,9 +34,11 @@ import { rnd, shuffle } from './random.js';
    `ten = a % 10`, a `rest = b - ten`.
    ============================================================ */
 
-/* Doplňovaná políčka jsou ve všech obtížnostech stejná - pořadí je zároveň
-   pořadím hodnot v odpovědi; `app.js` je čte setříděné podle `data-idx`. */
+/* Doplňovaná políčka - pořadí je zároveň pořadím hodnot v odpovědi; `app.js`
+   je čte setříděné podle `data-idx`. Těžká úroveň má jen tři, lehká a střední
+   navíc rovnou desítku (`sum`) v zápisu pod větvičkou (28 − 8 − 1 = / [20] − 1). */
 export const OVER10_FIELDS = ['ten', 'rest', 'c'];
+export const OVER10_FIELDS_STEPS = ['ten', 'rest', 'sum', 'c'];
 
 /* `hint` řídí, co dostane dítě k ruce:
      choices - kroužky v desítkovém rámci a k tomu nabídka čísel
@@ -78,14 +80,17 @@ function fieldChoices(correct, typical, near) {
 /* Každé políčko má vlastní nabídku (v pořadí OVER10_FIELDS) - po výběru
    čísla se klávesnice přepne na nabídku dalšího políčka. Typická chyba
    u doplňku je záměna jednotek a doplňku do deseti (18 − 9: 2 místo 8). */
-function over10Choices({ a, b, ten, rest, c, sum, op }) {
+function over10Choices({ a, b, ten, rest, c, sum, op, hidden }) {
   const unit = a % 10;
   const swap = op === 'sub' ? 10 - unit : unit;
-  return [
-    fieldChoices(ten, [swap, b - swap], [ten - 1, ten + 1, b]),
-    fieldChoices(rest, [b - swap, ten], [rest - 1, rest + 1, b]),
-    fieldChoices(c, [sum, op === 'sub' ? c + 2 * rest : c - 2 * rest], [c - 1, c + 1, a]),
-  ];
+  const by = {
+    ten: fieldChoices(ten, [swap, b - swap], [ten - 1, ten + 1, b]),
+    rest: fieldChoices(rest, [b - swap, ten], [rest - 1, rest + 1, b]),
+    // rovná desítka: typicky odečtený/přičtený špatný doplněk nebo vedlejší desítka
+    sum: fieldChoices(sum, [op === 'sub' ? a - swap : a + swap, sum - 10, sum + 10], [a, sum + 1, sum - 1]),
+    c: fieldChoices(c, [sum, op === 'sub' ? c + 2 * rest : c - 2 * rest], [c - 1, c + 1, a]),
+  };
+  return hidden.map((f) => by[f]);
 }
 
 export const OVER10_LEVEL_KEYS = Object.keys(OVER10_LEVELS);
@@ -147,12 +152,14 @@ export function makeOver10(max, levelKey = 'easy', op = 'add') {
   const sum = sub ? a - ten : a + ten;
   const c = sub ? sum - rest : sum + rest;
 
-  const parts = { ten, rest, c };
+  const parts = { ten, rest, sum, c };
   const hint = OVER10_LEVELS[level].hint;
+  // na lehké a střední dítě doplní i rovnou desítku v zápisu pod větvičkou
+  const fields = hint === 'none' ? OVER10_FIELDS.slice() : OVER10_FIELDS_STEPS.slice();
   const ex = {
     a, b, c, ten, rest, sum, level, hint, op: sub ? 'sub' : 'add',
-    hidden: OVER10_FIELDS.slice(),
-    values: OVER10_FIELDS.map((f) => parts[f]),
+    hidden: fields,
+    values: fields.map((f) => parts[f]),
     /* Znaménko patří do klíče: bez něj by dedup v `buildOver10Round()`
        považoval 16 + 8 a 16 − 8 za tentýž příklad. */
     key: `${a}${sub ? '-' : '+'}${b}|${level}`,

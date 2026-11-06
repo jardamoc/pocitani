@@ -369,9 +369,10 @@ nebyl srozumitelný. Obrázek s větvičkou říká totéž a dítě z něj hned
 druhé číslo dělí zrovna takhle.
 
 **Obtížnost = kolik nápovědy dítě dostane**, ne kolik políček doplňuje ani jak velká
-jsou čísla (ta řídí výhradně rozsah). Políčka jsou **ve všech úrovních stejná tři** —
-`OVER10_FIELDS` = `ten`, `rest`, `c` — a jejich pořadí je zároveň pořadím hodnot
-v odpovědi. Liší se jen `hint` v `OVER10_LEVELS`:
+jsou čísla (ta řídí výhradně rozsah). Těžká má tři políčka (`OVER10_FIELDS` = `ten`,
+`rest`, `c`), lehká a střední čtyři (`OVER10_FIELDS_STEPS`, navíc rovná desítka `sum`
+v zápisu pod větvičkou — dítě ji doplní samo, přání uživatele). Pořadí je zároveň
+pořadím hodnot v odpovědi. Nápovědu řídí `hint` v `OVER10_LEVELS`:
 
 | úroveň | `hint` | co dítě vidí navíc |
 |---|---|---|
@@ -379,8 +380,8 @@ v odpovědi. Liší se jen `hint` v `OVER10_LEVELS`:
 | střední | `frame` | jen kroužky |
 | těžká | `none` | nic, počítá zpaměti |
 
-Nabídka čísel je **po políčkách** (`over10Choices()` vrací pole tří pětic v pořadí
-`OVER10_FIELDS`): správné číslo, typické chyby (u odčítání 18 − 9 doplněk 2 místo 8)
+Nabídka čísel je **po políčkách** (`over10Choices()` vrací pětici pro každé políčko
+v pořadí `ex.hidden`): správné číslo, typické chyby (u odčítání 18 − 9 doplněk 2 místo 8)
 a sousedé, seřazené. Klávesnice ukáže pětici pro políčko s kurzorem a po výběru se
 přepne na další (`fieldNumbers()`, překreslení ve `focusin` a v `handleKey`). Kytičky
 mají dál jednu společnou nabídku.
@@ -395,9 +396,10 @@ sloupec druhého čísla. Odčítání zůstává po staru (rámeček kolem výs
 
 **Na lehké a střední úrovni (ne na těžké) jsou pod větvičkou dva řádky** (`over10SumHTML()`, podoba podle uživatele):
 `[7 + 3] + 1 =` (dvojice v růžovém rámečku jako nahoře) a `10 + 1 = 11`. Jsou to dva
-sloupce (mřížka `.o10-sum`): 10 uprostřed pod rámečkem, „+ 1 =“ přesně pod sebou. Nic se do nich
-nepíše: čísla jsou ozvěna políček (`syncBigaddEcho()`, `data-cell`) a druhý řádek se ukáže
-až po napsání doplňku (`data-after`) — rovná desítka by jinak napověděla.
+sloupce (mřížka `.o10-sum`): 10 uprostřed pod rámečkem, „+ 1 =“ přesně pod sebou. Píše se jen
+rovná desítka (políčko `sum`, vidět hned); ostatní čísla jsou ozvěna políček
+(`syncBigaddEcho()`, `data-cell`). Schovávání druhého řádku přes `data-after` zůstalo jen
+pro úlohy bez políčka `sum`.
 
 **Mezery kolem `+` / `−` a `=` jsou stejné.** První číslo stojí **uprostřed rámečku**
 (uživatel to tak chce) ve sloupci širokém jako políčko pod ním, takže vpravo od něj zbývá

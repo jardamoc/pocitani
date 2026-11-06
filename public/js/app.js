@@ -1483,11 +1483,13 @@ const O10_LABEL = {
   add: {
     ten: 'Kolik chybí prvnímu číslu do desítky',
     rest: 'Kolik zbývá přidat přes desítku',
+    sum: 'Na které desítce jsi',
     c: 'Výsledek',
   },
   sub: {
     ten: 'Kolik ubrat, abys byla na desítce',
     rest: 'Kolik zbývá ubrat pod desítku',
+    sum: 'Na které desítce jsi',
     c: 'Výsledek',
   },
 };
@@ -1519,7 +1521,7 @@ function over10HTML(ex) {
       ${cell('ten')}
       ${cell('rest')}
     </div>
-    ${over10SumHTML(ex)}`;
+    ${over10SumHTML(ex, cell)}`;
 }
 
 /* Dva řádky pod větvičkou, které vysvětlují, proč se desítka dělá
@@ -1528,18 +1530,21 @@ function over10HTML(ex) {
      10 + 1 = 11            výsledek je ozvěna políčka nahoře
    Doplňky jsou ozvěna políček (`syncBigaddEcho`); druhý řádek se ukáže,
    až je doplněk napsaný - rovná desítka by jinak napověděla. */
-function over10SumHTML(ex) {
+function over10SumHTML(ex, cell) {
   // lehká a střední úroveň, na těžké se počítá bez nápovědy (přání uživatele)
   if (ex.hint === 'none') return '';
   const s = OPS[ex.op].symbol;
-  const round = ex.op === 'sub' ? ex.a - ex.ten : ex.a + ex.ten;
+  /* Rovnou desítku doplní dítě samo (políčko `sum`), proto už nemusí čekat
+     schovaná, až bude doplněk napsaný - nic neprozradí. */
+  const round = ex.hidden.includes('sum') ? cell('sum') : (ex.op === 'sub' ? ex.a - ex.ten : ex.a + ex.ten);
+  const after = ex.hidden.includes('sum') ? '' : ' data-after=".o10b-ten" hidden';
   const echo = (key) => `<span class="ba-echo o10-echo is-empty" data-cell=".o10b-${key}"></span>`;
   // dva sloupce: desítka stojí uprostřed pod rámečkem, „+ 4 =“ přesně pod sebou
   return `<div class="o10-sum" aria-hidden="true">
       <span class="o10-pair">${ex.a} ${s} ${echo('ten')}</span>
       <span class="o10-tail">${s} ${echo('rest')} =</span>
-      <span class="o10-round" data-after=".o10b-ten" hidden>${round}</span>
-      <span class="o10-tail" data-after=".o10b-ten" hidden>${s} ${echo('rest')} = ${echo('c')}</span>
+      <span class="o10-round"${after}>${round}</span>
+      <span class="o10-tail"${after}>${s} ${echo('rest')} = ${echo('c')}</span>
     </div>`;
 }
 
@@ -3114,6 +3119,21 @@ function handleKey(key) {
   // maxLength je −1, když atribut chybí; brát to jako "žádný limit"
   if (input.maxLength > 0 && input.value.length >= input.maxLength) return;
   input.value += key;
+  autoAdvance(input);
+}
+
+/* Rozklad přes desítku: jakmile má políčko tolik číslic jako správná
+   hodnota, kurzor sám skočí na další prázdné políčko v pořadí `ex.hidden`
+   (doplněk → zbytek → desítka → výsledek). Dítě nemusí klepat na okénka. */
+function autoAdvance(input) {
+  const ex = round[index];
+  if (ex?.kind !== 'over10' || !input.matches('.o10-input')) return;
+  const idx = Number(input.dataset.idx);
+  if (input.value.length < String(ex.values[idx]).length) return;
+  const inputs = partInputs(ex);
+  const next = inputs.slice(idx + 1).find((i) => i.value === '') || inputs.find((i) => i.value === '');
+  if (next) { activeField = next; next.focus({ preventScroll: true }); }
+  if (Array.isArray(ex.numbers?.[0])) renderKeypad(ex);
 }
 
 el('exerciseBody').addEventListener('focusin', (e) => {
@@ -3134,6 +3154,7 @@ document.addEventListener('input', (e) => {
   // jakmile dítě začne přepisovat, červená z políčka zmizí
   e.target.closest('.gcell, .o10-cell, .kv-petal')?.classList.remove('is-wrong');
   syncBigaddEcho();
+  autoAdvance(e.target);
 });
 
 /* Znaménka jdou zadat i z fyzické klávesnice; `x` a `:` bereme taky,
