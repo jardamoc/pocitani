@@ -1322,7 +1322,7 @@ function hintFor(ex) {
         + 'vedle zbytek. Nahoře doplň výsledek a klepni na ✓.';
   }
   if (ex.kind === 'bigaddstep') {
-    return 'Rozlož druhé číslo na desítky a jednotky a počítej po krocích. V každém kroku klepni na tu možnost, která je správně.';
+    return 'Druhé číslo je rozložené na desítky (modře) a jednotky (oranžově). Počítej po krocích a v každém klepni na správnou možnost.';
   }
   if (ex.kind === 'kvet') {
     return `Čísla na lístcích dají dohromady číslo uprostřed kytičky. Klepni na prázdný lístek a doplň, `
@@ -1639,16 +1639,6 @@ const BA_LABEL = {
   tens: 'Desítky druhého čísla', ones: 'Jednotky druhého čísla', mid: 'Výsledek po desítkách', c: 'Výsledek',
 };
 
-/* Kostičky druhého čísla: desítka je tyčka, jednotka kostička. Uživatel je
-   chce jen na lehké úrovni (ta jde krok po kroku přes `bigmulHTML`). */
-function bigaddBlocksHTML(ex) {
-  if (!ex.blocks) return '';
-  return `<div class="ba-blocks" aria-hidden="true">
-      <span class="ba-bars">${'<span class="ba-bar"></span>'.repeat(ex.tens / 10)}</span>
-      <span class="ba-cubes">${'<span class="ba-cube"></span>'.repeat(ex.ones)}</span>
-    </div>`;
-}
-
 /* Ozvěny v zápisu ukazují, co dítě napsalo do větvičky. Hodnota políčka
    se mění bez události `input` (klávesnice, druhý pokus, odhalení), proto
    se volá ze všech těch míst. Po odhalení už políčko není, čte se `.gval`. */
@@ -1739,7 +1729,6 @@ function bigaddHTML(ex) {
   const echo = (key) => `<span class="o10-num ba-echo ba-echo-${key} is-empty" data-of="${key}"></span>`;
   const op = `<span class="o10-op">${sign}</span>`;
   const eq = '<span class="o10-op">=</span>';
-  const blocks = bigaddBlocksHTML(ex);
   // výsledek je ozvěnou i na konci prvního řádku, šipky viz `drawArrows()`
   const echoC = '<span class="o10-num ba-echo is-empty" data-cell=".ba-rows .ba-c"></span>';
   return `<div class="ba" data-op="${ex.op}" data-arrows="ba">
@@ -1751,7 +1740,6 @@ function bigaddHTML(ex) {
             <line x1="50" y1="1" x2="23" y2="23" class="ba-leg-tens"/><line x1="50" y1="1" x2="77" y2="23" class="ba-leg-ones"/>
           </svg>
           <div class="ba-parts">${cell('tens')}${cell('ones')}</div>
-          ${blocks}
         </div>
       </div>
       <div class="ba-rows">
@@ -1819,6 +1807,47 @@ function pexesoHTML(ex) {
     <p id="pexStatus" class="pex-status" aria-live="polite"></p>`;
 }
 
+/* Lehké velké sčítání: druhé číslo má desítky modře a jednotky oranžově
+   a pod ním je hotová větvička se stejně obarvenými díly - přání
+   uživatele. Kostičky tu byly a uživatel je vyřadil (patří k přechodu
+   přes desítku, tady jsou navíc). */
+function bigaddTaskHTML(ex) {
+  const t = Math.floor(ex.b / 10);
+  const o = ex.b % 10;
+  return `<div class="bm-task bas">
+      <span class="bas-lead">Vypočítej</span>
+      <b class="bas-a">${ex.a}</b><b class="bas-op">${OPS[ex.op].symbol}</b>
+      <span class="bas-b">
+        <b class="bas-num"><span class="bas-t">${t}</span><span class="bas-o">${o}</span></b>
+        <svg class="bas-legs" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true">
+          <line x1="50" y1="2" x2="25" y2="22" class="ba-leg-tens"/><line x1="50" y1="2" x2="75" y2="22" class="ba-leg-ones"/>
+        </svg>
+        <span class="bas-parts"><b class="bas-t">${ex.tens}</b><b class="bas-o">${ex.ones}</b></span>
+      </span>
+    </div>
+    ${bigaddPlanHTML(ex)}`;
+}
+
+/* Řádek „Rozepíšeme: [25 + 30] + 8" pod větvičkou - dítě vidí, že po
+   rozkladu jsou v příkladu tři čísla a že se začíná dvojicí v rámečku
+   (přání uživatele). Po dvou krocích (desítky, schovaná jednotka zpátky)
+   se rámeček změní na výsledek dvojice: „[55] + 8". */
+function bigaddPlanHTML(ex) {
+  const sign = OPS[ex.op].symbol;
+  const pairDone = bigStep >= 2;
+  const pair = pairDone
+    ? `<b>${ex.mid}</b>`
+    : `<b>${ex.a}</b> ${sign} <b class="bas-t">${ex.tens}</b>`;
+  // po dvojici už popisek neříká nic, co by neříkala otázka pod ním
+  const cap = pairDone ? '' : 'Nejdřív spočítáme čísla v rámečku.';
+  return `<div class="bas-plan">
+      <span class="bas-plan-lead">Rozepíšeme:</span>
+      <span class="bas-plan-row"><span class="bas-pair${pairDone ? ' is-done' : ''}">${pair}</span>
+        ${sign} <b class="bas-o">${ex.ones}</b></span>
+    </div>
+    <p class="bas-cap">${cap}</p>`; // prázdný odstavec drží mezeru, ať zápis neposkočí
+}
+
 /* Velké násobení: nahoře zadání, pod ním rostoucí zápis hotových kroků
    a dole dvě možnosti na celou šířku POD SEBOU - vedle sebe se text
    `80 · 5 + 5 · 5` na 320 px nevejde. */
@@ -1840,15 +1869,13 @@ function bigmulHTML(ex) {
 
   const step = ex.steps[bigStep];
   const choices = step
-    ? `<p class="bm-ask">${step.label}${step.expr ? ` ${step.expr}` : ''}</p>
-       <div class="bm-choices">${step.options
+    ? `<p class="bm-ask">${step.label}${step.expr ? ` <span class="bm-nowrap">${step.expr}</span>` : ''}</p>       <div class="bm-choices">${step.options
          .map((text) => `<button type="button" class="bm-opt" data-text="${text}">${text}</button>`)
          .join('')}</div>`
     : '';
 
   return `<div class="bigmul">
-      <p class="bm-task">Vypočítej <b>${ex.task}</b></p>
-      ${ex.kind === 'bigaddstep' ? `<div class="ba bm-blocks">${bigaddBlocksHTML(ex)}</div>` : ''}
+      ${ex.kind === 'bigaddstep' ? bigaddTaskHTML(ex) : `<p class="bm-task">Vypočítej <b>${ex.task}</b></p>`}
       <div class="bm-log">${done}</div>
       ${choices}
     </div>`;

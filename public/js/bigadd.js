@@ -35,9 +35,9 @@ export const BIGADD_FIELDS = ['tens', 'ones', 'mid', 'c'];
    „Sčítání dvojciferných čísel s rozkladem“ na umimematiku.cz) a ovládá ji
    ovladač velkého násobení - `ex.kind = 'bigaddstep'`. */
 export const BIGADD_LEVELS = {
-  easy: { label: 'Lehká', emoji: '🟢', note: 'krok po kroku s kostičkami, vybíráš ze dvou možností', carry: null, steps: true, blocks: true },
-  medium: { label: 'Střední', emoji: '🟡', note: 'rozklad a výpočet po krocích, píšeš sama', carry: null, blocks: false },
-  hard: { label: 'Těžká', emoji: '🔴', note: 'vždycky přes desítku', carry: true, blocks: false },
+  easy: { label: 'Lehká', emoji: '🟢', note: 'rozklad je nakreslený, počítáš nejdřív desítky a pak jednotky, vybíráš ze dvou možností', carry: null, steps: true },
+  medium: { label: 'Střední', emoji: '🟡', note: 'rozklad a výpočet po krocích, píšeš sama', carry: null },
+  hard: { label: 'Těžká', emoji: '🔴', note: 'vždycky přes desítku', carry: true },
 };
 export const BIGADD_LEVEL_KEYS = Object.keys(BIGADD_LEVELS);
 
@@ -91,7 +91,7 @@ function rollSub(hi, carry) {
 
 export function makeBigadd(max, levelKey = 'easy', op = 'add') {
   const level = BIGADD_LEVELS[levelKey] ? levelKey : 'easy';
-  const { blocks = false, steps = false } = BIGADD_LEVELS[level];
+  const { steps = false } = BIGADD_LEVELS[level];
   const carry = BIGADD_LEVELS[level].carry ?? Math.random() < 0.5;
   const sub = op === 'sub';
   const { a, t, o } = (sub ? rollSub : rollAdd)(bigaddMax(max), carry);
@@ -101,7 +101,7 @@ export function makeBigadd(max, levelKey = 'easy', op = 'add') {
   const c = sub ? mid - o : mid + o;
   const parts = { tens, ones: o, mid, c };
   const ex = {
-    a, b, c, tens, ones: o, mid, level, blocks, carry, op: sub ? 'sub' : 'add',
+    a, b, c, tens, ones: o, mid, level, carry, op: sub ? 'sub' : 'add',
     hidden: BIGADD_FIELDS.slice(),
     values: BIGADD_FIELDS.map((f) => parts[f]),
     // znaménko patří do klíče, jinak by 47 + 25 a 47 − 25 byl tentýž příklad
@@ -114,18 +114,25 @@ export function makeBigadd(max, levelKey = 'easy', op = 'add') {
   return ex;
 }
 
-/* Lehká úroveň: čtyři kroky, v každém dvě možnosti. Špatná je vždycky
-   typická chyba (ztracená nula, zapomenuté jednotky, o jedničku vedle).
+/* Lehká úroveň: rozklad druhého čísla je hotový (větvička pod ním a barvy
+   kreslí app.js) a dítě jde třemi kroky, v každém dvě možnosti
+   (88 − 34): „Z 88 si 8 schováme a počítáme jen desítky: 80 − 30 =",
+   „Schovanou 8 přidáme zpátky: 50 + 8 =", „Ještě zbývá odečíst jednotky: 58 − 4 =".
+   Podle uživatele (7. 11. 2026); krok „Rozdělíme 23 na: 20 a 3 / 2 a 3"
+   tu byl a na lehkou úroveň byl nejasný.
+   Špatná možnost je typická chyba (o desítku vedle, zapomenuté schované
+   jednotky, o jedničku vedle).
    Pořadí tlačítek se losuje tady, ne při vykreslení - zápis se po každém
    kroku překresluje celý (stejně jako u velkého násobení). */
-function bigaddSteps({ a, b, c, tens, ones, mid, op }) {
+function bigaddSteps({ a, c, tens, ones, mid, op }) {
   const sub = op === 'sub';
   const s = sub ? '−' : '+';
-  const t = tens / 10;
-  const round10 = a - (a % 10);
-  // zapomenuté jednotky prvního čísla: 56 + 40 → 90
-  let wrongMid = sub ? round10 - tens : round10 + tens;
-  if (wrongMid <= 0 || wrongMid === mid) wrongMid = mid + 10;
+  const kept = a % 10;          // první číslo nikdy nekončí nulou
+  const round10 = a - kept;
+  const tensOnly = sub ? round10 - tens : round10 + tens;
+  // o desítku vedle; záporné ani přes 100 nesmí být ani špatné číslo
+  let wrongTens = sub ? tensOnly + 10 : tensOnly - 10;
+  if (wrongTens <= 0 || wrongTens > 100) wrongTens = sub ? tensOnly - 10 : tensOnly + 10;
   let wrongC = c - 1;
   if (wrongC <= 0) wrongC = c + 1;
   /* `expr` (nepovinný) je příklad, který se v hotovém kroku vypíše před
@@ -134,10 +141,9 @@ function bigaddSteps({ a, b, c, tens, ones, mid, op }) {
     label, expr, correct, wrong, tag, options: Math.random() < 0.5 ? [correct, wrong] : [wrong, correct],
   });
   return [
-    // „4 a 4“ místo „40 a 4“ - ztracená nula u desítek; u 11 až 19 by to bylo „1 a 5“
-    step(`Rozdělíme ${b} na:`, `${tens} a ${ones}`, `${t} a ${ones}`, 'bigaddSplit'),
-    step('Takže v příkladu máme:', `${a} ${s} ${tens} ${s} ${ones}`, `${a} ${s} ${t} ${s} ${ones}`, 'bigaddSplit'),
-    step(`${sub ? 'Odečteme' : 'Přičteme'} nejdřív desítky:`, String(mid), String(wrongMid), 'bigaddTens', `${a} ${s} ${tens} =`),
+    step(`Z ${a} si ${kept} schováme a ${sub ? 'odečteme' : 'sečteme'} jen desítky:`, String(tensOnly), String(wrongTens), 'bigaddTens', `${round10} ${s} ${tens} =`),
+    // zapomenuté schované jednotky: zůstane jen výsledek desítek
+    step(`Schovanou ${kept} přidáme zpátky:`, String(mid), String(tensOnly), 'bigaddTens', `${tensOnly} + ${kept} =`),
     step(`Ještě zbývá ${sub ? 'odečíst' : 'přičíst'} jednotky:`, String(c), String(wrongC), 'bigaddOnes', `${mid} ${s} ${ones} =`),
   ];
 }

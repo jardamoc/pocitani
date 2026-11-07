@@ -454,7 +454,6 @@ Pár věcí, které se snadno rozbijí:
    47  +  25
           ╱ ╲              modrá = desítky, oranžová = jednotky
        [20]  [5]
-        ▮▮   ▪▪▪▪▪         kostičky (jen lehká, tam pod zadáním)
 
 47 + 20 + 5 =        zápis po krocích (střední a těžká), jako na Umíme to
 [67] + 5 = [72]      výsledek za rovná se, ne na zvláštním řádku (přání uživatele)
@@ -471,12 +470,24 @@ v `app.js`); hodnota políčka se mění bez události `input`, proto se volá z
 Sčítání a odčítání dvojciferných čísel do 100 tak, jak se učí ve 2.–3. třídě: druhé
 číslo se rozloží na desítky a jednotky a jde se po krocích (nejdřív desítky, pak
 jednotky). Pořadí obtížností odpovídá modulu „Sčítání a odčítání do 100“ na
-umimematiku.cz. **Lehká jde krok po kroku s výběrem ze dvou možností** (Rozdělíme 44 na: →
-56 + 40 + 4 → 56 + 40 = → 96 + 4 =), uživatel ji chtěl podle cvičení „Sčítání dvojciferných
-čísel s rozkladem" z Umíme to. Je to druh **`bigaddstep`** a jede přes ovladač velkého
+umimematiku.cz. **Lehká jde krok po kroku s výběrem ze dvou možností.** Podoba od
+7. 11. 2026 (přání uživatele, `bigaddTaskHTML()` + `bigaddPlanHTML()` v `app.js`):
+
+```
+Vypočítej 62 + 35          3 modře, 5 oranžově; pod 35 hotová větvička 30 a 5
+Rozepíšeme: [62 + 30] + 5  rámeček kolem dvojice, pod ním „Nejdřív spočítáme čísla v rámečku."
+Z 62 si 2 schováme a sečteme jen desítky: 60 + 30 =   (90 / 80)
+Schovanou 2 přidáme zpátky: 90 + 2 =                 (92 / 90 - zapomenutá schovaná)
+                           → rámeček zezelená: [92] + 5
+Ještě zbývá přičíst jednotky: 92 + 5 =               (97 / 96)
+```
+
+Dřív byl první krok „Rozdělíme 23 na: 20 a 3 / 2 a 3" a pod zadáním kostičky — uživateli
+to na lehkou úroveň přišlo nejasné, kostičky patří k přechodu přes desítku. **Nevracet.**
+Poznámka „8 si schováme…" jako zvláštní řádek pod otázkou se taky zkoušela a opakovala
+otázku. Je to druh **`bigaddstep`** a jede přes ovladač velkého
 násobení (`STEP_KINDS`, `bigTap`, `bigmulHTML`). Na rozdíl od násobení je popisek kroku
-**nad** výsledkem — je to začátek věty („Rozdělíme 67 na:“), ne komentář. **Kostičky jsou jen na lehké**
-(pod zadáním, `bigaddBlocksHTML()`), uživatel je ze střední vyřadil. **Střední** je obrázek
+**nad** výsledkem — je to začátek věty, ne komentář. **Střední** je obrázek
 s větvičkou a psaním, přes desítku napůl; **těžká** totéž, ale vždycky přes desítku.
 Rozsah je strop, ale nejvýš 100. **V nastavení jsou jen chipy do 50 a do 100**
 (`BIGADD_MAX_PRESETS`); uložený menší rozsah z jiné hry se nemění, jen se ukáže jako

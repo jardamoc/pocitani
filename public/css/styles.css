@@ -1047,18 +1047,6 @@ body.is-quiz .wrap { padding-top: 18px; }
 .ba-cell.ba-tens.slot:not(.is-correct):not(.is-wrong) { border-color: var(--pair-task); }
 .ba-cell.ba-ones.slot:not(.is-correct):not(.is-wrong) { border-color: var(--pair-result); }
 
-/* kostičky: desítka je tyčka z deseti dílků, jednotka jedna kostička */
-.ba-blocks { display: flex; gap: var(--ba-gap); margin-top: 6px; }
-/* lehká úroveň: kostičky druhého čísla hned pod zadáním */
-.bm-blocks .ba-blocks { justify-content: center; margin: 0 0 10px; }
-.ba-bars, .ba-cubes { width: var(--cell); display: flex; justify-content: center; align-items: flex-end; }
-.ba-bars { gap: 2px; }
-.ba-bar {
-  width: 4px; height: 34px; border-radius: 2px;
-  background: repeating-linear-gradient(to bottom, var(--pair-task) 0 3px, transparent 3px 3.4px);
-}
-.ba-cubes { display: grid; grid-template-columns: repeat(5, 6px); gap: 2px; justify-content: center; align-content: end; }
-.ba-cube { width: 6px; height: 6px; border-radius: 1px; background: var(--pair-result); }
 
 /* zápis pod rozkladem (jako na Umíme to, rovná se na konci řádku):
      39 + 50 + 1 =
@@ -1562,6 +1550,32 @@ span.uu-gap { cursor: default; }
 .bigmul { display: grid; gap: 10px; }
 .bm-task { margin: 0; text-align: center; font-size: 1.15rem; font-weight: 800; color: var(--ink); }
 .bm-task b { font-family: 'Baloo 2', sans-serif; font-size: 1.5rem; }
+/* Lehké velké sčítání: „Vypočítej 58 − 23" a pod 23 větvička 20 a 3.
+   Barvy desítek a jednotek jako všude jinde (`--pair-task` / `--pair-result`). */
+/* „Rozepíšeme: [25 + 30] + 8" - rámeček jako `.ba-pair` na střední úrovni */
+.bas-plan {
+  display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px 8px;
+  font-weight: 800; color: var(--ink);
+}
+.bas-plan-lead { font-size: 1rem; }
+.bas-plan-row { white-space: nowrap; font-size: 1.3rem; font-family: 'Baloo 2', sans-serif; }
+.bas-plan-row .bas-t { color: var(--pair-task); }
+.bas-plan-row .bas-o { color: var(--pair-result); }
+.bas-pair { display: inline-block; padding: 0 8px; border: 3px solid var(--accent-b); border-radius: 12px; }
+.bas-pair.is-done { border-color: var(--good); }
+.bas-cap { margin: 4px 0 12px; text-align: center; font-size: .9rem; font-weight: 700; color: var(--ink-soft); }
+.bm-nowrap { white-space: nowrap; } /* „88 − 30 =" se nesmí rozdělit na dva řádky */
+.bas { display: flex; justify-content: center; align-items: baseline; gap: 6px; margin-bottom: 8px; }
+.bas-lead { margin-right: 2px; }
+.bas-b { display: inline-flex; flex-direction: column; align-items: center; }
+.bas .bas-t { color: var(--pair-task); }
+.bas .bas-o { color: var(--pair-result); }
+/* větvička je širší než číslo nad ní - záporný okraj, ať neodsune číslo od znaménka */
+.bas-legs, .bas-parts { width: 4.4em; margin: 0 -1.5em; }
+.bas-legs { height: 18px; overflow: visible; stroke-width: 3; stroke-linecap: round; }
+.bas-legs line { vector-effect: non-scaling-stroke; }
+.bas-parts { display: grid; grid-template-columns: 1fr 1fr; text-align: center; }
+.bas-parts b { font-size: 1.35rem; line-height: 1.1; }
 
 .bm-log { display: grid; gap: 8px; }
 .bm-line { display: grid; gap: 2px; }
