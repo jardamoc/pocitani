@@ -1262,6 +1262,7 @@ function renderExercise() {
   /* Zápis velkého násobení roste podle toho, kolik kroků je za námi -
      stav se proto musí vynulovat dřív, než se tělo úlohy vykreslí. */
   if (STEP_KINDS.has(ex.kind)) resetBigmul();
+  coinsOpen = false; // nápověda s korunami začíná u každé úlohy zavřená
   // plocha abecedy se kreslí ze stavu, ten musí být nový dřív než HTML
   if (ex.kind === 'abc') resetAbc(ex);
   // u věty taky - označená slova jsou stav, ze kterého se kreslí
@@ -1731,7 +1732,7 @@ function bigaddHTML(ex) {
   const eq = '<span class="o10-op">=</span>';
   // výsledek je ozvěnou i na konci prvního řádku, šipky viz `drawArrows()`
   const echoC = '<span class="o10-num ba-echo is-empty" data-cell=".ba-rows .ba-c"></span>';
-  return `<div class="ba" data-op="${ex.op}" data-arrows="ba">
+  return `${coinsHelpHTML(ex)}<div class="ba" data-op="${ex.op}" data-arrows="ba">
       <svg class="o10-arrows" aria-hidden="true"></svg>
       <div class="ba-top">
         <div class="ba-split">
@@ -1769,7 +1770,7 @@ function kvetHTML(ex) {
         aria-label="Prázdný lístek ${i + 1}. kytičky"></span>`;
     }).join('');
     return `<div class="kv-flower" data-c="${i}">
-        <div class="kv-head" style="--n:${n}">${petals}<span class="kv-center">${f.target}</span></div>
+        <div class="kv-head" data-n="${n}" style="--n:${n}">${petals}<span class="kv-center">${f.target}</span></div>
         <svg class="kv-stem" viewBox="0 0 40 70" aria-hidden="true">
           <path d="M20 0 C16 22 26 40 20 70" class="kv-stalk"/>
           <path d="M21 42 C30 30 40 34 38 38 C34 44 26 44 21 42 Z" class="kv-leaf"/>
@@ -1807,6 +1808,105 @@ function pexesoHTML(ex) {
     <p id="pexStatus" class="pex-status" aria-live="polite"></p>`;
 }
 
+/* Nápověda s korunami u velkého sčítání (lehká a střední, přání uživatele
+   7. 11. 2026): otazník nad zadáním, po klepnutí mince - desetikoruny
+   a koruny prvního čísla, u odčítání se odebírané desetikoruny přeškrtnou -
+   a věta „5 desetikorun − 3 desetikoruny a 4 koruny“. Jednotky se spolu
+   schválně neodčítají: při přechodu přes desítku by vyšly záporně.
+   Nápověda nic nestojí, na odměny nemá vliv. Stav drží `coinsOpen`, protože
+   lehká úroveň se po každém kroku překresluje. */
+let coinsOpen = false;
+const COINS_LEVELS = new Set(['easy', 'medium']);
+// 1 desetikoruna, 2-4 desetikoruny, 5+ desetikorun
+const czPlural = (n, one, few, many) => `${n} ${n === 1 ? one : n >= 2 && n <= 4 ? few : many}`;
+const tensWord = (n) => czPlural(n, 'desetikoruna', 'desetikoruny', 'desetikorun');
+const onesWord = (n) => czPlural(n, 'koruna', 'koruny', 'korun');
+// 4. pád: „přidáme 1 desetikorunu“, „máme 1 korunu“
+const tensAcc = (n) => czPlural(n, 'desetikorunu', 'desetikoruny', 'desetikorun');
+const onesAcc = (n) => czPlural(n, 'korunu', 'koruny', 'korun');
+
+function coinsHelpHTML(ex) {
+  if (!COINS_LEVELS.has(ex.level)) return '';
+  const sub = ex.op === 'sub';
+  // vlastní kresba podobná skutečným mincím, bez jejich motivů (rozhodl uživatel)
+  const coin = (v, cls = '') => `<span class="coin coin-${v}${cls}"><b>${v}</b><small>Kč</small></span>`;
+  const coins = (count, v, gone = 0) =>
+    Array.from({ length: count }, (_, k) => coin(v, k >= count - gone ? ' is-gone' : '')).join('');
+  /* Koruny po pěti pod sebou (6 = pět nahoře, jedna dole), aby se daly
+     spočítat od oka - přání uživatele. Přeškrtnuté jsou poslední. */
+  const stack = (count, gone = 0) => {
+    if (!count) return '';
+    const all = Array.from({ length: count }, (_, k) => coin(1, k >= count - gone ? ' is-gone' : ''));
+    const rows = [];
+    for (let k = 0; k < all.length; k += 5) rows.push(`<span class="coins-five">${all.slice(k, k + 5).join('')}</span>`);
+    return `<span class="coins-stack">${rows.join('')}</span>`;
+  };
+  const tA = Math.floor(ex.a / 10), oA = ex.a % 10;
+  const tB = Math.floor(ex.b / 10), oB = ex.b % 10;
+  const row = (tens, ones, opts = {}) => {
+    const t = tens ? `<span class="coins-tens">${coins(tens, 10, opts.goneT || 0)}</span>` : '';
+    const o = stack(ones, opts.goneO || 0);
+    return `<div class="coins-row">${opts.sign ? '<span class="coins-sign">+</span>' : ''}${t}${t && o ? '<span class="coins-gap"></span>' : ''}${o}</div>`;
+  };
+  const T = (n) => `<b class="coins-t">${tensAcc(n)}</b>`;
+  const O = (n) => `<b class="coins-o">${onesAcc(n)}</b>`;
+  // „4 desetikoruny a 3 koruny“ ve 4. pádě, nulu vynechá
+  const both = (t, o) => [t ? T(t) : '', o ? O(o) : ''].filter(Boolean).join(' a ');
+  /* Postup jako s penězi v ruce: nejdřív desetikoruny, pak koruny, nakonec
+     co máme a kolik to je (výsledek ukázat chtěl uživatel). */
+  const parts = [`<p><b>${ex.a}&nbsp;Kč</b>, to&nbsp;je&nbsp;<b class="coins-t">${tensWord(tA)}</b> a <b class="coins-o">${onesWord(oA)}</b>.</p>`];
+  let endT;
+  let endO;
+  if (sub) {
+    // nejdřív co máme, pak krok po kroku, co odebíráme (přání uživatele)
+    parts.push(row(tA, oA));
+    parts.push(`<p>Nejdřív odebereme ${T(tB)}:</p>`);
+    parts.push(row(tA, oA, { goneT: tB }));
+    endT = tA - tB;
+    endO = oA;
+    if (oB && oB <= oA) {
+      parts.push(`<p>Pak odebereme ${O(oB)}:</p>`);
+      parts.push(row(endT, oA, { goneO: oB }));
+      endO = oA - oB;
+    } else if (oB) {
+      // korun je málo: jedna desetikoruna se rozmění na deset korun
+      parts.push(`<p>Pak máme odebrat ${O(oB)}, ale máme jen ${O(oA)}. Jednu desetikorunu proto rozměníme na deset korun:</p>`);
+      endT -= 1;
+      parts.push(row(endT, oA + 10));
+      parts.push(`<p>Teď odebereme ${O(oB)}:</p>`);
+      parts.push(row(endT, oA + 10, { goneO: oB }));
+      endO = oA + 10 - oB;
+    }
+  } else {
+    parts.push(row(tA, oA));
+    parts.push(`<p>Přidáme ${T(tB)}${oB ? ` a pak ${O(oB)}` : ''}:</p>`);
+    parts.push(row(tB, oB, { sign: true }));
+    endT = tA + tB;
+    endO = oA + oB;
+    parts.push(`<p>Teď máme ${both(endT, endO)}:</p>`);
+    parts.push(row(endT, endO));
+    if (endO >= 10) {
+      endT += 1;
+      endO -= 10;
+      parts.push('<p>Deset korun vyměníme za jednu desetikorunu:</p>');
+      parts.push(row(endT, endO));
+    }
+  }
+  if (sub) parts.push(`<p>Zůstane nám:</p>${row(endT, endO)}`);
+  parts.push(`<p class="coins-result">Celkem máme ${both(endT, endO)}, to&nbsp;je <b>${10 * endT + endO}&nbsp;Kč</b>.</p>`);
+  return `<div class="coins-help">
+      <button type="button" class="coins-btn" aria-expanded="${coinsOpen}" aria-label="Nápověda s korunami">?</button>
+      <div class="coins-panel"${coinsOpen ? '' : ' hidden'}>${parts.join('')}</div>
+    </div>`;
+}
+
+function coinsToggle(btn) {
+  coinsOpen = !coinsOpen;
+  btn.setAttribute('aria-expanded', String(coinsOpen));
+  btn.parentElement.querySelector('.coins-panel').hidden = !coinsOpen;
+  drawArrows(); // panel posune zápis dolů, šipky se musí překreslit
+}
+
 /* Lehké velké sčítání: druhé číslo má desítky modře a jednotky oranžově
    a pod ním je hotová větvička se stejně obarvenými díly - přání
    uživatele. Kostičky tu byly a uživatel je vyřadil (patří k přechodu
@@ -1814,7 +1914,7 @@ function pexesoHTML(ex) {
 function bigaddTaskHTML(ex) {
   const t = Math.floor(ex.b / 10);
   const o = ex.b % 10;
-  return `<div class="bm-task bas">
+  return `${coinsHelpHTML(ex)}<div class="bm-task bas">
       <span class="bas-lead">Vypočítej</span>
       <b class="bas-a">${ex.a}</b><b class="bas-op">${OPS[ex.op].symbol}</b>
       <span class="bas-b">
@@ -2004,7 +2104,16 @@ function renderPexStatus(ex) {
     + (pexMiss ? ` · chyb: ${pexMiss}` : '');
 }
 
+// otazník s korunami nesmí vzít políčku kurzor, jinak by klávesnice psala jinam
+el('exerciseBody').addEventListener('pointerdown', (e) => {
+  if (e.target.closest('.coins-btn')) e.preventDefault();
+});
 el('exerciseBody').addEventListener('click', (e) => {
+  const coinsBtn = e.target.closest('.coins-btn');
+  if (coinsBtn) {
+    coinsToggle(coinsBtn);
+    return;
+  }
   if (round[index]?.kind === 'abc') {
     abcTap(e.target);
     return;
