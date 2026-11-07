@@ -9,7 +9,8 @@ import { makeAbc, abcExplain, abcText } from './abc.js';
 import { makePosRound, posAnswer, posExplain, posText } from './pos.js';
 import { makeVetyRound, vetyExplain, vetyText } from './vety.js';
 import { makeVyznamRound, vyznamExplain, vyznamText } from './vyznam.js';
-import { makeUuRound, uuExplain, uuText } from './uu.js';
+// samostatná hra u, ú, ů skončila; text a vysvětlení zůstávají pro stará uložená kola
+import { uuExplain, uuText } from './uu.js';
 import { makePravRound, pravExplain, pravText } from './pravopis.js';
 import { makeHudbaRound, makeKlavirRound, makeSluchRound, hudbaExplain, hudbaText, HUDBA_TAGS } from './hudba.js';
 import { makeBigmul, bigmulExplain, bigmulText } from './bigmul.js';
@@ -539,21 +540,8 @@ export function buildVyznamRound(config) {
   }));
 }
 
-/* Doplň u, ú, ů - co věta, to úloha. Odpovědí jsou doplněná písmena
-   spojená ', ' v pořadí mezer, ovladač klepání je v app.js. */
-export function buildUuRound(config) {
-  return makeUuRound(config.level, config.uuCount).map((p) => ({
-    op: 'add',
-    kind: 'uu',
-    missing: 'gap',
-    a: 0, b: 0, c: 0,
-    cross: false,
-    skill: `uu:${p.level}`,
-    ...p,
-  }));
-}
-
-/* Pravopis - stejný tvar jako u, ú, ů. `missing` nese téma, aby výsledek
+/* Pravopis (i s u, ú, ů jako tématem). Odpovědí jsou doplněná písmena
+   spojená ', ' v pořadí mezer, ovladač klepání je v app.js. `missing` nese téma, aby výsledek
    uměl říct „Nejvíc chyb máš u párových souhlásek". */
 export function buildPravRound(config) {
   return makePravRound(config.level, config.pravTopics, config.pravCount).map((p) => ({
@@ -674,7 +662,7 @@ export function buildBigaddRound(config) {
    nikde nespadlo - proto musí vypadnout z desítkového rámce i z rozpadu
    podle operací. */
 function kvetExercise(config) {
-  const k = makeKvet(config.max, config.level);
+  const k = makeKvet(config.level);
   return {
     ...k,
     op: 'add',

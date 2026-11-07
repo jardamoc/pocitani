@@ -1,4 +1,5 @@
 import { shuffle } from './random.js';
+import { UU_LETTERS, UU_WORDS, UU_SENTENCES, parseUu, uuGapTag, uuRule } from './uu.js';
 
 /* ============================================================
    Pravopis
@@ -17,6 +18,7 @@ import { shuffle } from './random.js';
 
    Poznámka podle tématu:
      iy     - žádná, pravidlo se pozná z písmene před mezerou
+     uu     - žádná; má vlastní zápis z uu.js (`ne+[ú]roda`)
      dtn    - žádná
      bpvm   - u `je` rozklad na předponu (ob+jet), u `mně` příbuzné slovo (jemný)
      par    - slovo, ve kterém je souhláska slyšet (duby) - POVINNÁ
@@ -39,6 +41,8 @@ import { shuffle } from './random.js';
 
 export const PRAV_TOPICS = {
   iy: { label: 'Tvrdé a měkké', emoji: '🪨', grade: 2, ask: 'Doplň i, nebo y.' },
+  // slova, věty a pravidla jsou v uu.js (dřív samostatná hra)
+  uu: { label: 'u, ú, ů', emoji: '✏️', grade: 2, ask: 'Doplň u, ú, nebo ů.' },
   dtn: { label: 'dě, tě, ně', emoji: '🐞', grade: 2, ask: 'Doplň e, nebo ě.' },
   bpvm: { label: 'bě, pě, vě, mě', emoji: '🐝', grade: 2, ask: 'Doplň ě, nebo je – mě, nebo mně.' },
   par: { label: 'Párové souhlásky', emoji: '👯', grade: 2, ask: 'Kterou souhlásku napíšeš?' },
@@ -420,6 +424,14 @@ const ITEMS = {
   },
 };
 
+/* u, ú, ů: lehká slova, střední krátké věty, těžká delší věty a pasti
+   (neúroda, túra, Ústí). Zápis podle uu.js. */
+ITEMS.uu = {
+  easy: UU_WORDS,
+  medium: UU_SENTENCES.easy,
+  hard: [...UU_SENTENCES.medium, ...UU_SENTENCES.hard],
+};
+
 /* Tvrdé a měkké souhlásky - podle nich se rozhoduje i/y. d, t, n jsou
    zvlášť: ty mají obojí (dy tvrdě, di měkce), poznají se poslechem. */
 const HARD = ['h', 'ch', 'k', 'r'];
@@ -505,6 +517,22 @@ export function parsePrav(src, topic, single = false) {
   return { tokens, gaps, text, full };
 }
 
+/* u, ú, ů má vlastní zápis (`+` u složených slov, druh pravidla), proto
+   jde přes `parseUu()`. Mezery se jen převedou na tvar pravopisu: písmeno
+   je přesně tak, jak se ukáže (velké na začátku věty), a nabídka kláves
+   je u, ú, ů ve stejné velikosti. */
+function parseUuPrav(src) {
+  const p = parseUu(src);
+  const gaps = p.gaps.map((g) => ({
+    ...g,
+    topic: 'uu',
+    answer: g.upper ? g.answer.toUpperCase() : g.answer,
+    opts: g.upper ? UU_LETTERS.map((l) => l.toUpperCase()) : UU_LETTERS,
+    upper: false,
+  }));
+  return { ...p, gaps };
+}
+
 /* Rozdělí počet úloh mezi zapnutá témata co nejrovnoměrněji. */
 function shares(n, k) {
   const base = Math.floor(n / k);
@@ -524,7 +552,7 @@ export function makePravRound(levelKey = 'easy', topics = PRAV_TOPIC_KEYS, count
     for (const src of shuffle(ITEMS[topic][level]).slice(0, k)) picked.push({ topic, src });
   });
   return shuffle(picked).map(({ topic, src }) => {
-    const p = parsePrav(src, topic, single);
+    const p = topic === 'uu' ? parseUuPrav(src) : parsePrav(src, topic, single);
     return {
       topic,
       level,
@@ -542,8 +570,11 @@ export const PRAV_ITEMS = ITEMS;
 /* Tag chyby podle tématu první špatně doplněné mezery. */
 const TOPIC_TAG = { iy: 'pravIY', dtn: 'pravDTN', bpvm: 'pravBPV', par: 'pravPar', velka: 'pravVelka' };
 export function pravTag(ex, picks) {
-  const g = ex.gaps.find((gap, k) => picks[k] !== gap.answer);
-  return g ? TOPIC_TAG[g.topic] : null;
+  const i = ex.gaps.findIndex((gap, k) => picks[k] !== gap.answer);
+  if (i < 0) return null;
+  const g = ex.gaps[i];
+  // u, ú, ů má jemnější tagy (začátek slova, čárka × kroužek, krátké × dlouhé)
+  return g.topic === 'uu' ? uuGapTag(g, picks[i]) : TOPIC_TAG[g.topic];
 }
 
 const VELKA_WHY = {
@@ -559,6 +590,7 @@ const VELKA_WHY = {
 
 /* Jedna věta vysvětlení k jedné mezeře. **tučné** převádí app.js na <b>. */
 function rule(g) {
+  if (g.topic === 'uu') return uuRule(g);
   const w = `**${g.word}**`;
   const a = g.answer;
   if (g.topic === 'iy') {

@@ -162,6 +162,7 @@ const KIND_LABEL = {
   'vyznam:vztah': { acc: 'vztahy mezi slovy', gen: 'vztahů mezi slovy' },
   'vyznam:nad': { all: 'všechna', acc: 'slova nadřazená', gen: 'slov nadřazených' },
   'prav:iy': { all: 'všechna', acc: 'slova s i a y', gen: 'i a y' },
+  'prav:uu': { all: 'všechna', acc: 'slova s u, ú, ů', gen: 'u, ú, ů' },
   'prav:dtn': { all: 'všechna', acc: 'slova s dě, tě, ně', gen: 'dě, tě, ně' },
   'prav:bpvm': { all: 'všechna', acc: 'slova s bě, pě, vě, mě', gen: 'bě, pě, vě, mě' },
   'prav:par': { all: 'všechny', acc: 'párové souhlásky', gen: 'párových souhlásek' },
@@ -219,7 +220,6 @@ export function analyze(state, config, attempts) {
   const posMode = config.mode === 'pos';
   const vetyMode = config.mode === 'vety';
   const vyznamMode = config.mode === 'vyznam';
-  const uuMode = config.mode === 'uu';
   const pravMode = config.mode === 'prav';
   // klavír je samostatná hra, ale úlohy i rady má společné s hudební naukou
   const hudbaMode = config.mode === 'hudba' || config.mode === 'klavir' || config.mode === 'sluch';
@@ -228,7 +228,7 @@ export function analyze(state, config, attempts) {
      sčítání zase úplně všude, takže by "sčítání ti jde" nic neřeklo.
      Ve všech pěti jedeme podle obtížnosti. U velkého násobení je zase
      násobení úplně všude, takže by rozpad podle operací neřekl nic. */
-  const levelMode = riddleMode || gridMode || over10Mode || bigaddMode || kvetMode || pexesoMode || bigmulMode || abcMode || posMode || vetyMode || vyznamMode || uuMode || pravMode || hudbaMode;
+  const levelMode = riddleMode || gridMode || over10Mode || bigaddMode || kvetMode || pexesoMode || bigmulMode || abcMode || posMode || vetyMode || vyznamMode || pravMode || hudbaMode;
   const total = attempts.length;
   const correct = attempts.filter((a) => a.correct).length;
   const pct = total ? Math.round((correct / total) * 100) : 0;
@@ -279,7 +279,7 @@ export function analyze(state, config, attempts) {
     if (cross.pct >= 85) strengths.push(`Přechod přes desítku ti jde (${cross.correct} z ${cross.seen}). To je ta nejtěžší část!`);
     else if (cross.pct < 65) watchOuts.push(`Přechod přes desítku dělá potíže – ${cross.correct} z ${cross.seen}.`);
   }
-  if (!posMode && !vetyMode && !vyznamMode && !uuMode && !pravMode && !hudbaMode && pct >= 80 && avgMs > 0 && avgMs < 7000) strengths.push('Počítáš rychle a přesně zároveň.');
+  if (!posMode && !vetyMode && !vyznamMode && !pravMode && !hudbaMode && pct >= 80 && avgMs > 0 && avgMs < 7000) strengths.push('Počítáš rychle a přesně zároveň.');
 
   if (tags.get('offOne') >= 2) watchOuts.push('Několikrát ti výsledek utekl jen o jedničku – vyplatí se na konci zkontrolovat.');
   if (tags.get('riddleSymbol') >= 1) watchOuts.push('U hádanky se občas napsalo, kolik je jeden obrázek. Poslední řádek chce součet celého řádku.');
@@ -418,7 +418,8 @@ export function analyze(state, config, attempts) {
         ? `Šlo ti to skvěle – zkus příště ${harder} obtížnost, přibudou další druhy slov.`
         : 'Šlo ti to skvěle – tohle je nejtěžší úroveň. Zkus si dát víc úloh v kole.');
     }
-  } else if (uuMode) {
+  } else if (pravMode) {
+    // u, ú, ů je téma Pravopisu (dřív samostatná hra)
     if (tags.get('uuStart')) {
       tips.push('Na začátku slova se dlouhé ú píše vždycky s čárkou: úkol, úterý. Kroužek ů na začátku slova nikdy není.');
     }
@@ -428,13 +429,6 @@ export function analyze(state, config, attempts) {
     if (tags.get('uuLength')) {
       tips.push('Řekni si slovo nahlas a pomalu. Když se u čte krátce, nepíše se nad ním nic.');
     }
-    if (pct >= 90) {
-      const harder = { easy: 'střední', medium: 'těžkou' }[config.level];
-      tips.push(harder
-        ? `Šlo ti to skvěle – zkus příště ${harder} obtížnost, písmen k doplnění bude víc.`
-        : 'Šlo ti to skvěle – tohle jsou nejtěžší věty. Zkus si dát víc vět v kole.');
-    }
-  } else if (pravMode) {
     if (tags.get('pravIY')) {
       tips.push('Po tvrdých souhláskách h, ch, k, r, d, t, n píšeme y, po měkkých ž, š, č, ř, c, j, ď, ť, ň píšeme i.');
     }

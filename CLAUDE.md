@@ -93,7 +93,7 @@ neodklízej (`stash`, `checkout`) — zeptej se uživatele.
 | `public/js/pos.js` | Slovní druhy: ručně určené věty podle obtížnosti, výběr kola, vyhodnocení a vysvětlení |
 | `public/js/vety.js` | Druhy vět: ručně sepsané věty, výběr kola, možnosti k otázce a vysvětlení |
 | `public/js/vyznam.js` | Význam slov: ručně sepsaná slova a skupiny, tři úlohy, vysvětlení |
-| `public/js/uu.js` | Doplň u, ú, ů: ručně sepsané věty se zápisem `[ů]`, rozbor mezer, tag chyby, vysvětlení |
+| `public/js/uu.js` | téma u, ú, ů Pravopisu: ručně sepsaná slova a věty se zápisem `[ů]`, rozbor mezer, tag chyby, pravidla |
 | `public/js/pravopis.js` | Pravopis: ručně sepsaná slova a věty po tématech (i/y, dě/tě/ně, bě/pě/vě/mě, párové, velká písmena), nabídka kláves podle mezery, vysvětlení |
 | `public/js/hudba.js` | Hudební nauka a Klavír: tabulky, generátory úloh, vysvětlení — bez DOM |
 | `public/js/zvuk.js` | tóny klavíru pro hru Sluch — syntéza Web Audio, bez nahrávek |
@@ -175,7 +175,7 @@ Co z toho plyne pro psaní kódu:
 - **`mergePayload()` v `transfer.js` neukládá.** Slučování je čistá operace v paměti,
   která vrátí souhrn změn; zapisuje až `acceptIncoming()` v `app.js`.
 
-## Sedmnáct režimů hry
+## Šestnáct režimů hry
 
 Na úvodní obrazovce se vybírá karta **„Co si zahrajeme?"**. Nad kartami jsou tři
 záložky **🔢 Matematika / 📖 Čeština / 🎵 Hudba** (`SUBJECTS`, u každého režimu `subject` v `MODES`).
@@ -189,7 +189,7 @@ záložky.
 | **Počítání** | `calc` | — (vybírají se operace i druhy úloh navíc) |
 | **Počítej přes 10** | `over10` | „něco navíc" (v operacích zůstává jen ➕ a ➖) |
 | **Velké sčítání** | `bigadd` | „něco navíc" (v operacích jen ➕ a ➖, sdílí `config.over10Ops`) |
-| **Kytičky** | `kvet` | operace, „něco navíc"; rozsah = číslo uprostřed kytičky (nejvýš 100) |
+| **Kytičky** | `kvet` | operace, „něco navíc", **rozsah** (číslo uprostřed řídí obtížnost) |
 | **Obrázkové hádanky** | `riddle` | operace, „něco navíc" |
 | **Mřížka** | `grid` | „něco navíc", **počet příkladů** (jedna mřížka = jedno kolo) |
 | **Najdi dvojice** | `pexeso` | „něco navíc", **počet příkladů** (jedna plocha = jedno kolo) |
@@ -198,7 +198,6 @@ záložky.
 | **Slovní druhy** (Čeština) | `pos` | „něco navíc", **rozsah**; karta s operacemi vybírá, co se hledá; počet = počet vět |
 | **Druhy vět** (Čeština) | `vety` | „něco navíc", **rozsah**; karta s operacemi vybírá úlohu; počet = počet vět |
 | **Význam slov** (Čeština) | `vyznam` | „něco navíc", **rozsah**; karta s operacemi vybírá úlohu; jen se spojováním i **počet** |
-| **Doplň u, ú, ů** (Čeština) | `uu` | operace, „něco navíc", **rozsah**; počet = počet vět |
 | **Pravopis** (Čeština) | `prav` | „něco navíc", **rozsah**; karta s operacemi vybírá témata; počet = slova (lehká) / věty |
 | **Hudební nauka** (Hudba) | `hudba` | „něco navíc", **rozsah**; karta s operacemi vybírá úlohy; počet = počet úloh |
 | **Klavír** (Hudba) | `klavir` | „něco navíc", **rozsah**; karta s operacemi vybírá směr; počet = počet úloh |
@@ -493,8 +492,13 @@ Rozsah je strop, ale nejvýš 100. **V nastavení jsou jen chipy do 50 a do 100*
 - Barvy desítek a jednotek jsou `--pair-task` / `--pair-result` (mimo témata).
 ## Kytičky
 
-Dvě kytičky na louce, uprostřed každé číslo (= rozsah, nejvýš 100) a čísla na lístcích
-ho dají dohromady. Jeden lístek je prázdný, dítě doplní, kolik chybí. Předlohou byly
+Dvě kytičky na louce, uprostřed každé číslo a čísla na lístcích ho dají dohromady.
+**Číslo uprostřed se losuje pro každou kytičku zvlášť a jeho velikost řídí obtížnost**
+(`lo`/`hi`/`step` v `KVET_LEVELS`): lehká 30–60 po desítkách, střední 50–100 po desítkách,
+těžká 20–100 libovolně. Karta „Do kolika počítáme?" je schovaná. Dřív byl střed vždycky
+přesně rozsah a uživateli vadilo, že je pořád 20 (7. 11. 2026) — **nevracet**. Do odměn jde
+jako `max` horní mez úrovně. Políčko odpovědi má stejné písmo jako ostatní lístky
+(`.kv .kv-input`), jinak by si vzalo velké písmo z `.slot input`. Jeden lístek je prázdný, dítě doplní, kolik chybí. Předlohou byly
 čtyřlístky z Umíme to; uživatel chtěl **jiný obrázek, aby to nebylo stejné** — proto
 kytička s barevnými lístky, žlutým středem, stonkem a trávou.
 
@@ -797,14 +801,15 @@ obarví špatná okénka, druhé ukáže řešení (oprava napodruhé se počít
 - Ovladač je společný s „Doplň u, ú, ů" (`FILL`, `fillTap`, `finishFill` v `app.js`).
 - Čas se počítá **za každou větu** (`speedPerUnitKinds`, počet vět posílá `kindUnits`).
 
-## Doplň u, ú, ů
+## Doplň u, ú, ů (téma Pravopisu)
 
-Pátá hra pod záložkou Čeština (`config.mode` = `uu`), předlohou cvičení „Doplň u, ú, ů"
-ze sešitu. Věta s mezerami, **dítě klepne na mezeru a pak na u / ú / ů**; výběr pak sám
-skočí na další prázdnou mezeru. Hotovo až se vším vyplněným, jedna oprava jako u listu.
-Co věta, to úloha, počet 10 / 20 / 30 (`config.uuCount`).
+**Od 7. 11. 2026 není samostatná hra, ale téma `uu` v Pravopisu** (dohoda s uživatelem).
+Uložené nastavení s `mode: 'uu'` převede `normalizeConfig()` na Pravopis jen s tímhle
+tématem a se stejným počtem. Lehká = slova (`UU_WORDS`), střední = krátké věty,
+těžká = delší věty a pasti. `parseUuPrav()` v `pravopis.js` převede mezery na tvar
+pravopisu (`opts` u/ú/ů, u velkého písmene U/Ú/Ů). Předlohou cvičení „Doplň u, ú, ů" ze sešitu.
 
-**Věty jsou ručně sepsané** v `uu.js`, doplňované písmeno je v hranatých závorkách:
+**Slova a věty jsou ručně sepsané** v `uu.js`, doplňované písmeno je v hranatých závorkách:
 `'Ve vlak[u] [u]kaž pr[ů]kazk[u].'`. Velké písmeno (`[Ú]stí`) se doplňuje velké.
 `+` označí složené slovo (`ne+[ú]roda`) — nevypisuje se, jen z něj vysvětlení udělá
 „ne + úroda". Ú uprostřed slova bez `+` je výjimka (`t[ú]ra`, `sk[ú]tr`). Druh pravidla
@@ -817,11 +822,11 @@ Tagy chyb: `uuStart` (začátek slova), `uuMark` (ú × ů), `uuLength` (krátk�
 
 ## Pravopis
 
-Šestá hra pod záložkou Čeština (`config.mode` = `prav`, `ex.kind` = `prav`), předlohou byly
-doplňovačky z umimecesky.cz pro 2. třídu. **Jede přes ovladač „Doplň u, ú, ů"** (`FILL.prav`,
-`uuHTML`, `fillTap`) — jediný rozdíl je, že **klávesy určuje vybraná mezera** (`gap.opts`):
-i/y nebo í/ý, e/ě, ě/je, mě/mně, dvojice párových souhlásek, malé/velké písmeno.
-Hra u, ú, ů zůstala samostatná (rozhodl uživatel).
+Pátá hra pod záložkou Čeština (`config.mode` = `prav`, `ex.kind` = `prav`), předlohou byly
+doplňovačky z umimecesky.cz pro 2. třídu. Ovladač je `FILL.prav`, `uuHTML`, `fillTap`;
+**klávesy určuje vybraná mezera** (`gap.opts`):
+i/y nebo í/ý, u/ú/ů, e/ě, ě/je, mě/mně, dvojice párových souhlásek, malé/velké písmeno.
+U, ú, ů je jedno z témat (viz výš), samostatná hra už není.
 
 Témata na kartě „Co budeme procvičovat?" (`config.pravTopics`, **do `config.ops` nepatří**),
 počet 10 / 20 / 30 (`config.pravCount`): `iy` tvrdé a měkké souhlásky (vč. dy-ty-ny × di-ti-ni),
@@ -1298,7 +1303,7 @@ nést **podklad a rámeček** a text dej `var(--ink)`; ten se přepíná spolu s
 v obou režimech přes 10. Takhle byl nečitelný zápis velkého násobení, než dostal
 `color: var(--ink)` a zelený proužek vlevo.
 
-Po zásahu do barev projeď **všech šest témat × oba režimy** a změř kontrast, ne jen mrkni
+Po zásahu do barev projeď **všech osm témat × oba režimy** a změř kontrast, ne jen mrkni
 na jedno téma. Po opravě vycházelo: dialog 13,3–13,5, jméno ve slotu 5,3–6,8, podnadpis
 kategorie 4,8–6,1 (hranice čitelnosti je 4,5).
 

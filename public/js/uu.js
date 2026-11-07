@@ -1,12 +1,11 @@
-import { shuffle } from './random.js';
-
 /* ============================================================
-   Doplň u, ú, ů
+   Doplň u, ú, ů - téma Pravopisu (`uu` v PRAV_TOPICS)
 
-   Věta s mezerami, dítě klepne na mezeru a pak na u / ú / ů. Až jsou
-   vyplněné všechny, potvrdí to Hotovo. Co věta, to úloha.
+   Dřív samostatná hra, od 7. 11. 2026 jen téma pod Pravopisem (přání
+   uživatele). Tenhle soubor drží slova, věty a pravidla, kolo skládá
+   `makePravRound()` v pravopis.js.
 
-   Věty se NEGENERUJÍ - jsou ručně sepsané. Zápis:
+   Slova a věty se NEGENERUJÍ - jsou ručně sepsané. Zápis:
 
        'Ve vlak[u] [u]kaž pr[ů]kazk[u].'
 
@@ -23,16 +22,15 @@ import { shuffle } from './random.js';
 
 export const UU_LETTERS = ['u', 'ú', 'ů'];
 
-export const UU_COUNTS = [10, 20, 30];
+/* Lehká úroveň Pravopisu jsou jednotlivá slova. */
+export const UU_WORDS = [
+  'r[u]ka', 'k[u]ře', 'h[u]sa', 'b[u]chta', 'k[u]fr', 'hr[u]ška', '[u]cho', '[u]lice',
+  '[ú]kol', '[ú]terý', '[ú]směv', '[ú]l', '[ú]nor', '[ú]klid', '[ú]dolí', '[ú]zký', '[ú]loha',
+  'd[ů]m', 'st[ů]l', 'k[ů]ň', 'r[ů]že', 's[ů]l', 'v[ů]z', 'n[ů]ž', 'h[ů]l', 'dom[ů]', 'p[ů]l',
+  'k[ů]ra', 'p[ů]da', 'dol[ů]',
+];
 
-export const UU_LEVELS = {
-  easy: { label: 'Lehká', emoji: '🟢', note: 'krátké věty, v každé jedno nebo dvě písmena' },
-  medium: { label: 'Střední', emoji: '🟡', note: 'delší věty a víc písmen, i na konci slov (lvů, slonů)' },
-  hard: { label: 'Těžká', emoji: '🔴', note: 'slova jako neúroda nebo trojúhelník, jména měst a výjimky (túra)' },
-};
-export const UU_LEVEL_KEYS = Object.keys(UU_LEVELS);
-
-const SENTENCES = {
+export const UU_SENTENCES = {
   easy: [
     'V [ú]terý jdu do školy.',
     'Na stole je s[ů]l.',
@@ -186,28 +184,27 @@ export function parseUu(src) {
   return { tokens, gaps, text, full };
 }
 
-export function makeUuRound(levelKey = 'easy', count = 10) {
-  const level = UU_LEVELS[levelKey] ? levelKey : 'easy';
-  const n = UU_COUNTS.includes(count) ? count : UU_COUNTS[0];
-  return shuffle(SENTENCES[level]).slice(0, n).map((src) => {
-    const p = parseUu(src);
-    return { level, ...p, answer: p.gaps.map((g) => g.answer).join(', '), key: src };
-  });
-}
-
 /* Písmeno do mezery tak, jak se ukáže ve větě - velké na začátku věty. */
 export const uuShown = (gap, letter) => (gap.upper ? letter.toUpperCase() : letter);
+
+/* Tag chyby u jedné špatně doplněné mezery (velikost písmen nehraje roli). */
+export function uuGapTag(gap, pick) {
+  if (gap.kind === 'start') return 'uuStart';
+  const a = gap.answer.toLowerCase();
+  const p = String(pick || '').toLowerCase();
+  // obě dlouhá, jen jiná čárka / kroužek
+  if (a !== 'u' && p !== 'u') return 'uuMark';
+  return 'uuLength';
+}
 
 /* Tag chyby podle první špatně doplněné mezery. */
 export function uuTag(ex, picks) {
   const i = ex.gaps.findIndex((g, k) => picks[k] !== g.answer);
-  if (i < 0) return null;
-  const g = ex.gaps[i];
-  if (g.kind === 'start') return 'uuStart';
-  // obě dlouhá, jen jiná čárka / kroužek
-  if (g.answer !== 'u' && picks[i] !== 'u') return 'uuMark';
-  return 'uuLength';
+  return i < 0 ? null : uuGapTag(ex.gaps[i], picks[i]);
 }
+
+/* Jedna věta vysvětlení k jedné mezeře. */
+export const uuRule = (g) => RULE[g.kind](g);
 
 const RULE = {
   short: (g) => `**${g.word}** – tady se u čte **krátce**, píše se bez čárky i bez kroužku: **u**.`,

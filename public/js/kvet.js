@@ -8,8 +8,10 @@ import { rnd, shuffle } from './random.js';
    a dítě ho doplní (na lehčích úrovních vybírá z nabídky čísel).
 
    Trénuje se doplňování do celku: kolik chybí do 100, když už mám
-   20 + 10 + 0? Součet uprostřed je rozsah („do kolika počítáme“),
-   nejvýš 100.
+   20 + 10 + 0? Číslo uprostřed se losuje pro každou kytičku zvlášť
+   a jak velké je, řídí obtížnost (`lo`-`hi`, krok `step`). Karta
+   „Do kolika počítáme?“ je u kytiček schovaná - dřív byl střed vždycky
+   přesně rozsah a uživateli vadilo, že je pořád 20 (7. 11. 2026).
 
    Úloha má stejný tvar jako rozklad přes desítku: několik políček
    (jedno prázdné za každou kytičku), odpovědí je řetězec jejich hodnot
@@ -17,26 +19,13 @@ import { rnd, shuffle } from './random.js';
    ============================================================ */
 
 export const KVET_LEVELS = {
-  easy: { label: 'Lehká', emoji: '🟢', note: 'tři lístky, čísla po desítkách a nabídka čísel', petals: 3, tens: true, hint: 'choices' },
-  medium: { label: 'Střední', emoji: '🟡', note: 'čtyři lístky po desítkách a nabídka čísel', petals: 4, tens: true, hint: 'choices' },
-  hard: { label: 'Těžká', emoji: '🔴', note: 'čtyři lístky s jakýmikoli čísly, píšeš sama', petals: 4, tens: false, hint: 'none' },
+  easy: { label: 'Lehká', emoji: '🟢', note: 'tři lístky po desítkách, uprostřed 30 až 60, a nabídka čísel', petals: 3, step: 10, lo: 30, hi: 60, hint: 'choices' },
+  medium: { label: 'Střední', emoji: '🟡', note: 'čtyři lístky po desítkách, uprostřed 50 až 100, a nabídka čísel', petals: 4, step: 10, lo: 50, hi: 100, hint: 'choices' },
+  hard: { label: 'Těžká', emoji: '🔴', note: 'čtyři lístky s jakýmikoli čísly, uprostřed 20 až 100, píšeš sama', petals: 4, step: 1, lo: 20, hi: 100, hint: 'none' },
 };
 export const KVET_LEVEL_KEYS = Object.keys(KVET_LEVELS);
 
 export const KVET_FLOWERS = 2;
-export const KVET_MIN = 10;
-export const KVET_TOP = 100;
-
-export const kvetTarget = (max) => Math.max(KVET_MIN, Math.min(KVET_TOP, Math.round(max)));
-
-/* Po desítkách jen tam, kde to dává smysl - „do 15“ po desítkách nejde. */
-const stepFor = (level, target) => (KVET_LEVELS[level].tens && target % 10 === 0 && target >= 40 ? 10 : 1);
-
-export function kvetRangeNote(max) {
-  if (max > KVET_TOP) return `V kytičce je nejvýš ${KVET_TOP}, víc se tu nepočítá.`;
-  if (max < KVET_MIN) return `V kytičce je aspoň ${KVET_MIN}.`;
-  return null;
-}
 
 /* Rozdělí `units` kroků do `n` lístků. Žádný lístek nesmí nést celý součet
    (ostatní by byly samé nuly) a nula smí být nejvýš jedna. */
@@ -74,20 +63,29 @@ function choices(answers, target, step) {
   return shuffle(out);
 }
 
-export function makeKvet(max, levelKey = 'easy') {
+/* Střed jedné kytičky - násobek kroku mezi `lo` a `hi`. */
+const rollTarget = ({ lo, hi, step }) => rnd(lo / step, hi / step) * step;
+
+export function makeKvet(levelKey = 'easy') {
   const level = KVET_LEVELS[levelKey] ? levelKey : 'easy';
-  const { petals, hint } = KVET_LEVELS[level];
-  const target = kvetTarget(max);
-  const step = stepFor(level, target);
-  const flowers = Array.from({ length: KVET_FLOWERS }, () => flower(target, petals, step));
+  const cfg = KVET_LEVELS[level];
+  const { petals, hint, step } = cfg;
+  // dvě kytičky se stejným středem by vypadaly jako opakování
+  const targets = [rollTarget(cfg)];
+  while (targets.length < KVET_FLOWERS) {
+    const t = rollTarget(cfg);
+    if (!targets.includes(t)) targets.push(t);
+  }
+  const flowers = targets.map((target) => ({ target, ...flower(target, petals, step) }));
   const values = flowers.map((f) => f.values[f.empty]);
+  const top = Math.max(...targets);
   const ex = {
-    level, hint, target, flowers, step,
+    level, hint, flowers, step, top,
     hidden: flowers.map((_, i) => i),
     values,
-    key: flowers.map((f) => `${f.values.join('-')}@${f.empty}`).join('|'),
+    key: flowers.map((f) => `${f.target}:${f.values.join('-')}@${f.empty}`).join('|'),
   };
-  if (hint === 'choices') ex.numbers = choices(values, target, step);
+  if (hint === 'choices') ex.numbers = choices(values, top, step);
   return ex;
 }
 
@@ -95,14 +93,14 @@ export function kvetExplain(ex) {
   return ex.flowers.map((f, i) => {
     const known = f.values.filter((_, k) => k !== f.empty);
     const sum = known.reduce((s, v) => s + v, 0);
-    const x = ex.target - sum;
-    return `${i + 1}. kytička: ${known.join(' + ')} = ${sum}. Do ${ex.target} chybí ${ex.target} − ${sum} = **${x}**.`;
+    const x = f.target - sum;
+    return `${i + 1}. kytička: ${known.join(' + ')} = ${sum}. Do ${f.target} chybí ${f.target} − ${sum} = **${x}**.`;
   });
 }
 
 export function kvetText(ex, reveal) {
   const flowers = ex.flowers
-    .map((f) => f.values.map((v, k) => (k === f.empty && !reveal ? '?' : v)).join(' + '))
+    .map((f) => `${f.values.map((v, k) => (k === f.empty && !reveal ? '?' : v)).join(' + ')} = ${f.target}`)
     .join(', ');
-  return `kytičky do ${ex.target}: ${flowers}`;
+  return `kytičky: ${flowers}`;
 }
