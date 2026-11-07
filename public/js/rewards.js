@@ -52,7 +52,7 @@ export const REWARD_RULES = {
      ulohu zvlast, ne az na hotovy prumer - jedna slovni uloha v sade tak
      opravdu prida cas na tri priklady. Drz cela cisla, nasobek se zobrazuje
      v navodu a desetinne cislo do textu pro dite nepatri. */
-  speedKindMultiplier: { equation: 1, word: 3, bond: 2, sign: 2, compare: 1, over10: 2, bigadd: 3, bigaddstep: 3, kvet: 3, riddle: 3, grid: 4, pexeso: 6, bigmul: 3, abc: 1, pos: 2, vety: 2, vetylist: 2, vyznam: 2, slova: 4, uu: 2, hudba: 2 },
+  speedKindMultiplier: { equation: 1, word: 3, bond: 2, sign: 2, compare: 1, over10: 2, bigadd: 3, bigaddstep: 3, kvet: 3, riddle: 3, grid: 4, pexeso: 6, bigmul: 3, abc: 1, pos: 2, vety: 2, vetylist: 2, vyznam: 2, slova: 4, uu: 2, prav: 2, hudba: 2 },
   /* Druhy, u kterych se nasobek bere ZA KAZDE SLOVO, ne za celou ulohu -
      plocha s deviti slovy a s petadvaceti se lusti uplne jinak dlouho.
      Kolik slov na ploše bylo, posila app.js v `kindUnits`. List s pismeny
@@ -223,7 +223,7 @@ const kindWeight = (kind) => REWARD_RULES.speedKindMultiplier[kind] ?? 1;
 
 /* Druh, kterym nahradime ulohy bez rozpisu - stara ulozena data i souhrn,
    ktery `kindCounts` neposlal. */
-const DEFAULT_KIND_BY_MODE = { riddle: 'riddle', grid: 'grid', over10: 'over10', bigadd: 'bigadd', kvet: 'kvet', pexeso: 'pexeso', bigmul: 'bigmul', abc: 'abc', pos: 'pos', vety: 'vety', vyznam: 'vyznam', uu: 'uu', hudba: 'hudba', klavir: 'hudba', sluch: 'hudba' };
+const DEFAULT_KIND_BY_MODE = { riddle: 'riddle', grid: 'grid', over10: 'over10', bigadd: 'bigadd', kvet: 'kvet', pexeso: 'pexeso', bigmul: 'bigmul', abc: 'abc', pos: 'pos', vety: 'vety', vyznam: 'vyznam', uu: 'uu', prav: 'prav', hudba: 'hudba', klavir: 'hudba', sluch: 'hudba' };
 const defaultKind = (mode) => DEFAULT_KIND_BY_MODE[mode] || 'equation';
 
 /* Casovy rozpocet cele sady v sekundach. Kazda uloha si prispeje vlastnim
@@ -297,7 +297,7 @@ export function performanceTier(summary, dailyCorrect) {
 }
 
 /* Nazev jedne ulohy podle rezimu - do vety o rychlosti. */
-const UNIT_BY_MODE = { riddle: 'hádanku', grid: 'mřížku', over10: 'rozklad', pexeso: 'celou plochu', abc: 'celou řadu slov', pos: 'větu', vety: 'větu', vyznam: 'úlohu', uu: 'větu', hudba: 'úlohu', klavir: 'úlohu', sluch: 'úlohu' };
+const UNIT_BY_MODE = { riddle: 'hádanku', grid: 'mřížku', over10: 'rozklad', pexeso: 'celou plochu', abc: 'celou řadu slov', pos: 'větu', vety: 'větu', vyznam: 'úlohu', uu: 'větu', prav: 'úlohu', hudba: 'úlohu', klavir: 'úlohu', sluch: 'úlohu' };
 const unitName = (mode) => UNIT_BY_MODE[mode] || 'příklad';
 
 /* Cesky duvod: rekne presne tu podminku, ktera dumplinga vynesla nejvys. */
@@ -312,6 +312,7 @@ function reasonFor(parts, summary, dailyCorrect) {
   if (summary.mode === 'abc') return 'Za slova seřazená bez jediné chyby';
   if (summary.mode === 'pos' || summary.mode === 'vety' || summary.mode === 'uu') return 'Za věty bez jediné chyby';
   if (summary.mode === 'vyznam') return 'Za slova bez jediné chyby';
+  if (summary.mode === 'prav') return 'Za pravopis bez jediné chyby';
   if (summary.mode === 'hudba' || summary.mode === 'klavir' || summary.mode === 'sluch') return 'Za noty bez jediné chyby';
   return `Za počítání do ${summary.max} bez jediné chyby`;
 }
@@ -538,6 +539,7 @@ export function howToGet(category, collection = COLLECTION_ORDER[0]) {
     nasobek('vyznam', 'úloha ve významu slov'),
     nasobek('slova', 'plocha se souřadnými slovy'),
     nasobek('uu', 'věta s doplňováním u, ú, ů'),
+    nasobek('prav', 'slovo nebo věta v pravopisu'),
     nasobek('hudba', 'úloha v hudební nauce a na klavíru'),
   ].join(', ')}.`;
   /* U "Najdi dvojice" je chybou spojeni dvou karticek, ktere k sobe nepatri.

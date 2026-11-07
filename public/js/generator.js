@@ -10,6 +10,7 @@ import { makePosRound, posAnswer, posExplain, posText } from './pos.js';
 import { makeVetyRound, vetyExplain, vetyText } from './vety.js';
 import { makeVyznamRound, vyznamExplain, vyznamText } from './vyznam.js';
 import { makeUuRound, uuExplain, uuText } from './uu.js';
+import { makePravRound, pravExplain, pravText } from './pravopis.js';
 import { makeHudbaRound, makeKlavirRound, makeSluchRound, hudbaExplain, hudbaText, HUDBA_TAGS } from './hudba.js';
 import { makeBigmul, bigmulExplain, bigmulText } from './bigmul.js';
 
@@ -149,6 +150,7 @@ export function signature(ex) {
   if (ex.kind === 'vety' || ex.kind === 'vetylist') return `vety|${ex.key}`;
   if (ex.kind === 'vyznam' || ex.kind === 'slova') return `vyznam|${ex.key}`;
   if (ex.kind === 'uu') return `uu|${ex.key}`;
+  if (ex.kind === 'prav') return `prav|${ex.key}`;
   if (ex.kind === 'hudba') return `hudba|${ex.key}`;
   // velké násobení je dané dvojicí činitelů, ne trojicí a, b, c
   if (ex.kind === 'bigmul') return `bigmul|${ex.key}`;
@@ -551,6 +553,20 @@ export function buildUuRound(config) {
   }));
 }
 
+/* Pravopis - stejný tvar jako u, ú, ů. `missing` nese téma, aby výsledek
+   uměl říct „Nejvíc chyb máš u párových souhlásek". */
+export function buildPravRound(config) {
+  return makePravRound(config.level, config.pravTopics, config.pravCount).map((p) => ({
+    op: 'add',
+    kind: 'prav',
+    missing: p.topic,
+    a: 0, b: 0, c: 0,
+    cross: false,
+    skill: `prav:${p.topic}:${p.level}`,
+    ...p,
+  }));
+}
+
 /* Hudební nauka - stejný tvar jako druhy vět: co úloha, to jedna věc,
    `missing` nese úlohu (`znak` / `nazev` / `umisti` / `vyska` / `takt`).
    Odpovídá se klepnutím, ovladač je v app.js. */
@@ -705,6 +721,7 @@ export function exToText(ex, reveal = false) {
   if (ex.kind === 'vety' || ex.kind === 'vetylist') return vetyText(ex, reveal);
   if (ex.kind === 'vyznam' || ex.kind === 'slova') return vyznamText(ex, reveal);
   if (ex.kind === 'uu') return uuText(ex, reveal);
+  if (ex.kind === 'prav') return pravText(ex, reveal);
   if (ex.kind === 'hudba') return hudbaText(ex, reveal);
   if (ex.kind === 'bigmul') return bigmulText(ex, reveal);
   if (ex.kind === 'riddle') return riddleText(ex, reveal);
@@ -770,6 +787,7 @@ export function explain(ex) {
   if (kind === 'vety' || kind === 'vetylist') return vetyExplain(ex);
   if (kind === 'vyznam' || kind === 'slova') return vyznamExplain(ex);
   if (kind === 'uu') return uuExplain(ex);
+  if (kind === 'prav') return pravExplain(ex);
   if (kind === 'hudba') return hudbaExplain(ex);
   if (kind === 'bigmul') return bigmulExplain(ex);
   if (kind === 'riddle') return riddleExplain(ex);
@@ -918,6 +936,11 @@ export const TAGS = {
   uuStart: 'chyba na začátku slova',
   uuMark: 'záměna ú a ů',
   uuLength: 'záměna krátkého a dlouhého u',
+  pravIY: 'záměna i a y',
+  pravDTN: 'záměna e a ě po d, t, n',
+  pravBPV: 'záměna ě a je, mě a mně',
+  pravPar: 'záměna párové souhlásky',
+  pravVelka: 'velké a malé písmeno',
   bigmulSplit: 'chyba v rozkladu',
   bigmulProduct: 'ztracená nula v součinu',
   bigmulSum: 'chyba v součtu',
@@ -961,6 +984,7 @@ export function diagnose(ex, given) {
   /* Doplň u, ú, ů taky - odpovědí jsou písmena. Přesný tag podle mezer
      počítá ovladač (`uuTag()`), tohle je pojistka. */
   if (kind === 'uu') return 'uuLength';
+  if (kind === 'prav') return 'pravIY';
 
   /* Hudební nauka taky - odpovědí je název nebo místo, tag podle zvolené
      možnosti zapisuje ovladač, tohle je pojistka. */

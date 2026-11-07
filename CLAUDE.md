@@ -70,6 +70,11 @@ PowerShellu úložiště certifikátů Windows sám nečte, takže závěrečné
 padalo na `fetch failed` / „unable to get local issuer certificate", přestože web
 běžel. Vypadalo to jako chyba nasazení, a nebyla.
 
+**Před commitem zkontroluj `git status` na cizí změny.** Na repozitáři může souběžně
+pracovat jiná session (7. 11. 2026 rozpracovaný Pravopis). `git add <soubor>` pak vezme
+i její půlku a nasazená verze spadne na chybějícím importu. Cizí rozpracované změny
+neodklízej (`stash`, `checkout`) — zeptej se uživatele.
+
 ## Struktura
 
 | Soubor | Co v něm je |
@@ -89,6 +94,7 @@ běžel. Vypadalo to jako chyba nasazení, a nebyla.
 | `public/js/vety.js` | Druhy vět: ručně sepsané věty, výběr kola, možnosti k otázce a vysvětlení |
 | `public/js/vyznam.js` | Význam slov: ručně sepsaná slova a skupiny, tři úlohy, vysvětlení |
 | `public/js/uu.js` | Doplň u, ú, ů: ručně sepsané věty se zápisem `[ů]`, rozbor mezer, tag chyby, vysvětlení |
+| `public/js/pravopis.js` | Pravopis: ručně sepsaná slova a věty po tématech (i/y, dě/tě/ně, bě/pě/vě/mě, párové, velká písmena), nabídka kláves podle mezery, vysvětlení |
 | `public/js/hudba.js` | Hudební nauka a Klavír: tabulky, generátory úloh, vysvětlení — bez DOM |
 | `public/js/zvuk.js` | tóny klavíru pro hru Sluch — syntéza Web Audio, bez nahrávek |
 | `public/js/notace.js` | kreslení not jako SVG text (osnova, klíče, noty, pomlky, takty) — bez knihovny |
@@ -122,7 +128,7 @@ na neexistující soubor. Když je tam někdy mít chceš, přidej napřed vlast
 | `package.json` | jen ty tři zkratky a `"type": "module"`; žádné závislosti |
 
 Prosté ES moduly, žádný framework, žádné závislosti. Závislosti jdou jedním směrem:
-`random.js → riddle.js / grid.js / over10.js / bigadd.js / kvet.js / pexeso.js / bigmul.js / abc.js / pos.js / vety.js / vyznam.js / uu.js / hudba.js → generator.js → app.js`
+`random.js → riddle.js / grid.js / over10.js / bigadd.js / kvet.js / pexeso.js / bigmul.js / abc.js / pos.js / vety.js / vyznam.js / uu.js / pravopis.js / hudba.js → generator.js → app.js`
 (`notace.js → app.js` nezávisle, nic neimportuje)
 (`stats.js` si z `vety.js` a `vyznam.js` bere jen názvy pro výpis chyb)
 (`app.js` si z `abc.js` bere navíc funkce přesunu a z `pos.js` tabulky a `posCheck` / `posTag`),
@@ -169,7 +175,7 @@ Co z toho plyne pro psaní kódu:
 - **`mergePayload()` v `transfer.js` neukládá.** Slučování je čistá operace v paměti,
   která vrátí souhrn změn; zapisuje až `acceptIncoming()` v `app.js`.
 
-## Šestnáct režimů hry
+## Sedmnáct režimů hry
 
 Na úvodní obrazovce se vybírá karta **„Co si zahrajeme?"**. Nad kartami jsou tři
 záložky **🔢 Matematika / 📖 Čeština / 🎵 Hudba** (`SUBJECTS`, u každého režimu `subject` v `MODES`).
@@ -193,6 +199,7 @@ záložky.
 | **Druhy vět** (Čeština) | `vety` | „něco navíc", **rozsah**; karta s operacemi vybírá úlohu; počet = počet vět |
 | **Význam slov** (Čeština) | `vyznam` | „něco navíc", **rozsah**; karta s operacemi vybírá úlohu; jen se spojováním i **počet** |
 | **Doplň u, ú, ů** (Čeština) | `uu` | operace, „něco navíc", **rozsah**; počet = počet vět |
+| **Pravopis** (Čeština) | `prav` | „něco navíc", **rozsah**; karta s operacemi vybírá témata; počet = slova (lehká) / věty |
 | **Hudební nauka** (Hudba) | `hudba` | „něco navíc", **rozsah**; karta s operacemi vybírá úlohy; počet = počet úloh |
 | **Klavír** (Hudba) | `klavir` | „něco navíc", **rozsah**; karta s operacemi vybírá směr; počet = počet úloh |
 | **Sluch** (Hudba) | `sluch` | „něco navíc", **rozsah**; karta s operacemi vybírá úlohy; počet = počet úloh |
@@ -344,6 +351,13 @@ Týž zápis jde i opačným směrem (`rollSub()` v `over10.js`):
 čísla, která spolu dají rovnou desítku, tedy výsledek a zbytek. Řídí to
 `data-op` na `.o10b` a jediné pravidlo v CSS; uživatel si to takhle vyžádal
 podle školní předlohy.
+**Od 7. 11. 2026 (přání uživatele):** obě části rozkladu stojí **pod druhým číslem** (8 pod
+devítkou, ne pod osmnáctkou), z nich vedou šipky do zápisu (8 → „18 − 8“, 1 → „− 1“) a
+z rámečku „18 − 8“ šipka dolů na desítku; výsledek je i na konci prvního řádku zápisu.
+**Šipky a výsledek v prvním řádku jsou sjednocené** pro sčítání i odčítání přes 10 a pro
+Velké sčítání (střední/těžká). Kreslí je jako SVG podle skutečné polohy prvků `drawArrows()`
+v `app.js`, odkud kam říká tabulka `ARROWS` podle atributu `data-arrows` (prvky jsou ve dvou
+různých mřížkách, z CSS to nejde). U sčítání přes 10 zůstává doplněk pod prvním číslem v rámečku.
 Jednotky musí být **1 až 8**: při nule není co rozkládat, při devítce by na zbytek
 nic nezbylo. Rozsah hlídá **první číslo** — u odčítání je to to největší, kdežto
 u sčítání je největší výsledek.
@@ -448,6 +462,9 @@ Pár věcí, které se snadno rozbijí:
 ```
 
 Skoky po číselné ose tu byly a uživatel je nahradil zápisem po krocích — nevracet.
+**První řádek zápisu („48 − 30“) je v rámečku** (`.ba-pair`) a pod ním drobně
+„8 si schováme, počítáme 40 − 30 a pak 8 přidáme zpátky.“ (`bigaddNoteHTML()`, přání uživatele 7. 11. 2026) — dítě
+má vidět, že se odčítají jen desítky. Výsledek tam schválně není, ten píše o řádek níž.
 Desítky a jednotky v zápisu jsou **ozvěna** políček z větvičky (`syncBigaddEcho()`
 v `app.js`); hodnota políčka se mění bez události `input`, proto se volá z `handleKey`,
 `partRetry` i `revealParts`.
@@ -797,6 +814,40 @@ Při doplňování vět hlídej, **aby šlo doplnit jen jedno písmeno** („u d
 a aby slovo bylo opravdu s u (stádo **koz**, ne kůz; kamz**í**ky).
 
 Tagy chyb: `uuStart` (začátek slova), `uuMark` (ú × ů), `uuLength` (krátké × dlouhé).
+
+## Pravopis
+
+Šestá hra pod záložkou Čeština (`config.mode` = `prav`, `ex.kind` = `prav`), předlohou byly
+doplňovačky z umimecesky.cz pro 2. třídu. **Jede přes ovladač „Doplň u, ú, ů"** (`FILL.prav`,
+`uuHTML`, `fillTap`) — jediný rozdíl je, že **klávesy určuje vybraná mezera** (`gap.opts`):
+i/y nebo í/ý, e/ě, ě/je, mě/mně, dvojice párových souhlásek, malé/velké písmeno.
+Hra u, ú, ů zůstala samostatná (rozhodl uživatel).
+
+Témata na kartě „Co budeme procvičovat?" (`config.pravTopics`, **do `config.ops` nepatří**),
+počet 10 / 20 / 30 (`config.pravCount`): `iy` tvrdé a měkké souhlásky (vč. dy-ty-ny × di-ti-ni),
+`dtn` dě/tě/ně, `bpvm` bě/pě/vě/mě (je u předpon ob-/v-, mně u příbuzného slova s mn),
+`par` párové souhlásky, `velka` velká písmena. Když je zapnutých víc, rozdělí se kolo rovnoměrně
+a nad slovem je napsané, co se doplňuje. `ex.missing` nese téma (`KIND_LABEL` `prav:iy` …),
+tag chyby je podle tématu první špatné mezery (`pravIY`, `pravDTN`, `pravBPV`, `pravPar`, `pravVelka`).
+
+**Obtížnost:** lehká = jednotlivá slova (přání uživatele, jako umimecesky), střední krátké věty,
+těžká delší věty s víc mezerami a pastmi (párové uprostřed slova, dny a měsíce malým, Ústí nad Labem).
+
+**Slova a věty jsou ručně sepsané** v `pravopis.js`, zápis `'du[b|duby]'` — za `|` je poznámka
+do vysvětlení (u párových povinně slovo, kde je souhláska slyšet; u velkých písmen důvod
+`jmeno`/`zvire`/`mesto`/`reka`/`hora`/`stat`/`hrad`/`svatek`, u malých `cas`). Při doplňování:
+i/y **jen po tvrdých a měkkých souhláskách** — po obojetných jsou to vyjmenovaná slova (3. třída,
+další várka); žádná přejatá slova (kino); velká písmena bez slov, která jsou jménem i obyčejným
+slovem. **Každé slovo si ověř ve slovníku** — v první verzi bylo „věčer“ (správně večer bez ě)
+a kontrolní skript to nechytí, hlídá jen tvar zápisu. **Pozor:** uživatel měl v zadání tvrdé a měkké souhlásky prohozené — tvrdé jsou h, ch, k,
+r, d, t, n, měkké ž, š, č, ř, c, j, ď, ť, ň.
+
+## Třída v rohu karty
+
+Každá hra matematiky a češtiny má v `MODES` pole `grade` (1–3) a karta ho ukazuje jako kolečko
+vpravo nahoře (`gradeHTML()`, `.chip-grade`) — přání uživatele, „co je pro druhou třídu, dej 2".
+Témata pravopisu mají `grade` taky (`PRAV_TOPICS`), aby šla přidat témata pro 3. třídu
+(vyjmenovaná slova, předpony s-/z-/vz-). Hudba třídu nemá.
 
 ## Význam slov
 

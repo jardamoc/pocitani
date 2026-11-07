@@ -1,4 +1,4 @@
-import { OPS, COMPARES, EXTRA_KINDS, MISSING_LABEL, kindOps, buildRound, buildRiddleRound, buildGridRound, buildOver10Round, buildBigaddRound, buildKvetRound, buildPexesoRound, buildBigmulRound, buildAbcRound, buildPosRound, buildVetyRound, buildVyznamRound, buildUuRound, buildHudbaRound, buildKlavirRound, buildSluchRound, explain, diagnose } from './generator.js';
+import { OPS, COMPARES, EXTRA_KINDS, MISSING_LABEL, kindOps, buildRound, buildRiddleRound, buildGridRound, buildOver10Round, buildBigaddRound, buildKvetRound, buildPexesoRound, buildBigmulRound, buildAbcRound, buildPosRound, buildVetyRound, buildVyznamRound, buildUuRound, buildPravRound, buildHudbaRound, buildKlavirRound, buildSluchRound, explain, diagnose } from './generator.js';
 import {
   HUDBA_TASKS, HUDBA_TASK_KEYS, HUDBA_COUNTS, HUDBA_LEVELS, HUDBA_LEVEL_KEYS, NOTE_LETTERS, CLEFS, stepOf, PIANO_KEYS,
   KLAVIR_FORMS, KLAVIR_FORM_KEYS, KLAVIR_LEVELS, KLAVIR_LEVEL_KEYS,
@@ -11,6 +11,9 @@ import {
   VETY_TYPES, VETY_TASKS, VETY_TASK_KEYS, VETY_COUNTS, VETY_LEVELS, VETY_LEVEL_KEYS, VETY_LETTERS, vetyListExplain,
 } from './vety.js';
 import { UU_LETTERS, UU_COUNTS, UU_LEVELS, UU_LEVEL_KEYS, uuShown, uuTag, uuExplain } from './uu.js';
+import {
+  PRAV_TOPICS, PRAV_TOPIC_KEYS, PRAV_COUNTS, PRAV_LEVELS, PRAV_LEVEL_KEYS, pravTag, pravExplain,
+} from './pravopis.js';
 import {
   VYZNAM_TASKS, VYZNAM_TASK_KEYS, VYZNAM_RELS, VYZNAM_COUNTS, VYZNAM_LEVELS, VYZNAM_LEVEL_KEYS,
 } from './vyznam.js';
@@ -46,25 +49,28 @@ const BIGADD_MAX_PRESETS = [50, 100];
 /* Režimy hry. Počítání je původní trénink, ostatní tři mají místo výběru
    druhů úloh vlastní obtížnost. Společné zůstává "kolik příkladů" a
    "do kolika" - u mřížky je kolo jediná úloha, tak tam počet odpadá. */
-/* `subject` říká, pod kterou záložkou karta leží (Matematika / Čeština). */
+/* `subject` říká, pod kterou záložkou karta leží (Matematika / Čeština).
+   `grade` je třída, pro kterou hra je - ukazuje se v rohu karty (přání
+   uživatele, u matematiky a češtiny). */
 const MODES = {
-  calc: { subject: 'math', label: 'Počítání', icon: '🧮', sub: 'Příklady, slovní úlohy, pyramidy' },
-  over10: { subject: 'math', label: 'Počítej přes 10', icon: '🔟', sub: 'Rozlož si příklad krok za krokem' },
-  bigadd: { subject: 'math', label: 'Velké sčítání', icon: '➕', sub: 'Do 100 po desítkách a jednotkách' },
-  kvet: { subject: 'math', label: 'Kytičky', icon: '🌼', sub: 'Doplň lístek, ať kytička sedí' },
-  riddle: { subject: 'math', label: 'Obrázkové hádanky', icon: '🧩', sub: 'Zjisti, kolik je který obrázek' },
-  grid: { subject: 'math', label: 'Mřížka', icon: '🔳', sub: 'Doplň čísla, ať sedí doprava i dolů' },
+  calc: { subject: 'math', grade: 1, label: 'Počítání', icon: '🧮', sub: 'Příklady, slovní úlohy, pyramidy' },
+  over10: { subject: 'math', grade: 1, label: 'Počítej přes 10', icon: '🔟', sub: 'Rozlož si příklad krok za krokem' },
+  bigadd: { subject: 'math', grade: 2, label: 'Velké sčítání', icon: '➕', sub: 'Do 100 po desítkách a jednotkách' },
+  kvet: { subject: 'math', grade: 2, label: 'Kytičky', icon: '🌼', sub: 'Doplň lístek, ať kytička sedí' },
+  riddle: { subject: 'math', grade: 2, label: 'Obrázkové hádanky', icon: '🧩', sub: 'Zjisti, kolik je který obrázek' },
+  grid: { subject: 'math', grade: 2, label: 'Mřížka', icon: '🔳', sub: 'Doplň čísla, ať sedí doprava i dolů' },
   /* Vnitřní klíč zůstal `pexeso` z doby, kdy kartičky ležely lícem dolů.
      Uživatel si pak vyžádal, aby byly vidět všechny - je z toho spojovačka,
      ne paměťová hra. Klíč se schválně nepřejmenovává: je v uloženém
      nastavení i v historii kol. */
-  pexeso: { subject: 'math', label: 'Najdi dvojice', icon: '🔗', sub: 'Spoj příklad s jeho výsledkem' },
-  bigmul: { subject: 'math', label: 'Velké násobení', icon: '✖️', sub: 'Rozlož si ho na desítky a jednotky' },
-  abc: { subject: 'czech', label: 'Abeceda', icon: '🔤', sub: 'Seřaď slova podle abecedy' },
-  pos: { subject: 'czech', label: 'Slovní druhy', icon: '🔍', sub: 'Najdi ve větě slovesa nebo podstatná jména' },
-  vety: { subject: 'czech', label: 'Druhy vět', icon: '💬', sub: 'Urči, jaká je věta, a udělej z ní otázku' },
-  vyznam: { subject: 'czech', label: 'Význam slov', icon: '💡', sub: 'Slova souznačná, protikladná, nadřazená…' },
-  uu: { subject: 'czech', label: 'Doplň u, ú, ů', icon: '✏️', sub: 'Které u patří do slova?' },
+  pexeso: { subject: 'math', grade: 1, label: 'Najdi dvojice', icon: '🔗', sub: 'Spoj příklad s jeho výsledkem' },
+  bigmul: { subject: 'math', grade: 3, label: 'Velké násobení', icon: '✖️', sub: 'Rozlož si ho na desítky a jednotky' },
+  abc: { subject: 'czech', grade: 2, label: 'Abeceda', icon: '🔤', sub: 'Seřaď slova podle abecedy' },
+  pos: { subject: 'czech', grade: 2, label: 'Slovní druhy', icon: '🔍', sub: 'Najdi ve větě slovesa nebo podstatná jména' },
+  vety: { subject: 'czech', grade: 2, label: 'Druhy vět', icon: '💬', sub: 'Urči, jaká je věta, a udělej z ní otázku' },
+  vyznam: { subject: 'czech', grade: 2, label: 'Význam slov', icon: '💡', sub: 'Slova souznačná, protikladná, nadřazená…' },
+  uu: { subject: 'czech', grade: 2, label: 'Doplň u, ú, ů', icon: '✏️', sub: 'Které u patří do slova?' },
+  prav: { subject: 'czech', grade: 2, label: 'Pravopis', icon: '📝', sub: 'i/y, dě/tě/ně, párové souhlásky, velká písmena' },
   hudba: { subject: 'music', label: 'Hudební nauka', icon: '🎼', sub: 'Noty, pomlky, klíče a takty' },
   klavir: { subject: 'music', label: 'Klavír', icon: '🎹', sub: 'Najdi notu na klávesách a klávesu na osnově' },
   sluch: { subject: 'music', label: 'Sluch', icon: '👂', sub: 'Poznej tóny klavíru podle zvuku' },
@@ -105,12 +111,12 @@ const HUDBA_COUNT_DEFAULT = 10;
    společné, takže `config.level` přežije přepnutí režimu. */
 const LEVEL_TABLES = {
   riddle: RIDDLE_LEVELS, grid: GRID_LEVELS, over10: OVER10_LEVELS, bigadd: BIGADD_LEVELS, kvet: KVET_LEVELS, pexeso: PEXESO_LEVELS, bigmul: BIGMUL_LEVELS,
-  abc: ABC_LEVELS, pos: POS_LEVELS, vety: VETY_LEVELS, vyznam: VYZNAM_LEVELS, uu: UU_LEVELS, hudba: HUDBA_LEVELS, klavir: KLAVIR_LEVELS, sluch: SLUCH_LEVELS,
+  abc: ABC_LEVELS, pos: POS_LEVELS, vety: VETY_LEVELS, vyznam: VYZNAM_LEVELS, uu: UU_LEVELS, prav: PRAV_LEVELS, hudba: HUDBA_LEVELS, klavir: KLAVIR_LEVELS, sluch: SLUCH_LEVELS,
 };
 const LEVEL_KEYS = {
   riddle: RIDDLE_LEVEL_KEYS, grid: GRID_LEVEL_KEYS, over10: OVER10_LEVEL_KEYS, bigadd: BIGADD_LEVEL_KEYS, kvet: KVET_LEVEL_KEYS, pexeso: PEXESO_LEVEL_KEYS,
   bigmul: BIGMUL_LEVEL_KEYS, abc: ABC_LEVEL_KEYS, pos: POS_LEVEL_KEYS, vety: VETY_LEVEL_KEYS,
-  vyznam: VYZNAM_LEVEL_KEYS, uu: UU_LEVEL_KEYS, hudba: HUDBA_LEVEL_KEYS, klavir: KLAVIR_LEVEL_KEYS, sluch: SLUCH_LEVEL_KEYS,
+  vyznam: VYZNAM_LEVEL_KEYS, uu: UU_LEVEL_KEYS, prav: PRAV_LEVEL_KEYS, hudba: HUDBA_LEVEL_KEYS, klavir: KLAVIR_LEVEL_KEYS, sluch: SLUCH_LEVEL_KEYS,
 };
 
 /* Společná množina klíčů obtížnosti. Tabulky výš ji musí mít všechny stejnou,
@@ -227,6 +233,7 @@ const VYCHOZI_CONFIG = () => ({
   vetyTasks: ['type', 'ask'], vetyCount: VETY_COUNT_DEFAULT,
   vyznamTasks: [...VYZNAM_TASK_KEYS], vyznamCount: VYZNAM_COUNT_DEFAULT,
   uuCount: UU_COUNT_DEFAULT,
+  pravTopics: [...PRAV_TOPIC_KEYS], pravCount: PRAV_COUNTS[0],
   hudbaTasks: [...HUDBA_TASK_KEYS], hudbaCount: HUDBA_COUNT_DEFAULT,
   klavirForms: [...KLAVIR_FORM_KEYS], klavirCount: HUDBA_COUNT_DEFAULT,
   sluchForms: [...SLUCH_FORM_KEYS], sluchCount: HUDBA_COUNT_DEFAULT,
@@ -283,6 +290,7 @@ function normalizeConfig(raw) {
   const posTypes = Array.isArray(raw.posTypes) ? raw.posTypes.filter((t) => POS_TYPE_KEYS.includes(t)) : [];
   const vetyTasks = Array.isArray(raw.vetyTasks) ? raw.vetyTasks.filter((t) => VETY_TASK_KEYS.includes(t)) : [];
   const vyznamTasks = Array.isArray(raw.vyznamTasks) ? raw.vyznamTasks.filter((t) => VYZNAM_TASK_KEYS.includes(t)) : [];
+  const pravTopics = Array.isArray(raw.pravTopics) ? raw.pravTopics.filter((t) => PRAV_TOPIC_KEYS.includes(t)) : [];
   const hudbaTasks = Array.isArray(raw.hudbaTasks) ? raw.hudbaTasks.filter((t) => HUDBA_TASK_KEYS.includes(t)) : [];
   const klavirForms = Array.isArray(raw.klavirForms) ? raw.klavirForms.filter((t) => KLAVIR_FORM_KEYS.includes(t)) : [];
   const sluchForms = Array.isArray(raw.sluchForms) ? raw.sluchForms.filter((t) => SLUCH_FORM_KEYS.includes(t)) : [];
@@ -310,6 +318,9 @@ function normalizeConfig(raw) {
     vyznamCount: VYZNAM_COUNTS.includes(Number(raw.vyznamCount)) ? Number(raw.vyznamCount) : VYZNAM_COUNT_DEFAULT,
     // starší uložené nastavení doplňování u, ú, ů nezná
     uuCount: UU_COUNTS.includes(Number(raw.uuCount)) ? Number(raw.uuCount) : UU_COUNT_DEFAULT,
+    // starší uložené nastavení pravopis nezná - prázdný výběr = všechna témata
+    pravTopics: pravTopics.length ? pravTopics : [...PRAV_TOPIC_KEYS],
+    pravCount: PRAV_COUNTS.includes(Number(raw.pravCount)) ? Number(raw.pravCount) : PRAV_COUNTS[0],
     // starší uložené nastavení hudební nauku nezná
     hudbaTasks: hudbaTasks.length ? hudbaTasks : [...HUDBA_TASK_KEYS],
     hudbaCount: HUDBA_COUNTS.includes(Number(raw.hudbaCount)) ? Number(raw.hudbaCount) : HUDBA_COUNT_DEFAULT,
@@ -344,6 +355,7 @@ const isPosMode = () => config.mode === 'pos';
 const isVetyMode = () => config.mode === 'vety';
 const isVyznamMode = () => config.mode === 'vyznam';
 const isUuMode = () => config.mode === 'uu';
+const isPravMode = () => config.mode === 'prav';
 const isHudbaMode = () => config.mode === 'hudba';
 const isKlavirMode = () => config.mode === 'klavir';
 const isSluchMode = () => config.mode === 'sluch';
@@ -475,6 +487,7 @@ function renderModeCards() {
   const vety = isVetyMode();
   const vyznam = isVyznamMode();
   const uu = isUuMode();
+  const prav = isPravMode();
   const hudba = isMusicMode();
   el('card-ops').hidden = isRiddleMode() || bigmul || abc || uu || isKvetMode();
   el('card-kinds').hidden = usesLevel();
@@ -482,21 +495,23 @@ function renderModeCards() {
   // jedna mřížka i jedna plocha pexesa jsou celé kolo - počet příkladů odpadá
   el('card-count').hidden = grid || pexeso || isVyznamBoardOnly() || isVetyBoardOnly();
   // v abecedě ani ve slovních druzích se nepočítá, rozsah čísel tam nic neříká
-  el('card-max').hidden = abc || pos || vety || vyznam || uu || hudba;
+  el('card-max').hidden = abc || pos || vety || vyznam || uu || prav || hudba;
   // u češtiny se vybírá jen z pevných počtů slov / vět
-  el('countCustomWrap').hidden = abc || pos || vety || vyznam || uu || hudba;
+  el('countCustomWrap').hidden = abc || pos || vety || vyznam || uu || prav || hudba;
   /* Ve slovních druzích karta s operacemi zůstává, jen se v ní místo
      operací vybírá, co se ve větách hledá. */
   el('opsTitle').innerHTML = pos
     ? '<span aria-hidden="true">🎯</span> Co budeme hledat?'
+    : prav
+    ? '<span aria-hidden="true">🎯</span> Co budeme procvičovat?'
     : vety || vyznam || hudba
     ? '<span aria-hidden="true">🎯</span> Co budeme dělat?'
     : '<span aria-hidden="true">🎯</span> Co budeme počítat?';
   el('countTitle').innerHTML = isRiddleMode()
     ? '<span aria-hidden="true">🔢</span> Kolik hádanek?'
-    : abc
+    : abc || (prav && config.level === 'easy')
       ? '<span aria-hidden="true">🔢</span> Kolik slov?'
-      : pos || vety || uu
+      : pos || vety || uu || prav
         ? '<span aria-hidden="true">🔢</span> Kolik vět?'
         : vyznam || hudba
           ? '<span aria-hidden="true">🔢</span> Kolik úloh?'
@@ -545,6 +560,15 @@ function renderModeCards() {
 
   if (uu) {
     el('levelNote').textContent = `${level.label} – ${level.note}.`;
+    return;
+  }
+
+  if (prav) {
+    el('levelNote').textContent = `${level.label} – ${level.note}.`;
+    opsNote.textContent = config.pravTopics.length > 1
+      ? 'Témata se budou v kole střídat – nad každým slovem je napsané, co doplňuješ.'
+      : 'Můžeš si zapnout víc témat naráz, pak se budou střídat.';
+    opsNote.hidden = false;
     return;
   }
 
@@ -658,6 +682,7 @@ function renderConfigScreen() {
     .map(([key, mode]) => {
       const on = key === config.mode;
       return `<button type="button" class="chip chip-mode${on ? ' is-on' : ''}" data-value="${key}" aria-pressed="${on}">
+          ${gradeHTML(mode.grade)}
           <span class="chip-icon" aria-hidden="true">${mode.icon}</span>
           <span class="chip-main">${mode.label}</span>
           <span class="chip-sub">${mode.sub}</span>
@@ -685,7 +710,12 @@ function renderConfigScreen() {
   const opOn = isAddSubMode() ? config.over10Ops : config.ops;
   /* Ve slovních druzích se v téže kartě vybírá, co se hledá - z vlastního
      klíče `posTypes`. */
-  el('opChips').innerHTML = isPosMode()
+  el('opChips').innerHTML = isPravMode()
+    ? PRAV_TOPIC_KEYS
+      .map((key) => chipHTML(key, `${PRAV_TOPICS[key].emoji} ${PRAV_TOPICS[key].label}${gradeHTML(PRAV_TOPICS[key].grade)}`,
+        config.pravTopics.includes(key)))
+      .join('')
+    : isPosMode()
     ? POS_TYPE_KEYS
       .map((key) => chipHTML(key, `${POS_TYPES[key].emoji} ${POS_TYPES[key].label}`, config.posTypes.includes(key)))
       .join('')
@@ -727,6 +757,8 @@ function renderConfigScreen() {
       ? VYZNAM_COUNTS.map((n) => chipHTML(n, `${n} úloh`, config.vyznamCount === n)).join('')
       : isUuMode()
       ? UU_COUNTS.map((n) => chipHTML(n, `${n} vět`, config.uuCount === n)).join('')
+      : isPravMode()
+      ? PRAV_COUNTS.map((n) => chipHTML(n, `${n} ${config.level === 'easy' ? 'slov' : 'vět'}`, config.pravCount === n)).join('')
       : isHudbaMode()
       ? HUDBA_COUNTS.map((n) => chipHTML(n, `${n} úloh`, config.hudbaCount === n)).join('')
       : isKlavirMode()
@@ -755,6 +787,11 @@ function renderConfigScreen() {
   soundBtn.setAttribute('aria-pressed', String(state.sound));
 
   renderLastHint();
+}
+
+/* Třída v rohu karty hry (a u pravopisu i u tématu): 2 = pro druhou třídu. */
+function gradeHTML(grade) {
+  return grade ? `<span class="chip-grade" title="${grade}. třída" aria-label="${grade}. třída">${grade}</span>` : '';
 }
 
 function chipHTML(value, label, on) {
@@ -819,9 +856,11 @@ function renderLastHint() {
 
   const pct = Math.round((last.correct / last.total) * 100);
   const what = isRiddleMode() ? 'hádanek' : isOver10Mode() ? 'rozkladů' : isPosMode() || isVetyMode() || isUuMode() ? 'vět'
-    : isVyznamMode() || isMusicMode() ? 'úloh' : 'příkladů';
+    : isVyznamMode() || isMusicMode() || isPravMode() ? 'úloh' : 'příkladů';
   const focus = isRiddleMode()
     ? ' Každá hádanka je pokaždé nová.'
+    : isPravMode()
+      ? ' Slova a věty se pokaždé vylosují jiné.'
     : isPosMode() || isVetyMode() || isUuMode()
       ? ' Věty se pokaždé vylosují jiné.'
     : isVyznamMode()
@@ -898,7 +937,8 @@ el('opChips').addEventListener('click', (e) => {
   const hudba = isHudbaMode();
   const klavir = isKlavirMode();
   const sluch = isSluchMode();
-  const current = pos ? config.posTypes : vety ? config.vetyTasks : vyznam ? config.vyznamTasks
+  const prav = isPravMode();
+  const current = prav ? config.pravTopics : pos ? config.posTypes : vety ? config.vetyTasks : vyznam ? config.vyznamTasks
     : hudba ? config.hudbaTasks : klavir ? config.klavirForms : sluch ? config.sluchForms : over10 ? config.over10Ops : config.ops;
   const next = current.includes(value) ? current.filter((o) => o !== value) : [...current, value];
   if (!next.length) {
@@ -907,7 +947,8 @@ el('opChips').addEventListener('click', (e) => {
     setTimeout(() => { err.hidden = true; }, 2200);
     return;
   }
-  if (pos) config.posTypes = next;
+  if (prav) config.pravTopics = next;
+  else if (pos) config.posTypes = next;
   else if (vety) config.vetyTasks = next;
   else if (vyznam) config.vyznamTasks = next;
   else if (hudba) config.hudbaTasks = next;
@@ -940,6 +981,7 @@ el('countChips').addEventListener('click', (e) => {
   else if (isVetyMode()) config.vetyCount = Number(chip.dataset.value);
   else if (isVyznamMode()) config.vyznamCount = Number(chip.dataset.value);
   else if (isUuMode()) config.uuCount = Number(chip.dataset.value);
+  else if (isPravMode()) config.pravCount = Number(chip.dataset.value);
   else if (isHudbaMode()) config.hudbaCount = Number(chip.dataset.value);
   else if (isKlavirMode()) config.klavirCount = Number(chip.dataset.value);
   else if (isSluchMode()) config.sluchCount = Number(chip.dataset.value);
@@ -1133,6 +1175,7 @@ function startRound() {
     vety: () => buildVetyRound(config),   // taky
     vyznam: () => buildVyznamRound(config), // úloha po úloze, nejvýš jedna plocha
     uu: () => buildUuRound(config),       // co věta, to úloha
+    prav: () => buildPravRound(config),   // co slovo nebo věta, to úloha
     hudba: () => buildHudbaRound(config), // úloha po úloze
     klavir: () => buildKlavirRound(config), // taky
     sluch: () => buildSluchRound(config),   // taky
@@ -1216,12 +1259,14 @@ function renderExercise() {
   if (ex.kind === 'pos') resetPos();
   // list s písmeny i věta s u, ú, ů taky
   if (ex.kind === 'vetylist') resetFill(ex.items.length);
-  if (ex.kind === 'uu') resetFill(ex.gaps.length);
+  if (ex.kind === 'uu' || ex.kind === 'prav') resetFill(ex.gaps.length);
   if (CHOICE_HTML[ex.kind]) choicePicked = null;
   choiceMiss = null;
   hudbaAcc = 0;
   melodyTaps = [];
   el('exerciseBody').innerHTML = (BODY_HTML[ex.kind] || equationHTML)(ex);
+  // šipky u odčítání přes desítku až po rozvržení (měří se polohy)
+  requestAnimationFrame(drawArrows);
   /* Mřížka 5×5 a plocha pexesa o čtyřech sloupcích jsou nejširší, co
      aplikace kreslí. Na úzkém telefonu jim uvolníme okraje, ať nemusíme
      zmenšovat kolečka a kartičky pod dotykový cíl. */
@@ -1302,6 +1347,11 @@ function hintFor(ex) {
   }
   if (ex.kind === 'uu') {
     return 'Klepni na mezeru ve slově a pak na u, ú nebo ů. Až doplníš všechna písmena, klepni na Hotovo.';
+  }
+  if (ex.kind === 'prav') {
+    return ex.gaps.length > 1
+      ? 'Klepni na mezeru a pak na písmeno, které tam patří. Až doplníš všechno, klepni na Hotovo.'
+      : 'Klepni na písmeno, které patří do mezery. Pak klepni na Hotovo.';
   }
   if (ex.kind === 'slova') {
     return 'Najdi dvě slova, která patří do stejné skupiny, a klepni na obě. Takhle spoj všechny dvojice.';
@@ -1508,7 +1558,12 @@ function over10HTML(ex) {
 
   /* Rámeček obepíná ta dvě čísla, která spolu dají rovnou desítku: u sčítání
      první číslo s levou větví, u odčítání výsledek s pravou větví. */
+  /* Z obou částí rozkladu vedou šipky do zápisu pod větvičkou a z rámečku
+     („18 − 8") dolů na rovnou desítku (přání uživatele). Kreslí je
+     `drawArrows()` podle skutečné polohy prvků. */
   return `${over10FrameHTML(ex)}
+    <div class="o10-wrap" data-arrows="o10">
+    <svg class="o10-arrows" aria-hidden="true"></svg>
     <div class="o10b" data-op="${ex.op}" style="--ad:${String(ex.a).length}">
       <span class="o10b-box" aria-hidden="true"></span>
       <span class="o10-num o10b-a">${ex.a}</span>
@@ -1521,7 +1576,8 @@ function over10HTML(ex) {
       ${cell('ten')}
       ${cell('rest')}
     </div>
-    ${over10SumHTML(ex, cell)}`;
+    ${over10SumHTML(ex, cell)}
+    </div>`;
 }
 
 /* Dva řádky pod větvičkou, které vysvětlují, proč se desítka dělá
@@ -1539,9 +1595,10 @@ function over10SumHTML(ex, cell) {
   const after = ex.hidden.includes('sum') ? '' : ' data-after=".o10b-ten" hidden';
   const echo = (key) => `<span class="ba-echo o10-echo is-empty" data-cell=".o10b-${key}"></span>`;
   // dva sloupce: desítka stojí uprostřed pod rámečkem, „+ 4 =“ přesně pod sebou
+  // výsledek je i na konci prvního řádku (přání uživatele)
   return `<div class="o10-sum" aria-hidden="true">
       <span class="o10-pair">${ex.a} ${s} ${echo('ten')}</span>
-      <span class="o10-tail">${s} ${echo('rest')} =</span>
+      <span class="o10-tail o10-tail-1">${s} ${echo('rest')} = ${echo('c')}</span>
       <span class="o10-round"${after}>${round}</span>
       <span class="o10-tail"${after}>${s} ${echo('rest')} = ${echo('c')}</span>
     </div>`;
@@ -1603,8 +1660,64 @@ function syncBigaddEcho() {
   document.querySelectorAll('[data-after]').forEach((span) => {
     span.hidden = valueOf(span.dataset.after) === '';
   });
+  // ozvěny mění šířku zápisu, šipky se musí překreslit
+  drawArrows();
 }
+
+/* Šipky z rozkladu do zápisu pod ním („Počítej přes 10" i „Velké sčítání"):
+   z obou částí rozkladu do prvního řádku (8 → „18 − 8", 1 → „− 1") a z jeho
+   začátku dolů na mezivýsledek. Prvky stojí ve dvou různých mřížkách, takže
+   se šipky nedají postavit z CSS - měří se skutečná poloha a kreslí SVG přes
+   celý blok. Odkud kam, říká tabulka podle `data-arrows`. */
+const ARROWS = {
+  o10: [
+    ['.o10b-ten', '.o10-pair [data-cell=".o10b-ten"]'],
+    ['.o10b-rest', '.o10-tail-1 [data-cell=".o10b-rest"]'],
+    ['.o10-pair', '.o10-round'],
+  ],
+  ba: [
+    ['.ba-parts .ba-tens', '.ba-rows [data-of="tens"]'],
+    ['.ba-parts .ba-ones', '.ba-rows [data-of="ones"]'],
+    // z celého bloku i s poznámkou, jinak by šipka škrtala text
+    ['.ba-rows .ba-head-1', '.ba-rows .ba-mid'],
+  ],
+};
+function drawArrows() {
+  const wrap = document.querySelector('[data-arrows]');
+  const svg = wrap?.querySelector('.o10-arrows');
+  if (!svg) return;
+  const box = wrap.getBoundingClientRect();
+  const gap = 3;
+  const lines = (ARROWS[wrap.dataset.arrows] || []).map(([from, to]) => {
+    const a = wrap.querySelector(from)?.getBoundingClientRect();
+    const b = wrap.querySelector(to)?.getBoundingClientRect();
+    if (!a?.width || !b?.width) return '';
+    const x1 = a.left + a.width / 2 - box.left;
+    const y1 = a.bottom - box.top + gap;
+    const x2 = b.left + b.width / 2 - box.left;
+    const y2 = b.top - box.top - gap;
+    if (y2 <= y1) return '';
+    return `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" marker-end="url(#o10-head)"/>`;
+  }).join('');
+  svg.setAttribute('viewBox', `0 0 ${box.width.toFixed(1)} ${box.height.toFixed(1)}`);
+  svg.innerHTML = `<defs><marker id="o10-head" viewBox="0 0 10 10" refX="9" refY="5"
+      markerWidth="4" markerHeight="4" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker></defs>${lines}`;
+}
+window.addEventListener('resize', drawArrows);
+document.fonts?.ready.then(drawArrows);
 const BA_DIGITS = { tens: 2, ones: 1, mid: 3, c: 3 };
+
+/* Drobná poznámka pod rámečkem „48 − 30“: jednotky prvního čísla počkají,
+   počítá se jen s desítkami (přání uživatele). Výsledek tam schválně není,
+   ten dítě píše o řádek níž; druhé číslo je ozvěna políčka z větvičky.
+   První číslo nikdy nekončí nulou, takže „0 si schováme“ nevznikne. */
+function bigaddNoteHTML(ex, sign) {
+  const ones = ex.a % 10;
+  return `<span class="ba-note"><span><b class="ba-note-ones">${ones}</b> si schováme,</span>
+      <span>počítáme <b class="ba-note-tens">${ex.a - ones}</b> ${sign} <span class="ba-echo ba-echo-tens is-empty" data-of="tens"></span></span>
+      <span>a pak <b class="ba-note-ones">${ones}</b> přidáme zpátky.</span></span>`;
+}
 
 function bigaddHTML(ex) {
   const sign = OPS[ex.op].symbol;
@@ -1621,7 +1734,10 @@ function bigaddHTML(ex) {
   const op = `<span class="o10-op">${sign}</span>`;
   const eq = '<span class="o10-op">=</span>';
   const blocks = bigaddBlocksHTML(ex);
-  return `<div class="ba" data-op="${ex.op}">
+  // výsledek je ozvěnou i na konci prvního řádku, šipky viz `drawArrows()`
+  const echoC = '<span class="o10-num ba-echo is-empty" data-cell=".ba-rows .ba-c"></span>';
+  return `<div class="ba" data-op="${ex.op}" data-arrows="ba">
+      <svg class="o10-arrows" aria-hidden="true"></svg>
       <div class="ba-top">
         <div class="ba-split">
           <span class="o10-num ba-b"><span class="ba-b-pre"><span class="o10-num">${ex.a}</span><span class="o10-op">${sign}</span></span>${ex.b}<span class="o10-op ba-b-eq">=</span></span>
@@ -1633,8 +1749,8 @@ function bigaddHTML(ex) {
         </div>
       </div>
       <div class="ba-rows">
-        <span class="ba-head"><span class="o10-num">${ex.a}</span>${op}${echo('tens')}</span>
-        <span class="ba-tail">${op}${echo('ones')}${eq}</span>
+        <span class="ba-head ba-head-1"><span class="ba-pair"><span class="o10-num">${ex.a}</span>${op}${echo('tens')}</span>${bigaddNoteHTML(ex, sign)}</span>
+        <span class="ba-tail">${op}${echo('ones')}${eq}${echoC}</span>
         <span class="ba-head">${cell('mid')}</span>
         <span class="ba-tail">${op}${echo('ones')}${eq}${cell('c')}</span>
       </div>
@@ -1735,12 +1851,12 @@ function bigmulHTML(ex) {
 const BODY_HTML = {
   bond: bondHTML, word: wordHTML, riddle: riddleHTML, sign: signHTML, grid: gridHTML,
   compare: compareHTML, over10: over10HTML, bigadd: bigaddHTML, bigaddstep: bigmulHTML, kvet: kvetHTML, pexeso: pexesoHTML, bigmul: bigmulHTML, abc: abcHTML,
-  pos: posHTML, vety: vetyHTML, vyznam: vyznamHTML, slova: pexesoHTML, vetylist: vetyListHTML, uu: uuHTML,
+  pos: posHTML, vety: vetyHTML, vyznam: vyznamHTML, slova: pexesoHTML, vetylist: vetyListHTML, uu: uuHTML, prav: uuHTML,
   hudba: hudbaHTML,
 };
 
 /* Druhy, které se ovládají jen klepáním - bez klávesnice a bez `submit()`. */
-const TAP_ONLY = new Set(['pexeso', 'bigmul', 'bigaddstep', 'abc', 'pos', 'vety', 'vyznam', 'slova', 'vetylist', 'uu', 'hudba']);
+const TAP_ONLY = new Set(['pexeso', 'bigmul', 'bigaddstep', 'abc', 'pos', 'vety', 'vyznam', 'slova', 'vetylist', 'uu', 'prav', 'hudba']);
 
 /* Plochy se spojováním dvojic: čísla v „Najdi dvojice“ a souřadná slova
    ve „Význam slov“. Ovladač je pro obě tentýž. */
@@ -2465,6 +2581,19 @@ const FILL = {
     fix: 'V přerušovaném rámečku je písmeno, které tam patří.',
     html: () => uuHTML,
   },
+  /* Pravopis jede stejnou cestou jako u, ú, ů - jen nabídka kláves se
+     bere z vybrané mezery (`gap.opts`) a písmeno se ukazuje přesně tak,
+     jak je v nabídce (velká písmena). */
+  prav: {
+    answers: (ex) => ex.gaps.map((g) => g.answer),
+    shown: (ex, i, v) => v || '',
+    sep: ', ',
+    tag: (ex, picks) => pravTag(ex, picks) || 'pravIY',
+    steps: (ex, picks) => pravExplain(ex, picks),
+    red: (n) => (n === 1 ? 'Červené písmeno je špatně.' : 'Červená písmena jsou špatně.'),
+    fix: 'V přerušovaném rámečku je písmeno, které tam patří.',
+    html: () => uuHTML,
+  },
 };
 
 let fillPicks = [];        // co je v okénkách ('' = prázdné)
@@ -2534,10 +2663,16 @@ function uuHTML(ex) {
   const sentence = ex.tokens
     .map((parts) => `<span class="uu-word">${parts.map((p) => ('s' in p ? p.s : uuGap(ex, p.g))).join('')}</span>`)
     .join(' ');
-  const keys = locked ? '' : `<div class="uu-keys">${UU_LETTERS
+  /* U pravopisu nabídku určuje vybraná mezera (i/y, ě/je, b/p, p/P…). */
+  const letters = ex.kind === 'prav' ? ex.gaps[fillSel ?? 0]?.opts || [] : UU_LETTERS;
+  const keys = locked ? '' : `<div class="uu-keys">${letters
     .map((l) => `<button type="button" class="uu-key" data-letter="${l}">${l}</button>`).join('')}</div>`;
+  const ask = ex.kind === 'prav'
+    ? `<p class="vt-ask"><span aria-hidden="true">${PRAV_TOPICS[ex.topic].emoji}</span> ${PRAV_TOPICS[ex.topic].ask}</p>`
+    : '';
   return `<div class="uu">
-      <p class="uu-sentence">${sentence}</p>
+      ${ask}
+      <p class="uu-sentence${ex.single ? ' is-word' : ''}">${sentence}</p>
       ${keys}
       ${fillFooter()}
     </div>`;
@@ -3184,8 +3319,8 @@ document.addEventListener('keydown', (e) => {
     } else if (e.key === 'Enter' && (round[index].kind === 'abc' || round[index].kind === 'pos' || FILL[round[index].kind])) {
       el('exerciseBody').querySelector('.abc-done:not([disabled]), .pos-done:not([disabled]), .fill-done:not([disabled])')?.click();
       e.preventDefault();
-    } else if (!locked && round[index].kind === 'uu' && /^[1-3]$/.test(e.key)) {
-      // u, ú, ů klávesami 1 až 3 - do vybrané mezery
+    } else if (!locked && (round[index].kind === 'uu' || round[index].kind === 'prav') && /^[1-3]$/.test(e.key)) {
+      // u, ú, ů (u pravopisu dvě možnosti) klávesami 1 až 3 - do vybrané mezery
       el('exerciseBody').querySelectorAll('.uu-key')[Number(e.key) - 1]?.click();
       e.preventDefault();
     } else if (!locked && CHOICE_HTML[round[index].kind] && !round[index].retry && /^[1-7]$/.test(e.key)) {
@@ -3547,7 +3682,7 @@ function grantRewards(report) {
     mode: config.mode,
     level: rewards.difficultyOf(config),
     // v abecedě se nepočítá - rozsah čísel by jí jinak přidal epického
-    max: isAbcMode() || isPosMode() || isVetyMode() || isVyznamMode() || isUuMode() || isMusicMode() ? 0 : config.max,
+    max: isAbcMode() || isPosMode() || isVetyMode() || isVyznamMode() || isUuMode() || isPravMode() || isMusicMode() ? 0 : config.max,
     kindUnits,
     // druhy navic (slovni ulohy, pyramidy, znamenka) - podminka raritniho
     /* "Neco navic" existuje jen v rezimu Pocitani. Jinde karta schovana, ale
@@ -3717,6 +3852,8 @@ function renderResult(r) {
         ? 'Příště přijdou nová čísla.'
         : isPosMode() || isVetyMode() || isUuMode()
           ? 'Příště se vylosují jiné věty.'
+          : isPravMode()
+            ? 'Příště se vylosují jiná slova a věty.'
           : isVyznamMode()
             ? 'Příště se vylosují jiná slova.'
           : isMusicMode()
@@ -3740,7 +3877,7 @@ function renderResult(r) {
         <p style="margin:0;font-weight:700;color:var(--ink-soft)">Nic k procvičení – tohle byla čistá práce.</p></div>`;
 
   const jednotka = riddle ? 'hádanku' : isOver10Mode() ? 'rozklad' : isPosMode() || isVetyMode() || isUuMode() ? 'větu'
-    : isVyznamMode() || isMusicMode() ? 'úlohu' : 'příklad';
+    : isVyznamMode() || isMusicMode() || isPravMode() ? 'úlohu' : 'příklad';
   const avg = r.avgMs
     ? `<p class="score-sub">Průměrně ${Math.max(1, Math.round(r.avgMs / 1000))} s na ${jednotka}</p>`
     : '';

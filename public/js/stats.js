@@ -76,7 +76,7 @@ export function sanitizeState(raw) {
 }
 
 /* Druhy úloh, které se nedají z descriptoru znovu poskládat. */
-const NO_REPEAT = new Set(['riddle', 'grid', 'over10', 'bigadd', 'bigaddstep', 'kvet', 'pexeso', 'bigmul', 'abc', 'pos', 'vety', 'vetylist', 'vyznam', 'slova', 'uu', 'hudba']);
+const NO_REPEAT = new Set(['riddle', 'grid', 'over10', 'bigadd', 'bigaddstep', 'kvet', 'pexeso', 'bigmul', 'abc', 'pos', 'vety', 'vetylist', 'vyznam', 'slova', 'uu', 'prav', 'hudba']);
 
 const descriptor = (ex) => ({
   op: ex.op,
@@ -161,6 +161,11 @@ const KIND_LABEL = {
   'vety:ask': { acc: 'otázky', gen: 'otázek' },
   'vyznam:vztah': { acc: 'vztahy mezi slovy', gen: 'vztahů mezi slovy' },
   'vyznam:nad': { all: 'všechna', acc: 'slova nadřazená', gen: 'slov nadřazených' },
+  'prav:iy': { all: 'všechna', acc: 'slova s i a y', gen: 'i a y' },
+  'prav:dtn': { all: 'všechna', acc: 'slova s dě, tě, ně', gen: 'dě, tě, ně' },
+  'prav:bpvm': { all: 'všechna', acc: 'slova s bě, pě, vě, mě', gen: 'bě, pě, vě, mě' },
+  'prav:par': { all: 'všechny', acc: 'párové souhlásky', gen: 'párových souhlásek' },
+  'prav:velka': { all: 'všechna', acc: 'velká písmena', gen: 'velkých písmen' },
   'hudba:znak': { all: 'všechny', acc: 'značky', gen: 'značek' },
   'hudba:nazev': { all: 'všechny', acc: 'názvy not', gen: 'názvů not' },
   'hudba:umisti': { all: 'všechny', acc: 'noty na osnově', gen: 'umisťování not' },
@@ -200,7 +205,7 @@ const LEVEL_NAME = { easy: 'Lehké', medium: 'Střední', hard: 'Těžké' };
 
 /* Jak se v rozpadu podle obtížnosti pojmenuje jedna úloha daného režimu.
    Rod i číslo musí sedět na věty "Lehké mřížky ti jdou výborně". */
-const MODE_UNITS = { grid: 'mřížky', riddle: 'hádanky', over10: 'rozklady', bigadd: 'příklady', kvet: 'kytičky', pexeso: 'plochy', bigmul: 'příklady', abc: 'řady slov', pos: 'věty', vety: 'věty', vyznam: 'úlohy', uu: 'věty', hudba: 'úlohy', klavir: 'úlohy', sluch: 'úlohy' };
+const MODE_UNITS = { grid: 'mřížky', riddle: 'hádanky', over10: 'rozklady', bigadd: 'příklady', kvet: 'kytičky', pexeso: 'plochy', bigmul: 'příklady', abc: 'řady slov', pos: 'věty', vety: 'věty', vyznam: 'úlohy', uu: 'věty', prav: 'úlohy', hudba: 'úlohy', klavir: 'úlohy', sluch: 'úlohy' };
 
 export function analyze(state, config, attempts) {
   const riddleMode = config.mode === 'riddle';
@@ -215,6 +220,7 @@ export function analyze(state, config, attempts) {
   const vetyMode = config.mode === 'vety';
   const vyznamMode = config.mode === 'vyznam';
   const uuMode = config.mode === 'uu';
+  const pravMode = config.mode === 'prav';
   // klavír je samostatná hra, ale úlohy i rady má společné s hudební naukou
   const hudbaMode = config.mode === 'hudba' || config.mode === 'klavir' || config.mode === 'sluch';
   /* Režimy, kde se rozpad podle operací nehodí - hádanky, mřížky i pexeso
@@ -222,7 +228,7 @@ export function analyze(state, config, attempts) {
      sčítání zase úplně všude, takže by "sčítání ti jde" nic neřeklo.
      Ve všech pěti jedeme podle obtížnosti. U velkého násobení je zase
      násobení úplně všude, takže by rozpad podle operací neřekl nic. */
-  const levelMode = riddleMode || gridMode || over10Mode || bigaddMode || kvetMode || pexesoMode || bigmulMode || abcMode || posMode || vetyMode || vyznamMode || uuMode || hudbaMode;
+  const levelMode = riddleMode || gridMode || over10Mode || bigaddMode || kvetMode || pexesoMode || bigmulMode || abcMode || posMode || vetyMode || vyznamMode || uuMode || pravMode || hudbaMode;
   const total = attempts.length;
   const correct = attempts.filter((a) => a.correct).length;
   const pct = total ? Math.round((correct / total) * 100) : 0;
@@ -230,7 +236,7 @@ export function analyze(state, config, attempts) {
   /* Porovnávání a pexeso mají `op: 'add'` jen zástupně - do rozpadu podle
      operací ani do přechodu přes desítku nepatří, jinak by "sčítání ti jde"
      stálo z půlky na úlohách, kde se nic nesčítá. */
-  const PLACEHOLDER_OP = new Set(['compare', 'pexeso', 'kvet', 'abc', 'pos', 'vety', 'vetylist', 'vyznam', 'slova', 'uu', 'hudba']);
+  const PLACEHOLDER_OP = new Set(['compare', 'pexeso', 'kvet', 'abc', 'pos', 'vety', 'vetylist', 'vyznam', 'slova', 'uu', 'prav', 'hudba']);
   const scored = attempts.filter((a) => !PLACEHOLDER_OP.has(a.ex.kind));
   const byOp = group(scored, (a) => a.ex.op).sort((x, y) => y.seen - x.seen);
   const byLevel = group(attempts, (a) => a.ex.level || null)
@@ -273,7 +279,7 @@ export function analyze(state, config, attempts) {
     if (cross.pct >= 85) strengths.push(`Přechod přes desítku ti jde (${cross.correct} z ${cross.seen}). To je ta nejtěžší část!`);
     else if (cross.pct < 65) watchOuts.push(`Přechod přes desítku dělá potíže – ${cross.correct} z ${cross.seen}.`);
   }
-  if (!posMode && !vetyMode && !vyznamMode && !uuMode && !hudbaMode && pct >= 80 && avgMs > 0 && avgMs < 7000) strengths.push('Počítáš rychle a přesně zároveň.');
+  if (!posMode && !vetyMode && !vyznamMode && !uuMode && !pravMode && !hudbaMode && pct >= 80 && avgMs > 0 && avgMs < 7000) strengths.push('Počítáš rychle a přesně zároveň.');
 
   if (tags.get('offOne') >= 2) watchOuts.push('Několikrát ti výsledek utekl jen o jedničku – vyplatí se na konci zkontrolovat.');
   if (tags.get('riddleSymbol') >= 1) watchOuts.push('U hádanky se občas napsalo, kolik je jeden obrázek. Poslední řádek chce součet celého řádku.');
@@ -427,6 +433,28 @@ export function analyze(state, config, attempts) {
       tips.push(harder
         ? `Šlo ti to skvěle – zkus příště ${harder} obtížnost, písmen k doplnění bude víc.`
         : 'Šlo ti to skvěle – tohle jsou nejtěžší věty. Zkus si dát víc vět v kole.');
+    }
+  } else if (pravMode) {
+    if (tags.get('pravIY')) {
+      tips.push('Po tvrdých souhláskách h, ch, k, r, d, t, n píšeme y, po měkkých ž, š, č, ř, c, j, ď, ť, ň píšeme i.');
+    }
+    if (tags.get('pravDTN')) {
+      tips.push('Když slyšíš ďe, ťe, ňe, napiš dě, tě, ně. Když zní tvrdě (deka, teta), stačí obyčejné e.');
+    }
+    if (tags.get('pravBPV')) {
+      tips.push('Bě, pě, vě, mě píšeme skoro vždycky. Je jen tam, kde se slovo skládá ze dvou částí (ob + jet), mně jen tam, kde slyšíš mn (jemný – jemně).');
+    }
+    if (tags.get('pravPar')) {
+      tips.push('U souhlásky na konci slova si slovo prodluž: dub – duby, hrad – hrady. Pak hned uslyšíš, co tam patří.');
+    }
+    if (tags.get('pravVelka')) {
+      tips.push('Velké písmeno má začátek věty a jména: lidí, zvířat, měst, řek a hor. Dny a měsíce mají malé.');
+    }
+    if (pct >= 90) {
+      const harder = { easy: 'střední', medium: 'těžkou' }[config.level];
+      tips.push(harder
+        ? `Šlo ti to skvěle – zkus příště ${harder} obtížnost, místo slov přijdou věty.`
+        : 'Šlo ti to skvěle – tohle je nejtěžší úroveň. Zkus si zapnout víc témat naráz.');
     }
   } else if (bigmulMode) {
     if (pct < 100) {

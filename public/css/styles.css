@@ -412,6 +412,17 @@ h1, h2, h3, .num, .box-value, .key, .score-big { font-family: 'Baloo 2', 'Nunito
   flex-direction: column; align-items: center; text-align: center;
   gap: 2px; padding: 15px 14px; border-radius: 22px;
 }
+.chip-mode { position: relative; }
+/* Třída, pro kterou hra je - kolečko v pravém horním rohu karty. Na zapnuté
+   kartě je text bílý, tak kolečko dostane poloprůhledný bílý podklad. */
+.chip-grade {
+  display: inline-grid; place-items: center;
+  width: 1.45rem; height: 1.45rem; border-radius: 50%;
+  font-size: .78rem; font-weight: 900; line-height: 1;
+  background: var(--card); color: var(--ink); box-shadow: inset 0 0 0 2px var(--line);
+}
+.chip-mode .chip-grade { position: absolute; top: 7px; right: 8px; }
+.chip.is-on .chip-grade { background: rgba(255, 255, 255, .28); color: #fff; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .55); }
 .chip-icon { font-size: 1.85rem; line-height: 1.1; }
 .chip-main { font-size: 1.02rem; line-height: 1.2; }
 .chip-sub { font-weight: 700; font-size: .78rem; line-height: 1.25; opacity: .72; }
@@ -428,6 +439,13 @@ h1, h2, h3, .num, .box-value, .key, .score-big { font-family: 'Baloo 2', 'Nunito
 .chips-mode .chip.is-on[data-value="vety"] { background: linear-gradient(135deg, #34d399, #0f766e); }
 .chips-mode .chip.is-on[data-value="vyznam"] { background: linear-gradient(135deg, #fbbf24, #c2410c); }
 .chips-mode .chip.is-on[data-value="uu"] { background: linear-gradient(135deg, #60a5fa, #be185d); }
+.chips-mode .chip.is-on[data-value="prav"] { background: linear-gradient(135deg, #22d3ee, #7c3aed); }
+/* Témata pravopisu na kartě s operacemi - každé potřebuje vlastní barvu. */
+.chips .chip.is-on[data-value="iy"] { background: linear-gradient(135deg, #60a5fa, #2563eb); }
+.chips .chip.is-on[data-value="dtn"] { background: linear-gradient(135deg, #f87171, #b91c1c); }
+.chips .chip.is-on[data-value="bpvm"] { background: linear-gradient(135deg, #fbbf24, #c2410c); }
+.chips .chip.is-on[data-value="par"] { background: linear-gradient(135deg, #34d399, #0f766e); }
+.chips .chip.is-on[data-value="velka"] { background: linear-gradient(135deg, #c084fc, #7c3aed); }
 .chips-mode .chip.is-on[data-value="hudba"] { background: linear-gradient(135deg, #e879f9, #7c3aed); }
 .chips-mode .chip.is-on[data-value="klavir"] { background: linear-gradient(135deg, #64748b, #1e293b); }
 
@@ -870,6 +888,31 @@ body.is-quiz .wrap { padding-top: 18px; }
     var(--ink-soft) calc(50% - 1.5px), var(--ink-soft) calc(50% + 1.5px), transparent calc(50% + 1.5px));
 }
 
+/* Odčítání: obě části rozkladu visí pod druhým číslem (uživatel to tak
+   chtěl, 18 − 9: osmička pod devítku, ne pod osmnáctku). Levá část stojí
+   rovně pod devítkou přes sloupce znaménko–číslo–rovná se, stejně jako zbytek
+   u sčítání; pravá čára vede ze středu devítky ke zbytku v rámečku. */
+.o10b[data-op="sub"] { grid-template-rows: auto clamp(30px, 10vw, 48px) auto; }
+.o10b[data-op="sub"] .o10b-ten { grid-area: 3 / 2 / 4 / 5; justify-self: center; }
+.o10b[data-op="sub"] .o10b-leg-l {
+  grid-area: 2 / 3 / 3 / 4; margin: 0;
+  background: linear-gradient(to right, transparent calc(50% - 1.5px),
+    var(--ink-soft) calc(50% - 1.5px), var(--ink-soft) calc(50% + 1.5px), transparent calc(50% + 1.5px));
+}
+.o10b[data-op="sub"] .o10b-leg-r {
+  grid-area: 2 / 3 / 3 / 6; margin-left: calc(var(--o10-font) * .26);
+}
+
+/* šipky z rozkladu do zápisu (kreslí je `drawArrows()`), přes 10 i velké sčítání */
+.o10-wrap, .ba { position: relative; }
+.o10-arrows {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  overflow: visible; pointer-events: none; z-index: 1;
+  color: var(--ink-soft); stroke: currentColor; stroke-width: 2.5; stroke-linecap: round;
+}
+/* místo na šipky mezi rozkladem a zápisem i mezi řádky zápisu */
+.o10-wrap .o10-sum, .ba .ba-rows { margin-top: clamp(26px, 8vw, 40px); row-gap: clamp(20px, 6vw, 30px); }
+
 /* Barvy obou čísel jsou stejné jako kroužky nad příkladem - dítě tak vidí,
    která hromádka je která. Selektor má dvě třídy schválně: obecné
    `.o10-num` níž nastavuje barvu taky a se stejnou specificitou by
@@ -1023,6 +1066,24 @@ body.is-quiz .wrap { padding-top: 18px; }
   border: 3px solid var(--accent-a);
 }
 .o10-sum .ba-echo.is-empty { width: 1.3em; height: 1.1em; }
+/* velké sčítání: „48 − 30“ v rámečku jako dvojice u Počítej přes 10 -
+   z něj vede šipka na mezivýsledek pod ním */
+.ba-pair {
+  display: flex; align-items: center; gap: clamp(4px, 1.6vw, 8px);
+  padding: 2px 8px; border-radius: 12px; border: 3px solid var(--accent-a);
+}
+/* pod rámečkem drobně „8 si schováme, počítáme 40 − 30“ */
+.ba-head-1 { flex-direction: column; gap: 4px; }
+.ba-note {
+  font-family: 'Nunito', system-ui, sans-serif; font-weight: 700; font-size: clamp(.78rem, 3.4vw, .95rem);
+  line-height: 1.3; text-align: center; color: var(--ink-soft);
+  display: flex; flex-direction: column; align-items: center;
+}
+.ba-note > span { white-space: nowrap; }
+.ba-note b { font-weight: 900; }
+.ba-note-ones { color: var(--pair-result); }
+.ba-note-tens { color: var(--pair-task); }
+.ba-note .ba-echo.is-empty { width: 1.6em; height: 1.1em; vertical-align: middle; border-radius: 5px; }
 .ba-echo-tens { color: var(--pair-task); }
 .ba-echo-ones { color: var(--pair-result); }
 
@@ -1404,6 +1465,8 @@ span.vl-box { cursor: default; }
   font-family: 'Baloo 2', sans-serif; font-weight: 700; font-size: 1.6rem; line-height: 1.9;
 }
 .uu-word { white-space: nowrap; }
+/* Pravopis na lehké úrovni - jedno samotné slovo, tak větší. */
+.uu-sentence.is-word { font-size: 2.4rem; }
 .uu-gap {
   display: inline-block; min-width: 1.15em; height: 1.4em; padding: 0 2px; margin: 0 1px;
   vertical-align: baseline; cursor: pointer; text-align: center;
@@ -1418,7 +1481,8 @@ span.uu-gap { cursor: default; }
 .uu-gap.is-fix { border: 3px dashed var(--good); }
 .uu-keys { display: flex; justify-content: center; gap: 12px; }
 .uu-key {
-  width: 72px; height: 64px; cursor: pointer;
+  /* šířka podle obsahu - pravopis má na klávese i „mně" nebo „ch" */
+  min-width: 72px; height: 64px; padding: 0 12px; cursor: pointer;
   border: 3px solid transparent; border-radius: 16px; background: var(--surface-2); color: var(--ink);
   font-family: 'Baloo 2', sans-serif; font-weight: 800; font-size: 2.2rem; line-height: 1;
 }
