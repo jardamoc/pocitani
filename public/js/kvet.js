@@ -8,7 +8,7 @@ import { rnd, shuffle } from './random.js';
    a dítě ho doplní (na lehčích úrovních vybírá z nabídky čísel).
 
    Trénuje se doplňování do celku: kolik chybí do 100, když už mám
-   20 + 10 + 0? Číslo uprostřed se losuje pro každou kytičku zvlášť
+   20 + 10 + 30? Číslo uprostřed se losuje pro každou kytičku zvlášť
    a jak velké je, řídí obtížnost (`lo`-`hi`, krok `step`). Karta
    „Do kolika počítáme?“ je u kytiček schovaná - dřív byl střed vždycky
    přesně rozsah a uživateli vadilo, že je pořád 20 (7. 11. 2026).
@@ -27,14 +27,13 @@ export const KVET_LEVEL_KEYS = Object.keys(KVET_LEVELS);
 
 export const KVET_FLOWERS = 2;
 
-/* Rozdělí `units` kroků do `n` lístků. Žádný lístek nesmí nést celý součet
-   (ostatní by byly samé nuly) a nula smí být nejvýš jedna. */
+/* Rozdělí `units` kroků do `n` lístků. Nula na lístku nesmí být nikde -
+   lístek „0“ i doplnění „chybí 0“ uživateli vadilo (7. 11. 2026). */
 function split(units, n) {
-  for (let i = 0; i < 200; i++) {
-    const cuts = Array.from({ length: n - 1 }, () => rnd(0, units)).sort((x, y) => x - y);
+  for (let i = 0; units >= n && i < 200; i++) {
+    const cuts = Array.from({ length: n - 1 }, () => rnd(1, units - 1)).sort((x, y) => x - y);
     const parts = [...cuts, units].map((c, k) => c - (k ? cuts[k - 1] : 0));
-    if (Math.max(...parts) === units) continue;
-    if (parts.filter((p) => p === 0).length > 1) continue;
+    if (parts.includes(0)) continue;
     return parts;
   }
   // záchrana pro malé součty: rovnoměrně, zbytek do prvního lístku
@@ -50,13 +49,13 @@ function flower(target, n, step) {
 /* Nabídka: správná čísla a k nim věrohodní sousedé, celkem šest. */
 function choices(answers, target, step) {
   const out = [...new Set(answers)];
-  const pool = shuffle(Array.from({ length: target / step + 1 }, (_, k) => k * step))
+  const pool = shuffle(Array.from({ length: target / step }, (_, k) => (k + 1) * step))
     .sort((x, y) => Math.min(...answers.map((a) => Math.abs(x - a))) - Math.min(...answers.map((a) => Math.abs(y - a))));
   for (const n of pool) {
     if (out.length >= 6) break;
     if (!out.includes(n)) out.push(n);
   }
-  /* Do 40 po desítkách je jen pět čísel (0 až 40) - uživatel chce vždycky
+  /* Do 40 po desítkách jsou jen čtyři čísla (10 až 40) - uživatel chce vždycky
      šest tlačítek, takže se jedno špatné číslo zopakuje. */
   const spare = pool.filter((n) => !answers.includes(n));
   for (let i = 0; out.length < 6; i++) out.push(spare.length ? spare[i % spare.length] : pool[i % pool.length]);

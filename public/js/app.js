@@ -1735,7 +1735,7 @@ function bigaddHTML(ex) {
       <svg class="o10-arrows" aria-hidden="true"></svg>
       <div class="ba-top">
         <div class="ba-split">
-          <span class="o10-num ba-b"><span class="ba-b-pre"><span class="o10-num">${ex.a}</span><span class="o10-op">${sign}</span></span>${ex.b}<span class="o10-op ba-b-eq">=</span></span>
+          <span class="o10-num ba-b"><span class="ba-b-pre"><span class="o10-num">${ex.a}</span><span class="o10-op">${sign}</span></span>${ex.b}<span class="ba-b-eq"><span class="o10-op">=</span>${echoC}</span></span>
           <svg class="ba-legs" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true">
             <line x1="50" y1="1" x2="23" y2="23" class="ba-leg-tens"/><line x1="50" y1="1" x2="77" y2="23" class="ba-leg-ones"/>
           </svg>

@@ -1034,7 +1034,8 @@ body.is-quiz .wrap { padding-top: 18px; }
 }
 .ba-b-pre { right: 100%; margin-right: var(--ba-op-gap); }
 .ba-b-eq { left: 100%; margin-left: var(--ba-op-gap); }
-.ba-b-pre .o10-num, .ba-b-pre .o10-op { line-height: 1; }
+.ba-b-pre .o10-num, .ba-b-pre .o10-op,
+.ba-b-eq .o10-num, .ba-b-eq .o10-op { line-height: 1; }
 .ba-split { display: flex; flex-direction: column; align-items: center; }
 .ba-legs {
   width: calc(var(--cell) * 2 + var(--ba-gap)); height: clamp(16px, 5vw, 26px);

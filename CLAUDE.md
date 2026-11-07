@@ -516,7 +516,8 @@ kytička s barevnými lístky, žlutým středem, stonkem a trávou.
 - Lehká 3 lístky po desítkách, střední 4 po desítkách — obě s nabídkou šesti čísel
   (`ex.numbers`, klávesa `num:`); těžká 4 lístky s libovolnými čísly a psaní. Po desítkách
   jen při součtu dělitelném deseti a aspoň 40. Nabídka má **vždycky šest tlačítek** — do 40
-  po desítkách existuje jen pět čísel, takže se jedno špatné zopakuje (přání uživatele).
+  po desítkách existují jen čtyři čísla, takže se špatná zopakují (přání uživatele).
+  **Nula na lístku ani v nabídce není** (lístek „0“ a „chybí 0“ uživateli vadily, 7. 11. 2026).
 - Stejná cesta jako rozklad: jedno políčko na kytičku, `PART_SEL.kvet = '.kv-input'`.
   `op: 'add'` je **jen zástupné** — kytičky proto musí ven z `tenFrameHTML()` a jsou
   v `PLACEHOLDER_OP` ve `stats.js`.
