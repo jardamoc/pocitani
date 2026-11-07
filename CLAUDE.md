@@ -501,6 +501,12 @@ Rozsah je strop, ale nejvýš 100. **V nastavení jsou jen chipy do 50 a do 100*
   po kouscích“ ve vysvětlení by jinak bylo „− 0“.
 - Tagy chyb `bigaddSplit` / `bigaddTens` / `bigaddOnes` podle prvního špatného kroku.
 - Barvy desítek a jednotek jsou `--pair-task` / `--pair-result` (mimo témata).
+- **Nápověda s korunami** (lehká a střední, 7. 11. 2026, `coinsHelpHTML()` v `app.js`): otazník nad
+  zadáním, po klepnutí mince (vlastní kresba podobná skutečným, ne fotky — rozhodl uživatel).
+  Postup krok po kroku: co máme → odebereme/přidáme desetikoruny → koruny (při nedostatku
+  rozměníme desetikorunu) → co zůstane → „Celkem máme …, to je … Kč“. Koruny po pěti pod sebou.
+  Slova ve 4. pádě (`tensAcc`/`onesAcc`). Nic nestojí, na odměny nemá vliv. Stav otevření drží
+  `coinsOpen` (lehká se po každém kroku překresluje).
 ## Kytičky
 
 Dvě kytičky na louce, uprostřed každé číslo a čísla na lístcích ho dají dohromady.
