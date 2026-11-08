@@ -64,6 +64,13 @@ ukáže kola po dnech; data tahá z `GET /api/kola` s heslem v hlavičce.
 
 - **Tajemství nejsou v gitu:** `NTFY_TOPIC` (tajný název kanálu) a `PREHLED_HESLO` se
   nastavují `npx wrangler secret put <JMENO>`.
+  Za `put` patří **jméno** (`PREHLED_HESLO`), hodnota se zadává až na výzvu — napsané
+  heslo v příkazu vytvoří tajemství pojmenované heslem (stalo se 8. 11. 2026).
+  Chyba „latest version of your Worker isn't currently deployed" se spraví
+  `npx wrangler deploy` a novým `secret put`. Jednodušší je dashboard:
+  Workers & Pages → pocitani → Settings → Variables and Secrets.
+- **Přehled je tabulka** (`SLOUPCE` v `prehled.js`): řádek = kolo, pod záhlavím filtr
+  každého sloupce (výběr u sloupců s `vyber`, jinak hledání textu), klik na záhlaví řadí.
 - Bez sítě zůstane zpráva ve frontě (`pocitani.hlaseni.v1` přes `storage.js`, QR ho
   nepřenáší) a odejde při dalším spuštění nebo události `online`. Na `localhost` se nic neposílá.
 - Jméno zařízení se zadává v dialogu Nastavení za heslem, jinak se odhadne z prohlížeče.
