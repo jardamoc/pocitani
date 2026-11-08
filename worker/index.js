@@ -54,7 +54,7 @@ function ocistiKolo(k) {
   return {
     id: k.id,
     at: cislo(k.at, 9e15) || Date.now(),
-    zarizeni: { id: text(z.id, 64), jmeno: text(z.jmeno, 40) || 'Neznámé zařízení' },
+    zarizeni: { id: text(z.id, 64), jmeno: text(z.jmeno, 40) || 'Neznámé zařízení', typ: text(z.typ, 40) },
     mode: text(k.mode, 20),
     hra: text(k.hra, 60),
     uroven: text(k.uroven, 30),
@@ -88,6 +88,11 @@ async function prijmiKolo(request, env, ctx) {
     kolo = null;
   }
   if (!kolo) return json({ chyba: 'Vadná data.' }, 400);
+
+  /* IP a priblizne misto doplni server - prohlizec je nezna a od nej by se
+     verit nedalo. Misto je odhad Cloudflaru podle IP, ne GPS. */
+  kolo.ip = text(request.headers.get('CF-Connecting-IP') || '', 64);
+  kolo.misto = [request.cf?.city, request.cf?.country].filter(Boolean).map((s) => text(s, 60)).join(', ');
 
   const hodina = Date.now() - 3600 * 1000;
   const { n } = await env.DB.prepare('SELECT COUNT(*) AS n FROM kola WHERE prijato > ?').bind(hodina).first();
@@ -127,6 +132,8 @@ export function zpravaNtfy(k) {
   if (k.odmena) radky.push(`🎁 ${k.odmena.kategorie}${k.odmena.vyber ? ' (vybere si sbírku)' : ''}`);
   if (k.jde.length) radky.push(`👍 ${k.jde.join(' ')}`);
   if (k.pozor.length) radky.push(`🔎 ${k.pozor.join(' ')}`);
+  const odkud = [k.zarizeni.typ, k.ip, k.misto].filter(Boolean).join(' · ');
+  if (odkud) radky.push(`📍 ${odkud}`);
   return {
     title: `${k.zarizeni.jmeno}: ${k.hra}`,
     message: radky.join('\n'),

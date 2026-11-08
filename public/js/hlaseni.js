@@ -77,7 +77,7 @@ export async function nastavJmeno(jmeno) {
 /* Prida kolo do fronty a hned zkusi odeslat. Na vysledek se neceka. */
 export function odesliKolo(kolo) {
   if (!data) data = ocisti(null);
-  data.outbox = [...data.outbox, { ...kolo, zarizeni: { id: data.id, jmeno: jmenoZarizeni() } }].slice(-MAX_FRONTA);
+  data.outbox = [...data.outbox, { ...kolo, zarizeni: { id: data.id, jmeno: jmenoZarizeni(), typ: odhadZarizeni() } }].slice(-MAX_FRONTA);
   void storage.saveHlaseni(data).then(odesliFrontu);
 }
 

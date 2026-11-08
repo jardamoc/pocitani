@@ -55,10 +55,11 @@ hlavičky jsou v `public/_headers` — wrangler ten soubor přečte a samotný h
 
 ## Hlášení rodičům
 
-Po každém dohraném kole pošle `hlaseni.js` shrnutí na `POST /api/kolo` (zařízení, hra,
+Po každém dohraném kole pošle `hlaseni.js` shrnutí na `POST /api/kolo` (jméno a typ zařízení, hra,
 obtížnost, volby, rozsah, výsledek, čas, odměna, co jde / na co pozor, chyby). Worker ho uloží
 do D1 (`pocitani`, tabulka v `worker/schema.sql`, `id` = `gameId`, takže dvojí odeslání nic
-nezdvojí) a pošle upozornění přes **ntfy.sh** do telefonu. Stránka `public/prehled.html`
+nezdvojí) a pošle upozornění přes **ntfy.sh** do telefonu. IP adresu (`CF-Connecting-IP`)
+a přibližné město (`request.cf`) doplňuje server, od prohlížeče se neberou. Stránka `public/prehled.html`
 ukáže kola po dnech; data tahá z `GET /api/kola` s heslem v hlavičce.
 
 - **Tajemství nejsou v gitu:** `NTFY_TOPIC` (tajný název kanálu) a `PREHLED_HESLO` se

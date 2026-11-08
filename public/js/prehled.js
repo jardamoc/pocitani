@@ -110,7 +110,14 @@ function karta(k) {
       k.odmena ? ` · 🎁 ${k.odmena.kategorie}` : ''),
     k.jde?.length ? h('p', 'ph-good-text', '👍 ', k.jde.join(' ')) : null,
     k.pozor?.length ? h('p', 'ph-bad-text', '🔎 ', k.pozor.join(' ')) : null,
-    chyby);
+    chyby,
+    odkud(k));
+}
+
+// typ zarizeni z prohlizece, IP a priblizne misto (doplnuje server)
+function odkud(k) {
+  const text = [k.zarizeni?.typ, k.ip ? `IP ${k.ip}` : '', k.misto].filter(Boolean).join(' · ');
+  return text ? h('p', 'ph-where', `📍 ${text}`) : null;
 }
 
 el('phGate').addEventListener('submit', async (e) => {
