@@ -28,16 +28,19 @@
           <option value="365">rok</option>
         </select>
       </label>
-      <label>Zařízení
-        <select id="phDevice"><option value="">všechna</option></select>
-      </label>
-      <label>Hra
-        <select id="phGame"><option value="">všechny</option></select>
-      </label>
       <button id="phReload" type="button">Načíst znovu</button>
+      <button id="phClear" type="button" class="ph-ghost">Zrušit filtry</button>
     </div>
     <div id="phSummary" class="ph-card ph-summary"></div>
-    <div id="phList"></div>
+    <div class="ph-table-wrap">
+      <table id="phTable" class="ph-table">
+        <thead>
+          <tr id="phHead"></tr>
+          <tr id="phFilter" class="ph-filter-row"></tr>
+        </thead>
+        <tbody id="phBody"></tbody>
+      </table>
+    </div>
   </section>
 </main>
 <script type="module" src="js/prehled.js"></script>
