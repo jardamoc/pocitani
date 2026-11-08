@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Přehled výsledků</title>
+<link rel="stylesheet" href="css/prehled.css">
+</head>
+<body>
+<main class="ph">
+  <h1>Přehled výsledků</h1>
+
+  <form id="phGate" class="ph-card ph-gate" autocomplete="off">
+    <label for="phPass">Heslo k přehledu</label>
+    <input id="phPass" type="password" autocomplete="current-password">
+    <button type="submit">Otevřít</button>
+    <p id="phError" class="ph-error" hidden></p>
+  </form>
+
+  <section id="phPanel" hidden>
+    <div class="ph-filters">
+      <label>Období
+        <select id="phDays">
+          <option value="7">7 dní</option>
+          <option value="30" selected>30 dní</option>
+          <option value="90">90 dní</option>
+          <option value="365">rok</option>
+        </select>
+      </label>
+      <label>Zařízení
+        <select id="phDevice"><option value="">všechna</option></select>
+      </label>
+      <label>Hra
+        <select id="phGame"><option value="">všechny</option></select>
+      </label>
+      <button id="phReload" type="button">Načíst znovu</button>
+    </div>
+    <div id="phSummary" class="ph-card ph-summary"></div>
+    <div id="phList"></div>
+  </section>
+</main>
+<script type="module" src="js/prehled.js"></script>
+</body>
+</html>

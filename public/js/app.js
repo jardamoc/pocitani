@@ -31,6 +31,8 @@ import * as rewards from './rewards.js';
 import * as storage from './storage.js';
 import { bindCollectionTaps, dismissGranted, dismissPopup, renderCollection, setCollectionView, showGranted, updateBadge } from './rewards-ui.js';
 import { dismissExport, openExport } from './export-ui.js';
+import { nactiHlaseni, odesliKolo } from './hlaseni.js';
+import { categoryLabel } from './rewards-data.js';
 import { mergePayload, readIncoming } from './transfer.js';
 
 const el = (id) => document.getElementById(id);
@@ -3786,7 +3788,61 @@ function finish() {
   renderResult(report);
   show('result');
   if (report.pct >= 70) confetti(46);
-  grantRewards(report);
+  const id = gameId; // grantRewards ho vynuluje
+  const granted = grantRewards(report);
+  if (id) hlasKolo(report, granted, id);
+}
+
+/* Co se hralo za kombinaci - stejne popisky jako na karte s operacemi. */
+function comboLabels() {
+  const vyber = (keys, table, on) => keys.filter((k) => on.includes(k)).map((k) => table[k].label);
+  if (isPravMode()) return vyber(PRAV_TOPIC_KEYS, PRAV_TOPICS, config.pravTopics);
+  if (isPosMode()) return vyber(POS_TYPE_KEYS, POS_TYPES, config.posTypes);
+  if (isVetyMode()) return vyber(VETY_TASK_KEYS, VETY_TASKS, config.vetyTasks);
+  if (isVyznamMode()) return vyber(VYZNAM_TASK_KEYS, VYZNAM_TASKS, config.vyznamTasks);
+  if (isSluchMode()) return vyber(SLUCH_FORM_KEYS, SLUCH_FORMS, config.sluchForms);
+  if (isKlavirMode()) return vyber(KLAVIR_FORM_KEYS, KLAVIR_FORMS, config.klavirForms);
+  if (isHudbaMode()) return vyber(HUDBA_TASK_KEYS, HUDBA_TASKS, config.hudbaTasks);
+  if (isAddSubMode()) return vyber(OVER10_OPS, OPS, config.over10Ops);
+  if (config.mode === 'calc') {
+    return [...vyber(Object.keys(OPS), OPS, config.ops), ...vyber(Object.keys(EXTRA_KINDS), EXTRA_KINDS, config.kinds)];
+  }
+  if (config.mode === 'pexeso' || config.mode === 'grid') return vyber(Object.keys(OPS), OPS, config.ops);
+  return [];
+}
+
+// hry, kde se v nastaveni voli "Do kolika pocitame"
+const RANGE_MODES = new Set(['calc', 'over10', 'riddle', 'grid', 'pexeso', 'bigmul']);
+
+/* Shrnuti kola pro rodice (hlaseni.js -> server -> prehled a ntfy).
+   Chyby za sebou nesmi nic shodit - hra uz je dohrana. */
+function hlasKolo(report, granted, id) {
+  try {
+    const bezZnacek = (s) => String(s ?? '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+    const reward = granted?.[0];
+    const sekundy = Math.round(attempts.reduce((sum, at) => sum + (at.ms > 0 ? at.ms : 0), 0) / 1000);
+    odesliKolo({
+      id,
+      at: Date.now(),
+      mode: config.mode,
+      hra: MODES[config.mode]?.label || config.mode,
+      uroven: usesLevel() ? levelTable()[config.level]?.label || '' : '',
+      volby: comboLabels(),
+      rozsah: isBigaddMode() ? bigaddMax(config.max) : RANGE_MODES.has(config.mode) ? config.max : 0,
+      celkem: report.total,
+      spravne: report.correct,
+      procent: report.pct,
+      sekundy,
+      odmena: reward ? { kategorie: categoryLabel(reward.category) || reward.category || '', vyber: !!reward.pending } : null,
+      jde: report.strengths.map(bezZnacek),
+      pozor: report.watchOuts.map(bezZnacek),
+      chyby: (report.missedList || []).slice(0, 10).map((m) => ({
+        zadani: bezZnacek(m.text), spravne: bezZnacek(m.answer), dala: bezZnacek(m.given),
+      })),
+    });
+  } catch (err) {
+    console.warn('Hlaseni kola se nepodarilo pripravit', err);
+  }
 }
 
 /* Odmeny se zapisou do sbirky hned tady, jeste pred spustenim animace. Okno
@@ -3834,8 +3890,9 @@ function grantRewards(report) {
      set, denni objem i zaznam o zpracovanem gameId. */
   storage.saveRewards(rewardData);
   updateBadge(rewardData);
-  if (!granted?.length) return;
+  if (!granted?.length) return granted;
   showGranted(granted, afterRewardDialog, claimReward);
+  return granted;
 }
 
 function verdictFor(pct) {
@@ -4061,6 +4118,7 @@ async function boot() {
   applyTheme();
   renderConfigScreen();
   await acceptIncoming(); // prenos z QR kodu az nad nactenym stavem
+  await nactiHlaseni(); // jmeno zarizeni + odeslani zprav, ktere cekaji z minula
 }
 
 boot();

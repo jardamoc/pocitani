@@ -1,6 +1,7 @@
 import { qrMatrix, qrSvg, qrCapacity } from './qr.js';
 import { buildTransferUrl } from './transfer.js';
 import { verzeText } from './version.js';
+import { nastavJmeno, odhadZarizeni, vlastniJmeno } from './hlaseni.js';
 
 /* Dialog "Export" - prenos progresu na druhe zarizeni a mazani.
  *
@@ -81,6 +82,10 @@ export function openExport({ state, rewardData, onWipe }) {
     overlay.removeEventListener('click', onClick);
     gate.removeEventListener('submit', onSubmit);
     pass.removeEventListener('input', onInput);
+    overlay.removeEventListener('change', onJmeno);
+    // Escape zavre okno bez udalosti change - jmeno se ulozi i tak
+    const jmeno = el('deviceName');
+    if (jmeno && !panel.hidden && jmeno.value.trim() !== vlastniJmeno()) void nastavJmeno(jmeno.value);
     overlay.hidden = true;
     el('exportQr').innerHTML = '';
     pass.value = '';
@@ -94,8 +99,18 @@ export function openExport({ state, rewardData, onWipe }) {
     // razitko nasazeni uplne dole, at je videt, jestli zarizeni ma novou verzi
     const verze = el('exportVersion');
     if (verze) verze.textContent = verzeText();
+    const jmeno = el('deviceName');
+    if (jmeno) {
+      jmeno.value = vlastniJmeno();
+      jmeno.placeholder = odhadZarizeni();
+    }
     renderQr(state, rewardData);
   };
+
+  // jmeno se ulozi pri opusteni policka (a Enterem)
+  function onJmeno(e) {
+    if (e.target.id === 'deviceName') void nastavJmeno(e.target.value);
+  }
 
   /* Potvrzovaci tlacitko tu neni - jakmile heslo sedi, dialog se odemkne sam.
      Chybu proto hlasime az pri Enteru, ne behem psani. */
@@ -136,6 +151,7 @@ export function openExport({ state, rewardData, onWipe }) {
   pass.addEventListener('input', onInput);
   document.addEventListener('keydown', onKey, true);
   overlay.addEventListener('click', onClick);
+  overlay.addEventListener('change', onJmeno);
   closeExport = close;
   pass.focus();
 }

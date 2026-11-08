@@ -48,9 +48,27 @@ zastaví se na jiné větvi než `main` a na neuložených změnách (jinak by s
 něco jiného, než je v gitu), pak odešle commity, spustí nasazení a **nakonec si stáhne
 živý web a zkontroluje ho** — hláška o úspěšném nasazení sama o sobě nestačí.
 
-**Hostuje to Cloudflare Workers**, ne Pages: `public/` se nahraje jako statická aktiva
-a žádný kód na serveru neběží (`wrangler.jsonc` proto schválně nemá `main`). Bezpečnostní
+**Hostuje to Cloudflare Workers**, ne Pages: `public/` se nahraje jako statická aktiva.
+Od 8. 11. 2026 má Worker i malý kód na serveru (`worker/index.js`, `main` v `wrangler.jsonc`),
+který dostane jen adresy mimo `public/` — viz *Hlášení rodičům*. Bezpečnostní
 hlavičky jsou v `public/_headers` — wrangler ten soubor přečte a samotný ho neservíruje.
+
+## Hlášení rodičům
+
+Po každém dohraném kole pošle `hlaseni.js` shrnutí na `POST /api/kolo` (zařízení, hra,
+obtížnost, volby, rozsah, výsledek, čas, odměna, co jde / na co pozor, chyby). Worker ho uloží
+do D1 (`pocitani`, tabulka v `worker/schema.sql`, `id` = `gameId`, takže dvojí odeslání nic
+nezdvojí) a pošle upozornění přes **ntfy.sh** do telefonu. Stránka `public/prehled.html`
+ukáže kola po dnech; data tahá z `GET /api/kola` s heslem v hlavičce.
+
+- **Tajemství nejsou v gitu:** `NTFY_TOPIC` (tajný název kanálu) a `PREHLED_HESLO` se
+  nastavují `npx wrangler secret put <JMENO>`.
+- Bez sítě zůstane zpráva ve frontě (`pocitani.hlaseni.v1` přes `storage.js`, QR ho
+  nepřenáší) a odejde při dalším spuštění nebo události `online`. Na `localhost` se nic neposílá.
+- Jméno zařízení se zadává v dialogu Nastavení za heslem, jinak se odhadne z prohlížeče.
+- `hlasKolo()` v `app.js` je celé v `try` — chyba hlášení nesmí shodit konec hry.
+- Server bere jen známá pole ve známých mezích (`ocistiKolo()`) a víc než 120 kol za hodinu
+  odmítne; adresa `/api/kolo` je veřejná, heslo mít nemůže (bylo by vidět ve zdrojáku).
 
 `wrangler` **není v PATH**, jede se přes `npx`. Přihlášení je jednorázové
 (`npx wrangler login`, otevře prohlížeč) a ukládá se do `%APPDATA%\xdg.config\.wrangler`.
@@ -108,7 +126,10 @@ neodklízej (`stash`, `checkout`) — zeptej se uživatele.
 | `public/js/version.js` | razítko posledního nasazení (datum + pořadí v rámci dne) — **přepisuje ho `publish.mjs`**, ručně se needituje |
 | `public/js/qr.js` | generátor QR kódu podle normy — bez knihovny |
 | `public/js/transfer.js` | přenos postupu mezi zařízeními: zabalení, adresa, slučování |
-| `public/js/export-ui.js` | dialog „Export" — heslo, QR kód, tři mazací tlačítka |
+| `public/js/export-ui.js` | dialog „Export" — heslo, jméno zařízení, QR kód, tři mazací tlačítka |
+| `public/js/hlaseni.js` | hlášení rodičům: jméno zařízení, fronta zpráv, odeslání na `/api/kolo` |
+| `public/prehled.html`, `js/prehled.js`, `css/prehled.css` | přehled výsledků pro rodiče, za heslem ze serveru |
+| `worker/index.js`, `worker/schema.sql` | kód na serveru: příjem kol do D1, ntfy, `/api/kola` pro přehled |
 | `public/img/odmeny/dumplings/` | 78 postaviček (`.webp`, složka podle kategorie) a 5 nadpisů v `_category_titles/` (sdílí je všechny sbírky) |
 | `public/img/odmeny/labubu/` | 121 labubáků (`.webp`, složka podle kategorie) |
 | `public/css/styles.css` | vše včetně devíti barevných témat, tmavého režimu a odměn |
@@ -134,7 +155,7 @@ Prosté ES moduly, žádný framework, žádné závislosti. Závislosti jdou je
 (`app.js` si z `abc.js` bere navíc funkce přesunu a z `pos.js` tabulky a `posCheck` / `posTag`),
 `rewards-data.js → rewards.js → rewards-ui.js → app.js`,
 `validate.js → stats.js / rewards.js → storage.js → app.js` a
-`qr.js / transfer.js → export-ui.js → app.js`. Kruh nezaváděj.
+`qr.js / transfer.js → export-ui.js → app.js` a `storage.js → hlaseni.js → export-ui.js / app.js`. Kruh nezaváděj.
 
 ## Ukládání dat
 

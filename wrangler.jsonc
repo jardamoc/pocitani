@@ -1,11 +1,23 @@
 {
-  // Nasazeni na Cloudflare Workers - staticky web, zadny kod na serveru.
-  // Slozka `public/` se nahraje tak, jak lezi; `main` tu schvalne neni.
+  // Nasazeni na Cloudflare Workers. Slozka `public/` se nahraje tak, jak lezi,
+  // a Cloudflare ji servíruje sam. Worker (`main`) dostane jen adresy, ktere
+  // v public/ nejsou - /api/kolo a /api/kola pro hlaseni rodicum.
   "name": "pocitani",
+  "main": "worker/index.js",
   "compatibility_date": "2026-09-11",
   "assets": {
-    "directory": "./public"
+    "directory": "./public",
+    "binding": "ASSETS"
   },
+  // dohrana kola pro prehled; tabulka je v worker/schema.sql
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "pocitani",
+      "database_id": "21a66eb8-f7ca-4098-b3d0-e03eeb42b7a5"
+    }
+  ],
+  // tajemstvi NTFY_TOPIC a PREHLED_HESLO se nastavuji `npx wrangler secret put`
   "observability": {
     "enabled": true
   }

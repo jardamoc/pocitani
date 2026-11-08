@@ -44,9 +44,24 @@ const localBackend = {
      a ulozi ho znovu, aby v nem zustalo nastaveni a tema. */
   async clear(scope) {
     smaz(rewards.STORAGE_KEY);
-    if (scope === 'all') smaz(store.KEY);
+    if (scope === 'all') {
+      smaz(store.KEY);
+      smaz(HLASENI_KEY);
+    }
+  },
+
+  /* Hlaseni rodici: jmeno zarizeni a fronta neodeslanych zprav. Vlastni
+     klic - QR prenos ho neposila, kazde zarizeni ma sve jmeno. */
+  async loadHlaseni() {
+    return precti(HLASENI_KEY);
+  },
+
+  async saveHlaseni(data) {
+    zapis(HLASENI_KEY, data);
   },
 };
+
+const HLASENI_KEY = 'pocitani.hlaseni.v1';
 
 function precti(key) {
   try {
@@ -127,6 +142,17 @@ export async function flush() {
 
   if (state) await backend.saveState(state);
   if (data) await backend.saveRewards(data);
+}
+
+/* Hlaseni rodici (jmeno zarizeni, fronta zprav). Zapisuje se hned, ne pres
+   davku - je to malo a fronta nesmi prijit o zpravu pri zavreni karty.
+   Nahradni backend (testy) tyhle metody mit nemusi. */
+export async function loadHlaseni() {
+  return (await backend.loadHlaseni?.()) ?? null;
+}
+
+export async function saveHlaseni(data) {
+  await backend.saveHlaseni?.(data);
 }
 
 /* Tri rozsahy mazani. Cekajici zapis se nejdriv zahodi - jinak by se

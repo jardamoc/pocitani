@@ -2217,6 +2217,10 @@ body.is-rewards .rewards-toggle { display: none; }
   box-shadow: var(--ring), inset 0 0 0 2px var(--line);
 }
 
+/* jmeno zarizeni pro hlaseni rodicum - bezny text, ne roztazene heslo */
+.export-device { margin-top: 14px; padding-bottom: 14px; border-bottom: 2px dashed var(--line); }
+.export-device .export-device-name { width: 100%; box-sizing: border-box; font-size: 1.1rem; letter-spacing: normal; margin-top: 8px; }
+.export-device a { color: var(--ink); }
 .export-qr { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 16px; }
 /* QR ma vlastni bile pozadi bez ohledu na tmavy rezim - ctecky potrebuji
    kontrast a inverzni kod spousta telefonu neprecte. */
