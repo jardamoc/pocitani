@@ -1515,6 +1515,42 @@ body.is-dark { --pair-task: #93c5fd; --pair-result: #fdba74; }
 .hd[data-task="hd-takt-dopln"] .vt-opts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .hd[data-task="hd-takt-dopln"] .vt-opt { min-width: 0; }
 
+/* ---------- geometrie ----------
+   Obrázky kreslí geokresba.js: čáry `currentColor`, plochy průhledně
+   modré, takže sedí na světlém i tmavém podkladu. Neviditelné hrany
+   těles čárkovaně, pokračování přímky tečkami. */
+.chips-mode .chip.is-on[data-value="geom"] { background: linear-gradient(135deg, #38bdf8, #0f766e); }
+.chips .chip.is-on[data-value="utvar"] { background: linear-gradient(135deg, #60a5fa, #2563eb); }
+.chips .chip.is-on[data-value="najdi"] { background: linear-gradient(135deg, #34d399, #0f766e); }
+.chips .chip.is-on[data-value="cary"] { background: linear-gradient(135deg, #fb923c, #ea580c); }
+.chips .chip.is-on[data-value="kolem"] { background: linear-gradient(135deg, #f472b6, #be185d); }
+.geo-svg { display: block; width: 100%; height: auto; overflow: visible; }
+.geo-svg .geo-f1, .geo-svg .geo-f2, .geo-svg .geo-f3 {
+  fill: #3b82f6; stroke: currentColor; stroke-width: 2.5; stroke-linejoin: round;
+}
+.geo-svg .geo-f1 { fill-opacity: .32; }
+.geo-svg .geo-f2 { fill-opacity: .16; }
+.geo-svg .geo-f3 { fill-opacity: .5; }
+.geo-svg .geo-line { fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.geo-svg .geo-thick { stroke-width: 3.5; }
+.geo-svg .geo-thin { stroke-width: 1.6; }
+.geo-svg .geo-hid { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-dasharray: 5 4; opacity: .75; }
+.geo-svg .geo-tail { fill: none; stroke: currentColor; stroke-width: 5; stroke-linecap: round; stroke-dasharray: 0 9; }
+.geo-svg .geo-dot { fill: currentColor; }
+.geo-svg .geo-label { fill: currentColor; font: italic 700 16px 'Baloo 2', sans-serif; }
+.geo-figure { display: flex; justify-content: center; margin: 0 0 14px; color: var(--ink); }
+.geo-figure .geo-svg { max-width: 200px; }
+.geo-figure.is-line .geo-svg { max-width: 300px; }
+.geo-thing { display: flex; flex-direction: column; align-items: center; margin: 0 0 14px; color: var(--ink); }
+.geo-emoji { font-size: 4.5rem; line-height: 1.1; }
+.geo-thing-name { font-family: 'Baloo 2', sans-serif; font-weight: 700; font-size: 1.3rem; }
+.geo[data-task="geo-show"] .vt-opts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.geo[data-task="geo-show"] .vt-opt { font-size: clamp(.95rem, 4.4vw, 1.2rem); padding: 6px 4px; min-width: 0; }
+.geo[data-task="geo-find"] .vt-opts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.geo-pic { display: flex; align-items: center; justify-content: center; padding: 6px; min-width: 0; }
+.geo-pic .geo-svg { max-width: 130px; }
+.geo-lines .geo-pic .geo-svg { max-width: 170px; }
+
 /* ---------- list „Označ písmenem“ (druhy vět) ----------
    Věty pod sebou, vpravo okénko s písmenem. Okénko je tlačítko a písmeno
    se mění klepáním. Barvu nese podklad a rámeček, text zůstává `--ink`;

@@ -1,10 +1,12 @@
-import { OPS, COMPARES, EXTRA_KINDS, MISSING_LABEL, kindOps, buildRound, buildRiddleRound, buildGridRound, buildOver10Round, buildBigaddRound, buildKvetRound, buildPexesoRound, buildBigmulRound, buildAbcRound, buildPosRound, buildVetyRound, buildVyznamRound, buildPravRound, buildHudbaRound, buildKlavirRound, buildSluchRound, explain, diagnose } from './generator.js';
+import { OPS, COMPARES, EXTRA_KINDS, MISSING_LABEL, kindOps, buildRound, buildRiddleRound, buildGridRound, buildOver10Round, buildBigaddRound, buildKvetRound, buildPexesoRound, buildBigmulRound, buildAbcRound, buildPosRound, buildVetyRound, buildVyznamRound, buildPravRound, buildHudbaRound, buildKlavirRound, buildSluchRound, buildGeomRound, explain, diagnose } from './generator.js';
 import {
   HUDBA_TASKS, HUDBA_TASK_KEYS, HUDBA_COUNTS, HUDBA_LEVELS, HUDBA_LEVEL_KEYS, NOTE_LETTERS, CLEFS, stepOf, PIANO_KEYS,
   KLAVIR_FORMS, KLAVIR_FORM_KEYS, KLAVIR_LEVELS, KLAVIR_LEVEL_KEYS,
   SLUCH_FORMS, SLUCH_FORM_KEYS, SLUCH_LEVELS, SLUCH_LEVEL_KEYS, toneName,
 } from './hudba.js';
 import { staffSVG, symbolSVG, barSVG, barWidth, pianoSVG } from './notace.js';
+import { GEOM_TASKS, GEOM_TASK_KEYS, GEOM_COUNTS, GEOM_LEVELS, GEOM_LEVEL_KEYS } from './geometrie.js';
+import { geoSVG, isLine } from './geokresba.js';
 import { playSeq, playNote } from './zvuk.js';
 import { POS_TYPES, POS_TYPE_KEYS, POS_COUNTS, POS_LEVELS, POS_LEVEL_KEYS, posCheck, posTag } from './pos.js';
 import {
@@ -55,7 +57,7 @@ const BIGADD_MAX_PRESETS = [50, 100];
    uživatele, u matematiky a češtiny). */
 const MODES = {
   calc: { subject: 'math', grade: 1, label: 'Počítání', icon: '🧮', sub: 'Příklady, slovní úlohy, pyramidy' },
-  over10: { subject: 'math', grade: 1, label: 'Počítej přes 10', icon: '🔟', sub: 'Rozlož si příklad krok za krokem' },
+  over10: { subject: 'math', grade: 2, label: 'Počítej přes 10', icon: '🔟', sub: 'Rozlož si příklad krok za krokem' },
   bigadd: { subject: 'math', grade: 2, label: 'Velké sčítání', icon: '➕', sub: 'Do 100 po desítkách a jednotkách' },
   kvet: { subject: 'math', grade: 2, label: 'Kytičky', icon: '🌼', sub: 'Doplň lístek, ať kytička sedí' },
   riddle: { subject: 'math', grade: 2, label: 'Obrázkové hádanky', icon: '🧩', sub: 'Zjisti, kolik je který obrázek' },
@@ -66,6 +68,7 @@ const MODES = {
      nastavení i v historii kol. */
   pexeso: { subject: 'math', grade: 1, label: 'Najdi dvojice', icon: '🔗', sub: 'Spoj příklad s jeho výsledkem' },
   bigmul: { subject: 'math', grade: 3, label: 'Velké násobení', icon: '✖️', sub: 'Rozlož si ho na desítky a jednotky' },
+  geom: { subject: 'math', grade: 2, label: 'Geometrie', icon: '📐', sub: 'Útvary, tělesa a čáry' },
   abc: { subject: 'czech', grade: 2, label: 'Abeceda', icon: '🔤', sub: 'Seřaď slova podle abecedy' },
   pos: { subject: 'czech', grade: 2, label: 'Slovní druhy', icon: '🔍', sub: 'Najdi ve větě slovesa nebo podstatná jména' },
   vety: { subject: 'czech', grade: 2, label: 'Druhy vět', icon: '💬', sub: 'Urči, jaká je věta, a udělej z ní otázku' },
@@ -112,11 +115,13 @@ const HUDBA_COUNT_DEFAULT = 10;
 const LEVEL_TABLES = {
   riddle: RIDDLE_LEVELS, grid: GRID_LEVELS, over10: OVER10_LEVELS, bigadd: BIGADD_LEVELS, kvet: KVET_LEVELS, pexeso: PEXESO_LEVELS, bigmul: BIGMUL_LEVELS,
   abc: ABC_LEVELS, pos: POS_LEVELS, vety: VETY_LEVELS, vyznam: VYZNAM_LEVELS, prav: PRAV_LEVELS, hudba: HUDBA_LEVELS, klavir: KLAVIR_LEVELS, sluch: SLUCH_LEVELS,
+  geom: GEOM_LEVELS,
 };
 const LEVEL_KEYS = {
   riddle: RIDDLE_LEVEL_KEYS, grid: GRID_LEVEL_KEYS, over10: OVER10_LEVEL_KEYS, bigadd: BIGADD_LEVEL_KEYS, kvet: KVET_LEVEL_KEYS, pexeso: PEXESO_LEVEL_KEYS,
   bigmul: BIGMUL_LEVEL_KEYS, abc: ABC_LEVEL_KEYS, pos: POS_LEVEL_KEYS, vety: VETY_LEVEL_KEYS,
   vyznam: VYZNAM_LEVEL_KEYS, prav: PRAV_LEVEL_KEYS, hudba: HUDBA_LEVEL_KEYS, klavir: KLAVIR_LEVEL_KEYS, sluch: SLUCH_LEVEL_KEYS,
+  geom: GEOM_LEVEL_KEYS,
 };
 
 /* Společná množina klíčů obtížnosti. Tabulky výš ji musí mít všechny stejnou,
@@ -258,6 +263,7 @@ const VYCHOZI_CONFIG = () => ({
   hudbaTasks: [...HUDBA_TASK_KEYS], hudbaCount: HUDBA_COUNT_DEFAULT,
   klavirForms: [...KLAVIR_FORM_KEYS], klavirCount: HUDBA_COUNT_DEFAULT,
   sluchForms: [...SLUCH_FORM_KEYS], sluchCount: HUDBA_COUNT_DEFAULT,
+  geomTasks: [...GEOM_TASK_KEYS], geomCount: GEOM_COUNTS[0],
 });
 
 /* Stav se jen deklaruje. Naplni ho `boot()` na konci souboru, protoze
@@ -315,6 +321,7 @@ function normalizeConfig(raw) {
   const hudbaTasks = Array.isArray(raw.hudbaTasks) ? raw.hudbaTasks.filter((t) => HUDBA_TASK_KEYS.includes(t)) : [];
   const klavirForms = Array.isArray(raw.klavirForms) ? raw.klavirForms.filter((t) => KLAVIR_FORM_KEYS.includes(t)) : [];
   const sluchForms = Array.isArray(raw.sluchForms) ? raw.sluchForms.filter((t) => SLUCH_FORM_KEYS.includes(t)) : [];
+  const geomTasks = Array.isArray(raw.geomTasks) ? raw.geomTasks.filter((t) => GEOM_TASK_KEYS.includes(t)) : [];
   /* Samostatná hra „Doplň u, ú, ů“ je teď téma Pravopisu - kdo ji měl
      vybranou, dostane Pravopis jen s tímhle tématem a se stejným počtem. */
   const wasUu = raw.mode === 'uu';
@@ -351,6 +358,9 @@ function normalizeConfig(raw) {
     klavirCount: HUDBA_COUNTS.includes(Number(raw.klavirCount)) ? Number(raw.klavirCount) : HUDBA_COUNT_DEFAULT,
     sluchForms: sluchForms.length ? sluchForms : [...SLUCH_FORM_KEYS],
     sluchCount: HUDBA_COUNTS.includes(Number(raw.sluchCount)) ? Number(raw.sluchCount) : HUDBA_COUNT_DEFAULT,
+    // starší uložené nastavení geometrii nezná - prázdný výběr = všechny úlohy
+    geomTasks: geomTasks.length ? geomTasks : [...GEOM_TASK_KEYS],
+    geomCount: GEOM_COUNTS.includes(Number(raw.geomCount)) ? Number(raw.geomCount) : GEOM_COUNTS[0],
   };
 }
 
@@ -383,6 +393,8 @@ const isKlavirMode = () => config.mode === 'klavir';
 const isSluchMode = () => config.mode === 'sluch';
 /* Hry pod záložkou Hudba - stejné karty, žádný rozsah čísel. */
 const isMusicMode = () => isHudbaMode() || isKlavirMode() || isSluchMode();
+/* Geometrie je pod Matematikou, ale nic se v ní nepočítá - karty má jako hudba. */
+const isGeomMode = () => config.mode === 'geom';
 /* Druhy vět jen s listem „Označ písmenem“ - taky jediná úloha za kolo. */
 const isVetyBoardOnly = () => isVetyMode() && config.vetyTasks.every((t) => t === 'list');
 /* Význam slov se samotným spojováním je jedna plocha - počet úloh odpadá. */
@@ -509,7 +521,8 @@ function renderModeCards() {
   const vety = isVetyMode();
   const vyznam = isVyznamMode();
   const prav = isPravMode();
-  const hudba = isMusicMode();
+  // geometrie má karty stejné jako hudba: úlohy, obtížnost, počet, žádný rozsah
+  const hudba = isMusicMode() || isGeomMode();
   el('card-ops').hidden = isRiddleMode() || bigmul || abc || isKvetMode();
   el('card-kinds').hidden = usesLevel();
   el('card-level').hidden = !usesLevel();
@@ -591,7 +604,7 @@ function renderModeCards() {
 
   if (hudba) {
     el('levelNote').textContent = `${level.label} – ${level.note}.`;
-    opsNote.textContent = (isKlavirMode() ? config.klavirForms : isSluchMode() ? config.sluchForms : config.hudbaTasks).length > 1
+    opsNote.textContent = (isGeomMode() ? config.geomTasks : isKlavirMode() ? config.klavirForms : isSluchMode() ? config.sluchForms : config.hudbaTasks).length > 1
       ? 'Úlohy se budou v kole střídat – nad každou je napsané, co máš udělat.'
       : 'Můžeš si zapnout víc úloh naráz, pak se budou střídat.';
     opsNote.hidden = false;
@@ -754,6 +767,10 @@ function renderConfigScreen() {
     ? HUDBA_TASK_KEYS
       .map((key) => chipHTML(key, `${HUDBA_TASKS[key].emoji} ${HUDBA_TASKS[key].label}`, config.hudbaTasks.includes(key)))
       .join('')
+    : isGeomMode()
+    ? GEOM_TASK_KEYS
+      .map((key) => chipHTML(key, `${GEOM_TASKS[key].emoji} ${GEOM_TASKS[key].label}`, config.geomTasks.includes(key)))
+      .join('')
     : opKeys
       .map((key) => chipHTML(key, `${OPS[key].emoji} ${OPS[key].label}`, opOn.includes(key)))
       .join('');
@@ -778,6 +795,8 @@ function renderConfigScreen() {
       ? HUDBA_COUNTS.map((n) => chipHTML(n, `${n} úloh`, config.klavirCount === n)).join('')
       : isSluchMode()
       ? HUDBA_COUNTS.map((n) => chipHTML(n, `${n} úloh`, config.sluchCount === n)).join('')
+      : isGeomMode()
+      ? GEOM_COUNTS.map((n) => chipHTML(n, `${n} úloh`, config.geomCount === n)).join('')
       : COUNT_PRESETS.map((n) => chipHTML(n, `${n} příkladů`, config.count === n)).join('');
 
   /* Velké sčítání má smysl jen od 40 výš - malé rozsahy se tam vůbec
@@ -869,7 +888,7 @@ function renderLastHint() {
 
   const pct = Math.round((last.correct / last.total) * 100);
   const what = isRiddleMode() ? 'hádanek' : isOver10Mode() ? 'rozkladů' : isPosMode() || isVetyMode() ? 'vět'
-    : isVyznamMode() || isMusicMode() || isPravMode() ? 'úloh' : 'příkladů';
+    : isVyznamMode() || isMusicMode() || isPravMode() || isGeomMode() ? 'úloh' : 'příkladů';
   const focus = isRiddleMode()
     ? ' Každá hádanka je pokaždé nová.'
     : isPravMode()
@@ -880,6 +899,8 @@ function renderLastHint() {
       ? ' Slova se pokaždé vylosují jiná.'
     : isMusicMode()
       ? ' Noty se pokaždé vylosují jiné.'
+    : isGeomMode()
+      ? ' Obrázky se pokaždé vylosují jiné.'
     : isOver10Mode()
       ? ' Každý rozklad je pokaždé nový.'
       : isBigmulMode() || isBigaddMode()
@@ -951,8 +972,9 @@ el('opChips').addEventListener('click', (e) => {
   const klavir = isKlavirMode();
   const sluch = isSluchMode();
   const prav = isPravMode();
+  const geom = isGeomMode();
   const current = prav ? config.pravTopics : pos ? config.posTypes : vety ? config.vetyTasks : vyznam ? config.vyznamTasks
-    : hudba ? config.hudbaTasks : klavir ? config.klavirForms : sluch ? config.sluchForms : over10 ? config.over10Ops : config.ops;
+    : geom ? config.geomTasks : hudba ? config.hudbaTasks : klavir ? config.klavirForms : sluch ? config.sluchForms : over10 ? config.over10Ops : config.ops;
   const next = current.includes(value) ? current.filter((o) => o !== value) : [...current, value];
   if (!next.length) {
     const err = el('opsError');
@@ -964,6 +986,7 @@ el('opChips').addEventListener('click', (e) => {
   else if (pos) config.posTypes = next;
   else if (vety) config.vetyTasks = next;
   else if (vyznam) config.vyznamTasks = next;
+  else if (geom) config.geomTasks = next;
   else if (hudba) config.hudbaTasks = next;
   else if (klavir) config.klavirForms = next;
   else if (sluch) config.sluchForms = next;
@@ -997,6 +1020,7 @@ el('countChips').addEventListener('click', (e) => {
   else if (isHudbaMode()) config.hudbaCount = Number(chip.dataset.value);
   else if (isKlavirMode()) config.klavirCount = Number(chip.dataset.value);
   else if (isSluchMode()) config.sluchCount = Number(chip.dataset.value);
+  else if (isGeomMode()) config.geomCount = Number(chip.dataset.value);
   else config.count = Number(chip.dataset.value);
   saveConfig();
   renderConfigScreen();
@@ -1190,6 +1214,7 @@ function startRound() {
     hudba: () => buildHudbaRound(config), // úloha po úloze
     klavir: () => buildKlavirRound(config), // taky
     sluch: () => buildSluchRound(config),   // taky
+    geom: () => buildGeomRound(config),     // úloha po úloze
   };
   round = (build[config.mode] || build.calc)();
   index = 0;
@@ -1370,6 +1395,7 @@ function hintFor(ex) {
       ? 'Která skupina zahrnuje všechna čtyři slova? Klepni na slovo nadřazené.'
       : 'Přečti si obě slova a rozmysli si, jak spolu souvisí. Pak klepni na správné slovo.';
   }
+  if (ex.kind === 'geom') return GEOM_HINT[ex.task] || '';
   if (ex.kind === 'hudba') return HUDBA_HINT[ex.task === 'takt' || ex.task === 'klavir' || ex.task === 'sluch' ? `${ex.task}:${ex.form}` : ex.task] || '';
   if (ex.kind === 'bigmul') {
     return 'Rozlož si násobení na desítky a jednotky. V každém kroku klepni na tu možnost, která je správně.';
@@ -1987,11 +2013,11 @@ const BODY_HTML = {
   bond: bondHTML, word: wordHTML, riddle: riddleHTML, sign: signHTML, grid: gridHTML,
   compare: compareHTML, over10: over10HTML, bigadd: bigaddHTML, bigaddstep: bigmulHTML, kvet: kvetHTML, pexeso: pexesoHTML, bigmul: bigmulHTML, abc: abcHTML,
   pos: posHTML, vety: vetyHTML, vyznam: vyznamHTML, slova: pexesoHTML, vetylist: vetyListHTML, prav: uuHTML,
-  hudba: hudbaHTML,
+  hudba: hudbaHTML, geom: geomHTML,
 };
 
 /* Druhy, které se ovládají jen klepáním - bez klávesnice a bez `submit()`. */
-const TAP_ONLY = new Set(['pexeso', 'bigmul', 'bigaddstep', 'abc', 'pos', 'vety', 'vyznam', 'slova', 'vetylist', 'prav', 'hudba']);
+const TAP_ONLY = new Set(['pexeso', 'bigmul', 'bigaddstep', 'abc', 'pos', 'vety', 'vyznam', 'slova', 'vetylist', 'prav', 'hudba', 'geom']);
 
 /* Plochy se spojováním dvojic: čísla v „Najdi dvojice“ a souřadná slova
    ve „Význam slov“. Ovladač je pro obě tentýž. */
@@ -3150,7 +3176,35 @@ function hudbaHTML(ex) {
   return wrap(`${ask(ex.text)}<div class="vt-opts">${opts}</div>`, 'takt-chyba');
 }
 
-const CHOICE_HTML = { vety: vetyHTML, vyznam: vyznamHTML, hudba: hudbaHTML };
+/* ---------------- geometrie ----------------
+   Všechny čtyři úlohy jedou přes ovladač s výběrem. U „Najdi obrázek“
+   a u čar obráceně jsou možnosti obrázky (`.vt-opt.geo-pic`), jinak
+   obrázek nahoře a pod ním tlačítka s názvy. Obrázky kreslí geokresba.js
+   z parametrů, které vylosoval generátor - po klepnutí se nic nepřeháže. */
+const GEOM_HINT = {
+  utvar: 'Je to placaté jako papír, nebo těleso, které jde vzít do ruky? Spočítej strany a rohy.',
+  najdi: 'Prohlédni si všechny obrázky a klepni na ten, který se jmenuje jako v otázce.',
+  cary: 'Podívej se na konce čáry: končí v bodě, nebo pokračuje dál? Je rovná, lomená, nebo zahnutá?',
+  kolem: 'Představ si tu věc v ruce. Je kulatá ze všech stran, má špičku, nebo rovné stěny?',
+};
+
+function geomHTML(ex) {
+  const ask = `<p class="vt-ask"><span aria-hidden="true">${GEOM_TASKS[ex.task].emoji}</span> ${ex.text}</p>`;
+  const dis = locked ? ' disabled' : '';
+  const lines = ex.task === 'cary' ? ' geo-lines' : '';
+  if (ex.form === 'find') {
+    const opts = ex.options.map((o, i) => `<button type="button" class="vt-opt geo-pic${choiceState(o, i)}" data-i="${i}"
+        aria-label="${i + 1}. obrázek"${dis}>${geoSVG(o.fig)}</button>`).join('');
+    return `<div class="vt geo${lines}" data-task="geo-find">${ask}<div class="vt-opts">${opts}</div></div>`;
+  }
+  const figure = ex.task === 'kolem'
+    ? `<div class="geo-thing"><span class="geo-emoji" aria-hidden="true">${ex.item.emoji}</span><span class="geo-thing-name">${ex.item.name}</span></div>`
+    : `<div class="geo-figure${isLine(ex.shape) ? ' is-line' : ''}">${geoSVG(ex.fig)}</div>`;
+  return `<div class="vt geo" data-task="geo-show">${ask}${figure}
+      <div class="vt-opts">${choiceButtons(ex, (o) => o.text)}</div></div>`;
+}
+
+const CHOICE_HTML = { vety: vetyHTML, vyznam: vyznamHTML, hudba: hudbaHTML, geom: geomHTML };
 
 /* Index první špatné volby u úloh s druhým pokusem (`ex.retry`). */
 let choiceMiss = null;
@@ -3258,7 +3312,7 @@ function choiceFinish(ex, picked, opt) {
   fb.dataset.state = 'wrong';
   fb.innerHTML = `
     <div class="fb-badge"><span aria-hidden="true">🤔</span> Tentokrát ne</div>
-    <p class="fb-retry-note">${ex.task === 'sluch' && ex.form === 'melodie' ? 'Zelené klávesy hrají správnou melodii, červené jsi zahrála jinak.' : ex.task === 'umisti' ? 'Zelené noty jsou správně, červené jsi umístila ty.' : ex.task === 'klavir' && ex.form === 'naosnovu' ? 'Zelené noty jsou správně, červené jsi umístila ty.' : ex.task === 'klavir' ? 'Zelená klávesa je správně, červenou jsi vybrala ty.' : 'Zelená možnost je správně, červenou jsi vybrala ty.'}</p>
+    <p class="fb-retry-note">${ex.task === 'sluch' && ex.form === 'melodie' ? 'Zelené klávesy hrají správnou melodii, červené jsi zahrála jinak.' : ex.task === 'umisti' ? 'Zelené noty jsou správně, červené jsi umístila ty.' : ex.task === 'klavir' && ex.form === 'naosnovu' ? 'Zelené noty jsou správně, červené jsi umístila ty.' : ex.task === 'klavir' ? 'Zelená klávesa je správně, červenou jsi vybrala ty.' : ex.kind === 'geom' && ex.form === 'find' ? 'Zelený obrázek je správně, červený jsi vybrala ty.' : 'Zelená možnost je správně, červenou jsi vybrala ty.'}</p>
     <p class="fb-steps-title">Jak na to:</p>
     <ul class="fb-steps">${steps}</ul>
     <button type="button" class="btn btn-primary">Rozumím, další <span aria-hidden="true">➜</span></button>`;
@@ -3803,6 +3857,7 @@ function comboLabels() {
   if (isSluchMode()) return vyber(SLUCH_FORM_KEYS, SLUCH_FORMS, config.sluchForms);
   if (isKlavirMode()) return vyber(KLAVIR_FORM_KEYS, KLAVIR_FORMS, config.klavirForms);
   if (isHudbaMode()) return vyber(HUDBA_TASK_KEYS, HUDBA_TASKS, config.hudbaTasks);
+  if (isGeomMode()) return vyber(GEOM_TASK_KEYS, GEOM_TASKS, config.geomTasks);
   if (isAddSubMode()) return vyber(OVER10_OPS, OPS, config.over10Ops);
   if (config.mode === 'calc') {
     return [...vyber(Object.keys(OPS), OPS, config.ops), ...vyber(Object.keys(EXTRA_KINDS), EXTRA_KINDS, config.kinds)];
@@ -3870,7 +3925,7 @@ function grantRewards(report) {
     mode: config.mode,
     level: rewards.difficultyOf(config),
     // v abecedě se nepočítá - rozsah čísel by jí jinak přidal epického
-    max: isAbcMode() || isPosMode() || isVetyMode() || isVyznamMode() || isPravMode() || isMusicMode() ? 0
+    max: isAbcMode() || isPosMode() || isVetyMode() || isVyznamMode() || isPravMode() || isMusicMode() || isGeomMode() ? 0
       : isKvetMode() ? KVET_LEVELS[config.level]?.hi ?? 0 : config.max,
     kindUnits,
     // druhy navic (slovni ulohy, pyramidy, znamenka) - podminka raritniho
@@ -4048,6 +4103,8 @@ function renderResult(r) {
             ? 'Příště se vylosují jiná slova.'
           : isMusicMode()
             ? 'Příště se vylosují jiné noty.'
+          : isGeomMode()
+            ? 'Příště se vylosují jiné obrázky.'
             : 'Podobné příklady se objeví v dalším kole.';
 
   const retry = r.missedList.length
@@ -4067,7 +4124,7 @@ function renderResult(r) {
         <p style="margin:0;font-weight:700;color:var(--ink-soft)">Nic k procvičení – tohle byla čistá práce.</p></div>`;
 
   const jednotka = riddle ? 'hádanku' : isOver10Mode() ? 'rozklad' : isPosMode() || isVetyMode() ? 'větu'
-    : isVyznamMode() || isMusicMode() || isPravMode() ? 'úlohu' : 'příklad';
+    : isVyznamMode() || isMusicMode() || isPravMode() || isGeomMode() ? 'úlohu' : 'příklad';
   const avg = r.avgMs
     ? `<p class="score-sub">Průměrně ${Math.max(1, Math.round(r.avgMs / 1000))} s na ${jednotka}</p>`
     : '';

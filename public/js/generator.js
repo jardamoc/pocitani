@@ -14,6 +14,7 @@ import { uuExplain, uuText } from './uu.js';
 import { makePravRound, pravExplain, pravText } from './pravopis.js';
 import { makeHudbaRound, makeKlavirRound, makeSluchRound, hudbaExplain, hudbaText, HUDBA_TAGS } from './hudba.js';
 import { makeBigmul, bigmulExplain, bigmulText } from './bigmul.js';
+import { makeGeomRound, geomExplain, geomText, GEOM_TAGS } from './geometrie.js';
 
 export const OPS = {
   add: { symbol: '+', label: 'Sčítání', name: 'sčítání', emoji: '➕' },
@@ -153,6 +154,7 @@ export function signature(ex) {
   if (ex.kind === 'uu') return `uu|${ex.key}`;
   if (ex.kind === 'prav') return `prav|${ex.key}`;
   if (ex.kind === 'hudba') return `hudba|${ex.key}`;
+  if (ex.kind === 'geom') return `geom|${ex.key}`;
   // velké násobení je dané dvojicí činitelů, ne trojicí a, b, c
   if (ex.kind === 'bigmul') return `bigmul|${ex.key}`;
   if (ex.kind === 'bigaddstep') return `bigaddstep|${ex.key}`;
@@ -570,6 +572,21 @@ export function buildHudbaRound(config) {
   }));
 }
 
+/* Geometrie - stejný tvar jako hudební nauka: co úloha, to jeden obrázek
+   nebo věc, `missing` nese úlohu (`utvar` / `najdi` / `cary` / `kolem`).
+   `op: 'add'` je jen zástupné, nic se nepočítá. */
+export function buildGeomRound(config) {
+  return makeGeomRound(config.level, config.geomTasks, config.geomCount).map((p) => ({
+    op: 'add',
+    kind: 'geom',
+    missing: p.task,
+    a: 0, b: 0, c: 0,
+    cross: false,
+    skill: `geom:${p.task}`,
+    ...p,
+  }));
+}
+
 /* Klavír - samostatná hra, ale úlohy stejného druhu `hudba` (`task` je
    `klavir`, `form` směr). Ovladač, vysvětlení i statistika jsou společné. */
 export function buildKlavirRound(config) {
@@ -711,6 +728,7 @@ export function exToText(ex, reveal = false) {
   if (ex.kind === 'uu') return uuText(ex, reveal);
   if (ex.kind === 'prav') return pravText(ex, reveal);
   if (ex.kind === 'hudba') return hudbaText(ex, reveal);
+  if (ex.kind === 'geom') return geomText(ex, reveal);
   if (ex.kind === 'bigmul') return bigmulText(ex, reveal);
   if (ex.kind === 'riddle') return riddleText(ex, reveal);
   if (ex.kind === 'sign') {
@@ -777,6 +795,7 @@ export function explain(ex) {
   if (kind === 'uu') return uuExplain(ex);
   if (kind === 'prav') return pravExplain(ex);
   if (kind === 'hudba') return hudbaExplain(ex);
+  if (kind === 'geom') return geomExplain(ex);
   if (kind === 'bigmul') return bigmulExplain(ex);
   if (kind === 'riddle') return riddleExplain(ex);
 
@@ -935,6 +954,7 @@ export const TAGS = {
   bigmulStep: 'chyba v jednom kroku',
   compareFlip: 'obrácený zobáček',
   ...HUDBA_TAGS,
+  ...GEOM_TAGS,
   other: 'jiná chyba',
 };
 
@@ -977,6 +997,8 @@ export function diagnose(ex, given) {
   /* Hudební nauka taky - odpovědí je název nebo místo, tag podle zvolené
      možnosti zapisuje ovladač, tohle je pojistka. */
   if (kind === 'hudba') return 'hudbaNazev';
+  // geometrie taky - tag podle zvolené možnosti zapisuje ovladač
+  if (kind === 'geom') return 'geomUtvar';
 
   /* Význam slov taky - tag podle zvolené možnosti zapisuje ovladač,
      u plochy se souřadnými slovy je "odpovědí" počet chybných spojení. */

@@ -76,7 +76,7 @@ export function sanitizeState(raw) {
 }
 
 /* Druhy úloh, které se nedají z descriptoru znovu poskládat. */
-const NO_REPEAT = new Set(['riddle', 'grid', 'over10', 'bigadd', 'bigaddstep', 'kvet', 'pexeso', 'bigmul', 'abc', 'pos', 'vety', 'vetylist', 'vyznam', 'slova', 'uu', 'prav', 'hudba']);
+const NO_REPEAT = new Set(['riddle', 'grid', 'over10', 'bigadd', 'bigaddstep', 'kvet', 'pexeso', 'bigmul', 'abc', 'pos', 'vety', 'vetylist', 'vyznam', 'slova', 'uu', 'prav', 'hudba', 'geom']);
 
 const descriptor = (ex) => ({
   op: ex.op,
@@ -174,6 +174,10 @@ const KIND_LABEL = {
   'hudba:takt': { all: 'všechny', acc: 'takty', gen: 'taktů' },
   'hudba:klavir': { all: 'všechny', acc: 'noty na klavíru', gen: 'hledání not na klavíru' },
   'hudba:sluch': { all: 'všechny', acc: 'tóny podle sluchu', gen: 'tónů podle sluchu' },
+  'geom:utvar': { all: 'všechny', acc: 'útvary a tělesa', gen: 'útvarů a těles' },
+  'geom:najdi': { all: 'všechny', acc: 'obrázky útvarů', gen: 'hledání obrázků' },
+  'geom:cary': { all: 'všechny', acc: 'čáry', gen: 'čar' },
+  'geom:kolem': { all: 'všechna', acc: 'tělesa kolem nás', gen: 'těles kolem nás' },
 };
 
 function starsFor(pct) {
@@ -206,7 +210,7 @@ const LEVEL_NAME = { easy: 'Lehké', medium: 'Střední', hard: 'Těžké' };
 
 /* Jak se v rozpadu podle obtížnosti pojmenuje jedna úloha daného režimu.
    Rod i číslo musí sedět na věty "Lehké mřížky ti jdou výborně". */
-const MODE_UNITS = { grid: 'mřížky', riddle: 'hádanky', over10: 'rozklady', bigadd: 'příklady', kvet: 'kytičky', pexeso: 'plochy', bigmul: 'příklady', abc: 'řady slov', pos: 'věty', vety: 'věty', vyznam: 'úlohy', uu: 'věty', prav: 'úlohy', hudba: 'úlohy', klavir: 'úlohy', sluch: 'úlohy' };
+const MODE_UNITS = { grid: 'mřížky', riddle: 'hádanky', over10: 'rozklady', bigadd: 'příklady', kvet: 'kytičky', pexeso: 'plochy', bigmul: 'příklady', abc: 'řady slov', pos: 'věty', vety: 'věty', vyznam: 'úlohy', uu: 'věty', prav: 'úlohy', hudba: 'úlohy', klavir: 'úlohy', sluch: 'úlohy', geom: 'úlohy' };
 
 export function analyze(state, config, attempts) {
   const riddleMode = config.mode === 'riddle';
@@ -223,12 +227,13 @@ export function analyze(state, config, attempts) {
   const pravMode = config.mode === 'prav';
   // klavír je samostatná hra, ale úlohy i rady má společné s hudební naukou
   const hudbaMode = config.mode === 'hudba' || config.mode === 'klavir' || config.mode === 'sluch';
+  const geomMode = config.mode === 'geom';
   /* Režimy, kde se rozpad podle operací nehodí - hádanky, mřížky i pexeso
      mají `op: 'add'` jen jako zástupnou hodnotu a u rozkladu přes desítku je
      sčítání zase úplně všude, takže by "sčítání ti jde" nic neřeklo.
      Ve všech pěti jedeme podle obtížnosti. U velkého násobení je zase
      násobení úplně všude, takže by rozpad podle operací neřekl nic. */
-  const levelMode = riddleMode || gridMode || over10Mode || bigaddMode || kvetMode || pexesoMode || bigmulMode || abcMode || posMode || vetyMode || vyznamMode || pravMode || hudbaMode;
+  const levelMode = riddleMode || gridMode || over10Mode || bigaddMode || kvetMode || pexesoMode || bigmulMode || abcMode || posMode || vetyMode || vyznamMode || pravMode || hudbaMode || geomMode;
   const total = attempts.length;
   const correct = attempts.filter((a) => a.correct).length;
   const pct = total ? Math.round((correct / total) * 100) : 0;
@@ -236,7 +241,7 @@ export function analyze(state, config, attempts) {
   /* Porovnávání a pexeso mají `op: 'add'` jen zástupně - do rozpadu podle
      operací ani do přechodu přes desítku nepatří, jinak by "sčítání ti jde"
      stálo z půlky na úlohách, kde se nic nesčítá. */
-  const PLACEHOLDER_OP = new Set(['compare', 'pexeso', 'kvet', 'abc', 'pos', 'vety', 'vetylist', 'vyznam', 'slova', 'uu', 'prav', 'hudba']);
+  const PLACEHOLDER_OP = new Set(['compare', 'pexeso', 'kvet', 'abc', 'pos', 'vety', 'vetylist', 'vyznam', 'slova', 'uu', 'prav', 'hudba', 'geom']);
   const scored = attempts.filter((a) => !PLACEHOLDER_OP.has(a.ex.kind));
   const byOp = group(scored, (a) => a.ex.op).sort((x, y) => y.seen - x.seen);
   const byLevel = group(attempts, (a) => a.ex.level || null)
@@ -279,7 +284,7 @@ export function analyze(state, config, attempts) {
     if (cross.pct >= 85) strengths.push(`Přechod přes desítku ti jde (${cross.correct} z ${cross.seen}). To je ta nejtěžší část!`);
     else if (cross.pct < 65) watchOuts.push(`Přechod přes desítku dělá potíže – ${cross.correct} z ${cross.seen}.`);
   }
-  if (!posMode && !vetyMode && !vyznamMode && !pravMode && !hudbaMode && pct >= 80 && avgMs > 0 && avgMs < 7000) strengths.push('Počítáš rychle a přesně zároveň.');
+  if (!posMode && !vetyMode && !vyznamMode && !pravMode && !hudbaMode && !geomMode && pct >= 80 && avgMs > 0 && avgMs < 7000) strengths.push('Počítáš rychle a přesně zároveň.');
 
   if (tags.get('offOne') >= 2) watchOuts.push('Několikrát ti výsledek utekl jen o jedničku – vyplatí se na konci zkontrolovat.');
   if (tags.get('riddleSymbol') >= 1) watchOuts.push('U hádanky se občas napsalo, kolik je jeden obrázek. Poslední řádek chce součet celého řádku.');
@@ -398,6 +403,28 @@ export function analyze(state, config, attempts) {
       tips.push(harder
         ? `Šlo ti to skvěle – zkus příště ${harder} obtížnost.`
         : 'Šlo ti to skvěle – tohle je nejtěžší obtížnost, obě osnovy najednou.');
+    }
+  } else if (geomMode) {
+    if (tags.get('geomPlocha')) {
+      tips.push('Rovinný útvar je placatý jako papír, těleso můžeš vzít do ruky. Míč je koule, kruh je jen jeho obrázek na papíře.');
+    }
+    if (tags.get('geomCtyr')) {
+      tips.push('Čtverec má všechny strany stejně dlouhé, obdélník dvě delší a dvě kratší. Krychle má všechny stěny čtverce, kvádr i obdélníky.');
+    }
+    if (tags.get('geomKruh')) {
+      tips.push('Kruh je celá plocha, kružnice je jen ta kulatá čára kolem.');
+    }
+    if (tags.get('geomKonce')) {
+      tips.push('Dívej se na konce čáry: úsečka končí v bodech na obou stranách, polopřímka jen na jedné, přímka nikde.');
+    }
+    if (tags.get('geomTeleso')) {
+      tips.push('U těles se dívej na špičku a na podstavu: kužel má kulatou podstavu, jehlan hranatou, válec má dvě kulaté.');
+    }
+    if (pct >= 90) {
+      const harder = { easy: 'střední', medium: 'těžkou' }[config.level];
+      tips.push(harder
+        ? `Šlo ti to skvěle – zkus příště ${harder} obtížnost, tvary budou záludnější.`
+        : 'Šlo ti to skvěle – tohle je nejtěžší geometrie. Zkus si dát víc úloh v kole.');
     }
   } else if (vyznamMode) {
     if (tags.get('vyznamSynAnt')) {

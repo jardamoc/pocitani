@@ -124,6 +124,8 @@ neodklízej (`stash`, `checkout`) — zeptej se uživatele.
 | `public/js/hudba.js` | Hudební nauka a Klavír: tabulky, generátory úloh, vysvětlení — bez DOM |
 | `public/js/zvuk.js` | tóny klavíru pro hru Sluch — syntéza Web Audio, bez nahrávek |
 | `public/js/notace.js` | kreslení not jako SVG text (osnova, klíče, noty, pomlky, takty) — bez knihovny |
+| `public/js/geometrie.js` | Geometrie: útvary, tělesa, čáry, věci kolem nás, výběr možností podle obtížnosti, vysvětlení — bez DOM |
+| `public/js/geokresba.js` | kreslení útvarů, těles a čar jako SVG text z parametrů `fig` — bez knihovny, nic neimportuje |
 | `public/js/stats.js` | rozbor kola, rady, `sanitizeState()` — **na úložiště nesahá** |
 | `public/js/storage.js` | **jediná vrstva nad úložištěm** — načtení, fronta zápisů, mazání, vyměnitelný backend |
 | `public/js/validate.js` | `wholeNumber` / `textList` — sdílené kousky validace, bez DOM |
@@ -158,7 +160,7 @@ na neexistující soubor. Když je tam někdy mít chceš, přidej napřed vlast
 
 Prosté ES moduly, žádný framework, žádné závislosti. Závislosti jdou jedním směrem:
 `random.js → riddle.js / grid.js / over10.js / bigadd.js / kvet.js / pexeso.js / bigmul.js / abc.js / pos.js / vety.js / vyznam.js / uu.js / pravopis.js / hudba.js → generator.js → app.js`
-(`notace.js → app.js` nezávisle, nic neimportuje)
+(`notace.js → app.js` a `geokresba.js → app.js` nezávisle, nic neimportují; `geometrie.js` jde cestou `random.js → … → generator.js`)
 (`stats.js` si z `vety.js` a `vyznam.js` bere jen názvy pro výpis chyb)
 (`app.js` si z `abc.js` bere navíc funkce přesunu a z `pos.js` tabulky a `posCheck` / `posTag`),
 `rewards-data.js → rewards.js → rewards-ui.js → app.js`,
@@ -204,7 +206,7 @@ Co z toho plyne pro psaní kódu:
 - **`mergePayload()` v `transfer.js` neukládá.** Slučování je čistá operace v paměti,
   která vrátí souhrn změn; zapisuje až `acceptIncoming()` v `app.js`.
 
-## Šestnáct režimů hry
+## Sedmnáct režimů hry
 
 Na úvodní obrazovce se vybírá karta **„Co si zahrajeme?"**. Nad kartami jsou tři
 záložky **🔢 Matematika / 📖 Čeština / 🎵 Hudba** (`SUBJECTS`, u každého režimu `subject` v `MODES`).
@@ -223,6 +225,7 @@ záložky.
 | **Mřížka** | `grid` | „něco navíc", **počet příkladů** (jedna mřížka = jedno kolo) |
 | **Najdi dvojice** | `pexeso` | „něco navíc", **počet příkladů** (jedna plocha = jedno kolo) |
 | **Velké násobení** | `bigmul` | operace (je to vždy násobení), „něco navíc" |
+| **Geometrie** | `geom` | „něco navíc", **rozsah**; karta s operacemi vybírá úlohy; počet = počet úloh |
 | **Abeceda** (Čeština) | `abc` | operace, „něco navíc", **rozsah „Do kolika"**; počet se vybírá ze slov |
 | **Slovní druhy** (Čeština) | `pos` | „něco navíc", **rozsah**; karta s operacemi vybírá, co se hledá; počet = počet vět |
 | **Druhy vět** (Čeština) | `vety` | „něco navíc", **rozsah**; karta s operacemi vybírá úlohu; počet = počet vět |
@@ -1020,6 +1023,35 @@ klávesy a tóny těsně vedle sebe.
 - Úloha zahraje sama po zobrazení; tlačítko 🔊 (`.hd-play`) funguje i po odpovědi.
 - Horní c se ve vysvětlení jmenuje **„vysoké c"** (`toneName()`), jinak by „c" bylo dvojznačné.
 - Klávesy zahrají tón při klepnutí i ve hře Klavír.
+
+## Geometrie
+
+Hra pod Matematikou pro 2. třídu (`config.mode` = `geom`, `ex.kind` = `geom`), přidaná
+9. 11. 2026. Stejný tvar jako Hudební nauka: ovladač s výběrem (`CHOICE_HTML.geom`,
+`choiceTap`), jedno klepnutí rozhoduje, druhý pokus není. Úlohy (`config.geomTasks`,
+**do `config.ops` nepatří**), počet 10 / 20 / 30 (`config.geomCount`):
+
+- `utvar` Poznej útvar — obrázek → název (čtverec, obdélník, trojúhelník, kruh, kružnice,
+  pětiúhelník, šestiúhelník, krychle, kvádr, koule, válec, kužel, jehlan),
+- `najdi` Najdi obrázek — „Kde je kružnice?“ a 3–4 obrázky,
+- `cary` Čáry — bod, úsečka, přímka, polopřímka, lomená, křivá; jednou obrázek → název, jindy naopak,
+- `kolem` Tělesa kolem nás — věc jako emoji s popiskem (míč, plechovka…) → těleso.
+  Jen věci bez sporu: jehlan tam není (pyramida nemá emoji), krabice taky ne (krychle i kvádr).
+
+**Obtížnost = záludnost** (rozhodl uživatel): lehká 3 možnosti z téže rodiny (útvary s útvary,
+tělesa s tělesy) a bez záludných dvojic z `TRAP`, rovné obrázky; střední 4 náhodné možnosti,
+natočené a různě velké obrázky; těžká dává záludné dvojice přednostně (čtverec × obdélník
+× krychle, kruh × kružnice × koule, přímka × polopřímka × úsečka, míč × kruh).
+
+- **Parametry obrázku (`fig`) losuje generátor**, kreslení nic nelosuje — plocha se po
+  klepnutí překresluje a obrázek nesmí poskočit.
+- Kruh je plocha (výplň), kružnice jen čára. Tělesa ve volném promítání, neviditelné hrany
+  čárkovaně. Konec přímky a polopřímky, který pokračuje dál, je **řada teček** (`.geo-tail`);
+  malé tečky byly na telefonu nečitelné, proto jsou tlusté.
+- Plochy jsou průhledně modré a čáry `currentColor` — sedí ve světlém i tmavém režimu.
+- `op: 'add'` je jen zástupné (`PLACEHOLDER_OP`, `NO_REPEAT`, `levelMode` ve `stats.js`).
+- Tagy chyb `geomPlocha` (útvar × těleso), `geomCtyr`, `geomKruh`, `geomKonce`, `geomTeleso`,
+  `geomUtvar`, `geomCara`. Do odměn `max: 0`, čas 1 běžný příklad na úlohu.
 
 ## Doplň znaménko
 
