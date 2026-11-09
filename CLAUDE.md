@@ -1319,7 +1319,8 @@ Pozor: holé `node --test tests/` na tomhle stroji spadne na `Cannot find module
 Runner bere pozicní argument jako cestu ke spuštění, ne jako adresář ke skenu —
 proto je ve skriptu glob `"tests/*.test.mjs"`.
 
-Generátory úloh testy nemají a ověřují se dál **jednorázovými skripty v Node**, které
+Z generátorů má trvalý test jen Geometrie (`tests/geometrie.test.mjs`: jedna správná
+možnost, texty, obrázky v ploše, záludné dvojice podle obtížnosti). Ostatní se ověřují dál **jednorázovými skripty v Node**, které
 si napiš do scratchpadu. U čehokoli, co generuje úlohy, testuj vždycky tohle:
 
 - **jednoznačnost řešení** — u hádanek nezávisle dvakrát (hodnost soustavy i hrubou silou
