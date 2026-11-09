@@ -147,7 +147,7 @@ function solid(fig) {
 }
 
 /* ---------------- čáry ----------------
-   Širší obrázek. Body jsou tečky s velkým písmenem, přímka má malé p.
+   Širší obrázek. Body jsou křížky s velkým písmenem, přímka má malé p.
    Pokračování za okraj je řada teček (`.geo-tail`). */
 const LW = 160;
 const LH = 70;
@@ -158,7 +158,12 @@ function lineFig(fig) {
   const t = ((fig.tilt || 0) * Math.PI) / 180;
   const P = (s) => [cx + s * Math.cos(t), cy + s * Math.sin(t)];
   const seg = (a, b, cls = 'geo-line') => `<line class="${cls}" x1="${r1(a[0])}" y1="${r1(a[1])}" x2="${r1(b[0])}" y2="${r1(b[1])}"/>`;
-  const dot = (p) => `<circle class="geo-dot" cx="${r1(p[0])}" cy="${r1(p[1])}" r="4"/>`;
+  // bod se ve škole značí křížkem (přání uživatele), ne tečkou
+  const dot = (p) => {
+    const [x, y] = p;
+    const k = 5;
+    return `<path class="geo-line geo-cross" d="M${r1(x - k)},${r1(y - k)} L${r1(x + k)},${r1(y + k)} M${r1(x - k)},${r1(y + k)} L${r1(x + k)},${r1(y - k)}"/>`;
+  };
   const label = (p, text) => `<text class="geo-label" x="${r1(p[0])}" y="${r1(p[1] - 10)}" text-anchor="middle">${text}</text>`;
 
   switch (fig.shape) {

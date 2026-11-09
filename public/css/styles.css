@@ -1536,7 +1536,7 @@ body.is-dark { --pair-task: #93c5fd; --pair-result: #fdba74; }
 .geo-svg .geo-thin { stroke-width: 1.6; }
 .geo-svg .geo-hid { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-dasharray: 5 4; opacity: .75; }
 .geo-svg .geo-tail { fill: none; stroke: currentColor; stroke-width: 5; stroke-linecap: round; stroke-dasharray: 0 9; }
-.geo-svg .geo-dot { fill: currentColor; }
+.geo-svg .geo-cross { stroke-width: 2.8; }
 .geo-svg .geo-label { fill: currentColor; font: italic 700 16px 'Baloo 2', sans-serif; }
 .geo-figure { display: flex; justify-content: center; margin: 0 0 14px; color: var(--ink); }
 .geo-figure .geo-svg { max-width: 200px; }

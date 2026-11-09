@@ -1045,6 +1045,7 @@ natočené a různě velké obrázky; těžká dává záludné dvojice přednos
 
 - **Parametry obrázku (`fig`) losuje generátor**, kreslení nic nelosuje — plocha se po
   klepnutí překresluje a obrázek nesmí poskočit.
+- **Bod se značí křížkem**, ne tečkou (přání uživatele) — i na konci úsečky a na začátku polopřímky.
 - Kruh je plocha (výplň), kružnice jen čára. Tělesa ve volném promítání, neviditelné hrany
   čárkovaně. Konec přímky a polopřímky, který pokračuje dál, je **řada teček** (`.geo-tail`);
   malé tečky byly na telefonu nečitelné, proto jsou tlusté.

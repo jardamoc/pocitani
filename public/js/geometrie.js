@@ -134,7 +134,7 @@ const RULE = {
   valec: 'Válec má **dvě kulaté podstavy**, nahoře a dole, a kulatý bok – jako plechovka.',
   kuzel: 'Kužel má **jednu kulatou podstavu** a nahoře **špičku** – jako kornout.',
   jehlan: 'Jehlan má **hranatou podstavu** a boky z **trojúhelníků**, které se sbíhají do špičky – jako pyramida.',
-  bod: 'Bod je jen **malá tečka**. Pojmenujeme ho velkým písmenem, třeba A.',
+  bod: 'Bod značíme **malým křížkem**. Pojmenujeme ho velkým písmenem, třeba A.',
   usecka: 'Úsečka je rovná čára, která **začíná v jednom bodě a končí v druhém**. Dá se změřit pravítkem.',
   primka: 'Přímka je rovná čára **bez začátku i bez konce** – pokračuje na obě strany pořád dál.',
   polopr: 'Polopřímka **začíná v bodě**, ale **nekončí** – na druhou stranu pokračuje pořád dál.',
