@@ -1492,6 +1492,10 @@ body.is-dark { --pair-task: #93c5fd; --pair-result: #fdba74; }
 /* klepací pruhy „Umísti notu“ - neviditelné, při najetí myší jemně podbarvené */
 .hd-slot { fill: transparent; cursor: pointer; }
 .hd-slot:hover { fill: rgba(124, 92, 255, .14); }
+/* položená, ještě nepotvrzená nota - klepnutí jí projde na pruh pod ní, ať jde posunout */
+.hd .hd-note.is-pending { color: var(--violet); pointer-events: none; }
+.hd-confirmrow { display: flex; justify-content: center; margin: 0 0 10px; }
+.hd-confirm[disabled] { opacity: .45; cursor: default; }
 /* „Která nota je vyšší?“ - klepe se přímo na notu */
 .hd-hit { cursor: pointer; }
 .hd-hit-bg { fill: transparent; stroke: transparent; stroke-width: 2; }

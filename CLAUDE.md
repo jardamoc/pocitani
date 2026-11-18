@@ -235,6 +235,11 @@ záložky.
 | **Klavír** (Hudba) | `klavir` | „něco navíc", **rozsah**; karta s operacemi vybírá směr; počet = počet úloh |
 | **Sluch** (Hudba) | `sluch` | „něco navíc", **rozsah**; karta s operacemi vybírá úlohy; počet = počet úloh |
 
+**„Něco navíc" v Počítání obyčejné příklady nahrazuje, nemíchá se s nimi** (přání uživatele
+18. 11. 2026): zapnuté jen slovní úlohy = v kole jsou jen slovní úlohy, víc druhů se dělí rovným
+dílem (`buildRound()`). Nic nezapnuté = jen obyčejné příklady. Dřív měl každý druh kvótu 30 %
+a zbytek doplnily obyčejné příklady — nevracet.
+
 Větve se rozcházejí až v `startRound()`, kde je tabulka builderů. Všechno ostatní —
 klávesnice, vyhodnocení, statistiky — je společné, protože každá úloha má stejný tvar:
 `{ op, kind, missing, a, b, c, answer, skill }`.
@@ -250,6 +255,11 @@ jednoho políčka na odpověď několik dílčích; odpovědí je u obou **řet�
 `partInputs()` / `partValue()` / `hasParts()` — čtení odpovědi, třesení prázdných políček,
 obarvení, druhý pokus i dopsání řešení jedou přes ně. **Když přidáš třetí takovou úlohu,
 stačí řádek v `PART_SEL`**, ne nová větev na pěti místech.
+
+**U Počítej přes 10 a Velkého sčítání jsou pomocná okénka nepovinná** (přání uživatele
+18. 11. 2026, `SKIPPABLE_PARTS` + `fillSkippedParts()` v `app.js`): správný výsledek v posledním
+políčku stačí, prázdná pomocná okénka se před vyhodnocením doplní sama. Se špatným výsledkem se
+nedoplní nic a prázdná okénka se zatřesou. Výsledek musí zůstat posledním políčkem v `ex.hidden`.
 
 **Když přidáváš nový druh úlohy, drž se tohohle tvaru.** Ušetří ti to práci na pěti místech.
 Stačí pak: položka v `EXTRA_KINDS`, větev v `makeExercise()`, funkce v `BODY_HTML`,
@@ -976,6 +986,10 @@ Pár věcí, které se snadno rozbijí:
 - Všechno jede přes `choiceTap()` (`CHOICE_HTML.hudba`); obrázkové možnosti, noty
   i pruhy v osnově mají třídu `vt-opt` a `data-i`. Druhý pokus drží `choiceMiss`.
 - Linky a mezery se v textech počítají **zdola** (jak se učí ve škole).
+- **Zápis noty do osnovy se potvrzuje** („Umísti notu“ i Klavír → na osnovu, přání uživatele
+  18. 11. 2026): na tabletu se prst trefoval o linku vedle. Klepnutí notu jen položí (fialová,
+  `placePending`, `is-pending`), další klepnutí ji posune, vyhodnotí až tlačítko Potvrdit
+  (`.hd-confirm`, i Enter). Okamžité vyhodnocení po klepnutí nevracet.
 - Klávesy 1–7 vyberou možnost, kromě „Umísti notu".
 - Do odměn jde `max: 0` jako u češtiny, čas 2 běžné příklady na úlohu.
 

@@ -52,10 +52,6 @@ export const EXTRA_KINDS = {
   compare: { label: 'Větší/menší', emoji: '⚖️', ops: ['add', 'sub', 'mul', 'div'] },
 };
 
-/* Zapnuty druh ma byt videt vic nez drive (drive vychazelo ~2 z 10).
-   Kvotu proto pocitame pevne, ne pres nahodu, aby v kole opravdu byly. */
-const EXTRA_SHARE = 0.3;
-
 export function crossesTen(op, a, b) {
   if (op === 'add') return a > 0 && b > 0 && (a % 10) + (b % 10) >= 10;
   if (op === 'sub') return a % 10 < b % 10;
@@ -325,7 +321,11 @@ export function buildRound(config, missed = []) {
   const { ops, count, max } = config;
   const kinds = usableKinds(config);
 
-  const usable = missed.filter((m) => focusAllowed(m, ops, kinds));
+  /* Zapnuty druh navic obycejne priklady nahrazuje, nemicha se s nimi
+     (prani uzivatele 18. 11. 2026): "jen slovni ulohy" = v kole jsou jen
+     slovni ulohy. Bez zapnuteho druhu jsou v kole jen obycejne priklady. */
+  const onlyKinds = kinds.length > 0;
+  const usable = missed.filter((m) => focusAllowed(m, ops, kinds) && (!onlyKinds || m.kind !== 'equation'));
   const focusCount = Math.min(usable.length, Math.round(count * 0.4));
   const chosen = shuffle(usable.slice(0, 12)).slice(0, focusCount);
 
@@ -344,9 +344,9 @@ export function buildRound(config, missed = []) {
     for (let t = 0; t < 6; t++) if (push(similarTo(m, max, ops))) break;
   }
 
-  // kvota pro kazdy zapnuty druh; opakovane priklady z minula se do ni pocitaji
-  const quota = Math.max(1, Math.round(count * EXTRA_SHARE));
-  for (const kind of kinds) {
+  // kolo se rozdeli mezi zapnute druhy rovnym dilem; opakovane priklady z minula se do kvoty pocitaji
+  const quota = onlyKinds ? Math.ceil(count / kinds.length) : 0;
+  for (const kind of shuffle([...kinds])) {
     let have = items.filter((ex) => ex.kind === kind).length;
     let guard = 0;
     while (have < quota && items.length < count && guard++ < quota * 40) {
@@ -354,11 +354,14 @@ export function buildRound(config, missed = []) {
     }
   }
 
+  const fillKinds = onlyKinds ? kinds : ['equation'];
   let guard = 0;
-  while (items.length < count && guard++ < count * 60) push(randomExercise(ops, max));
+  while (items.length < count && guard++ < count * 60) push(randomExercise(ops, max, pick(fillKinds)));
   // uz jen dorovnani, kdyz je rozsah tak maly, ze nove kombinace nejsou
-  const anyKind = ['equation', ...kinds];
-  while (items.length < count) items.push(randomExercise(ops, max, pick(anyKind)) || randomExercise(ops, max));
+  while (items.length < count) {
+    // doplneni znamenka se pri malem rozsahu umi nepovest - pak radsi obycejny priklad, nez se zaseknout
+    items.push(randomExercise(ops, max, pick(fillKinds)) || randomExercise(ops, max));
+  }
 
   return shuffle(items).slice(0, count);
 }

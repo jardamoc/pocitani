@@ -1,4 +1,4 @@
-import { OPS, COMPARES, EXTRA_KINDS, MISSING_LABEL, kindOps, buildRound, buildRiddleRound, buildGridRound, buildOver10Round, buildBigaddRound, buildKvetRound, buildPexesoRound, buildBigmulRound, buildAbcRound, buildPosRound, buildVetyRound, buildVyznamRound, buildPravRound, buildHudbaRound, buildKlavirRound, buildSluchRound, buildGeomRound, explain, diagnose } from './generator.js';
+import { OPS, COMPARES, EXTRA_KINDS, MISSING_LABEL, kindOps, usableKinds, buildRound, buildRiddleRound, buildGridRound, buildOver10Round, buildBigaddRound, buildKvetRound, buildPexesoRound, buildBigmulRound, buildAbcRound, buildPosRound, buildVetyRound, buildVyznamRound, buildPravRound, buildHudbaRound, buildKlavirRound, buildSluchRound, buildGeomRound, explain, diagnose } from './generator.js';
 import {
   HUDBA_TASKS, HUDBA_TASK_KEYS, HUDBA_COUNTS, HUDBA_LEVELS, HUDBA_LEVEL_KEYS, NOTE_LETTERS, CLEFS, stepOf, PIANO_KEYS,
   KLAVIR_FORMS, KLAVIR_FORM_KEYS, KLAVIR_LEVELS, KLAVIR_LEVEL_KEYS,
@@ -846,11 +846,16 @@ function renderKindNote() {
     })
     .filter(Boolean);
 
+  // zapnuté druhy obyčejné příklady nahrazují - ať je jasné, proč v kole nejsou
+  const only = usableKinds(config).length
+    ? 'V kole budou jen vybrané úlohy, bez obyčejných příkladů.'
+    : '';
   if (!reasons.length) {
-    note.hidden = true;
+    note.textContent = only;
+    note.hidden = !only;
     return;
   }
-  note.textContent = `${reasons.join(' ')} Uprav si výběr nahoře, jinak se v kole neobjeví.`;
+  note.textContent = `${reasons.join(' ')} Uprav si výběr nahoře, jinak se v kole neobjeví.${only ? ` ${only}` : ''}`;
   note.hidden = false;
 }
 
@@ -997,7 +1002,7 @@ el('opChips').addEventListener('click', (e) => {
 });
 
 /* Na rozdil od operaci je prazdny vyber v poradku - pak jsou v kole
-   jen obycejne priklady. */
+   jen obycejne priklady. Zapnute druhy je nahrazuji, nemichaji se s nimi. */
 el('kindChips').addEventListener('click', (e) => {
   const chip = e.target.closest('.chip');
   if (!chip) return;
@@ -1301,6 +1306,7 @@ function renderExercise() {
   choiceMiss = null;
   hudbaAcc = 0;
   melodyTaps = [];
+  placePending = null;
   el('exerciseBody').innerHTML = (BODY_HTML[ex.kind] || equationHTML)(ex);
   // šipky u odčítání přes desítku až po rozvržení (měří se polohy)
   requestAnimationFrame(drawArrows);
@@ -3016,13 +3022,13 @@ function vyznamHTML(ex) {
 const HUDBA_HINT = {
   znak: 'Podívej se pořádně na tvar – je prázdný, nebo plný? Má nožičku, praporek, tečky?',
   nazev: 'Najdi klíč a od jeho noty počítej po krocích nahoru nebo dolů – linka, mezera, linka…',
-  umisti: 'Klepni na linku nebo do mezery, kam nota patří. Když se spleteš, máš ještě jeden pokus.',
+  umisti: 'Klepni na linku nebo do mezery, kam nota patří. Notu můžeš ještě posunout, pak dej Potvrdit. Když se spleteš, máš ještě jeden pokus.',
   vyska: 'Čím výš nota na osnově sedí, tím vyšší je tón. Klepni na správnou notu.',
   'sluch:vyssi': 'Poslouchej pozorně. Tóny si můžeš pustit znovu, kolikrát chceš.',
   'sluch:odc': 'Zazní c a po něm jiný tón. Je o hodně výš, nebo jen kousek? Klávesy při klepnutí zahrají.',
   'sluch:melodie': 'Poslechni si melodii a zahraj ji tón po tónu. Když se spleteš, můžeš to zkusit ještě jednou.',
   'sluch:nota': 'Zazní c a po něm jiný tón. Čím je tón vyšší, tím výš na osnově sedí.',
-  'klavir:naosnovu': 'U černé klávesy si napřed vyber křížek ♯ nebo béčko ♭. Pak klepni na linku nebo mezeru, kam nota patří.',
+  'klavir:naosnovu': 'U černé klávesy si napřed vyber křížek ♯ nebo béčko ♭. Pak klepni na linku nebo mezeru, kam nota patří, a dej Potvrdit.',
   'klavir:naklavir': 'Přečti notu na osnově a klepni na její klávesu. Křížek ♯ posouvá o klávesu doprava, béčko ♭ doleva.',
   'takt:doby': 'Sečti doby: celá 4, půlová 2, čtvrťová 1, dvě osminové dohromady 1.',
   'takt:dopln': 'Spočítej, kolik dob v taktu už je, a kolik jich ještě chybí.',
@@ -3076,12 +3082,13 @@ function hudbaHTML(ex) {
     // každá ve vlastním sloupci, jinak by se sousední noty překrývaly
     const mark = (o, cls, x) => marks.push({ staff: o.staff, step: o.step, value: 'whole', cls, x });
     if (choiceMiss !== null) mark(ex.options[choiceMiss], 'is-wrong', 70);
+    if (placePending !== null && !locked) mark(ex.options[placePending], 'is-pending', 120);
     if (choicePicked !== null) {
       ex.options.forEach((o) => { if (o.ok) mark(o, 'is-right', 140); });
       if (!ex.options[choicePicked].ok) mark(ex.options[choicePicked], 'is-wrong', 105);
     }
     const svg = staffSVG({ staves: ex.staves, notes: marks, slots: locked ? null : ex.options, width: 170 });
-    return wrap(`${ask(HUDBA_ASK.umisti(ex))}<div class="hd-figure hd-place">${svg}</div>`);
+    return wrap(`${ask(HUDBA_ASK.umisti(ex))}<div class="hd-figure hd-place">${svg}</div>${placeConfirmHTML()}`);
   }
 
   if (ex.task === 'sluch') {
@@ -3120,6 +3127,7 @@ function hudbaHTML(ex) {
     const marks = [];
     const mark = (o, cls, x) => marks.push({ staff: o.staff, step: o.step, value: 'whole', acc: o.acc, cls, x });
     if (choiceMiss !== null) mark(ex.options[choiceMiss], 'is-wrong', 58);
+    if (placePending !== null && !locked) mark(ex.options[placePending], 'is-pending', 110);
     if (choicePicked !== null) {
       const seen = new Set();
       ex.options.forEach((o) => {
@@ -3137,7 +3145,7 @@ function hudbaHTML(ex) {
     const accs = ex.accs.map((a) => `<button type="button" class="hd-accbtn${a === hudbaAcc ? ' is-on' : ''}" data-acc="${a}"
         aria-pressed="${a === hudbaAcc}"${dis}>${ACC_BTN[a]}</button>`).join('');
     return wrap(`${ask('Zapiš na osnovu notu, která patří ke svítící klávese.')}<div class="hd-figure hd-keys">${piano}</div>
-      <div class="hd-accs">${accs}</div><div class="hd-figure hd-place">${svg}</div>`, 'klavir-rev');
+      <div class="hd-accs">${accs}</div><div class="hd-figure hd-place">${svg}</div>${placeConfirmHTML()}`, 'klavir-rev');
   }
 
   if (ex.task === 'klavir') {
@@ -3212,18 +3220,38 @@ let choiceMiss = null;
 let hudbaAcc = 0;
 /* Klávesy zahrané v úloze „Zahraj, co slyšíš“. */
 let melodyTaps = [];
+/* Zápis noty do osnovy („Umísti notu“, Klavír → na osnovu): klepnutí notu
+   jen položí (`placePending` = index místa), vyhodnotí se až tlačítkem
+   Potvrdit. Na tabletu se prst často trefí o linku vedle - přání uživatele
+   18. 11. 2026, ať si dítě položenou notu může posunout, než se to počítá. */
+let placePending = null;
+const isPlaceTask = (ex) => ex?.kind === 'hudba' && (ex.task === 'umisti' || (ex.task === 'klavir' && ex.form === 'naosnovu'));
+
+/* Tlačítko pod osnovou; dokud nota neleží, je vypnuté. */
+function placeConfirmHTML() {
+  if (locked) return '';
+  return `<div class="hd-confirmrow"><button type="button" class="btn btn-primary hd-confirm"${placePending === null ? ' disabled' : ''}>Potvrdit <span aria-hidden="true">✓</span></button></div>`;
+}
 
 function choiceTap(target) {
   const ex = round[index];
   const accBtn = target.closest('.hd-accbtn');
   if (accBtn && !locked) {
     hudbaAcc = Number(accBtn.dataset.acc);
+    placePending = null; // položená nota měla jinou posuvku
     el('exerciseBody').innerHTML = CHOICE_HTML[ex.kind](ex);
     return;
   }
   // přehrání tónů jde i po odpovědi - ať si dítě poslechne, co to bylo
   if (target.closest('.hd-play')) {
     playSeq(ex.tones);
+    return;
+  }
+  if (target.closest('.hd-confirm')) {
+    if (locked || placePending === null) return;
+    const picked = placePending;
+    placePending = null;
+    choiceDecide(ex, picked, ex.options[picked]);
     return;
   }
   const btn = target.closest('.vt-opt');
@@ -3237,7 +3265,15 @@ function choiceTap(target) {
     melodyTap(ex, picked);
     return;
   }
+  if (isPlaceTask(ex)) {
+    placePending = picked;
+    el('exerciseBody').innerHTML = CHOICE_HTML[ex.kind](ex);
+    return;
+  }
+  choiceDecide(ex, picked, opt);
+}
 
+function choiceDecide(ex, picked, opt) {
   /* První chyba u úlohy s druhým pokusem jen zčervená a zatřese -
      řešení se ještě neukáže. */
   if (!opt.ok && ex.retry && choiceMiss === null) {
@@ -3504,8 +3540,8 @@ document.addEventListener('keydown', (e) => {
   if (TAP_ONLY.has(round[index]?.kind)) {
     if (e.key === 'Enter' && locked) {
       el('feedback').querySelector('.btn')?.click();
-    } else if (e.key === 'Enter' && (round[index].kind === 'abc' || round[index].kind === 'pos' || FILL[round[index].kind])) {
-      el('exerciseBody').querySelector('.abc-done:not([disabled]), .pos-done:not([disabled]), .fill-done:not([disabled])')?.click();
+    } else if (e.key === 'Enter' && (round[index].kind === 'abc' || round[index].kind === 'pos' || FILL[round[index].kind] || isPlaceTask(round[index]))) {
+      el('exerciseBody').querySelector('.abc-done:not([disabled]), .pos-done:not([disabled]), .fill-done:not([disabled]), .hd-confirm:not([disabled])')?.click();
       e.preventDefault();
     } else if (!locked && round[index].kind === 'prav' && /^[1-3]$/.test(e.key)) {
       // dvě možnosti (u, ú, ů tři) klávesami 1 až 3 - do vybrané mezery
@@ -3600,9 +3636,29 @@ function markResult(ex, correct) {
   });
 }
 
+/* Počítej přes 10 a Velké sčítání: pomocná okénka rozkladu jsou nápověda,
+   ne povinnost (přání uživatele 18. 11. 2026). Když dítě napíše rovnou správný
+   výsledek (poslední políčko), prázdná pomocná okénka se doplní sama a úloha
+   platí. Se špatným výsledkem se nic nedoplní - prázdná okénka se zatřesou
+   a dítě si pomůže rozkladem. */
+const SKIPPABLE_PARTS = new Set(['over10', 'bigadd']);
+
+function fillSkippedParts(ex) {
+  if (!SKIPPABLE_PARTS.has(ex.kind)) return;
+  const inputs = partInputs(ex);
+  const last = inputs.length - 1;
+  const result = inputs[last]?.value.trim();
+  if (!result || Number(result) !== partValue(ex, last)) return;
+  inputs.forEach((input, i) => {
+    if (input.value.trim() === '') input.value = String(partValue(ex, i));
+  });
+  syncBigaddEcho();
+}
+
 function submit() {
   if (locked) return;
   const ex = round[index];
+  fillSkippedParts(ex);
   const given = readAnswer(ex);
   if (given === null) {
     shakeEmpty(ex);
