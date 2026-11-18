@@ -1348,12 +1348,14 @@ function renderExercise() {
 
 function hintFor(ex) {
   if (ex.kind === 'grid') return 'Doplň čísla tak, aby vyšlo každé počítání doprava i dolů. Pak klepni na ✓.';
+  // pomocná okénka jsou nepovinná (`fillSkippedParts()`) - ať to dítě ví
+  const ONLY_RESULT = '\nKdyž to umíš spočítat zpaměti, stačí napsat jen výsledek.';
   if (ex.kind === 'over10') {
-    return ex.op === 'sub'
+    return (ex.op === 'sub'
       ? 'Rozděl druhé číslo na dvě části: vlevo tolik, aby z prvního čísla zbyla rovná desítka, '
         + 'vpravo zbytek. Ten uber od desítky a nahoře doplň výsledek. Pak klepni na ✓.'
       : 'Rozděl druhé číslo na dvě části: do rámečku dej tolik, aby s prvním číslem byla rovná desítka, '
-        + 'vedle zbytek. Nahoře doplň výsledek a klepni na ✓.';
+        + 'vedle zbytek. Nahoře doplň výsledek a klepni na ✓.') + ONLY_RESULT;
   }
   if (ex.kind === 'bigaddstep') {
     return 'Druhé číslo je rozložené na desítky (modře) a jednotky (oranžově). Počítej po krocích a v každém klepni na správnou možnost.';
@@ -1364,7 +1366,7 @@ function hintFor(ex) {
   }
   if (ex.kind === 'bigadd') {
     return `Rozlož druhé číslo na desítky a jednotky. Pak ${ex.op === 'sub' ? 'odečti' : 'přičti'} `
-      + 'nejdřív desítky a potom jednotky. Nakonec klepni na ✓.';
+      + 'nejdřív desítky a potom jednotky. Nakonec klepni na ✓.' + ONLY_RESULT;
   }
   if (ex.kind === 'pexeso') {
     return 'Ke každému příkladu najdi jeho výsledek a klepni na obě kartičky. '
@@ -1766,11 +1768,15 @@ function bigaddHTML(ex) {
   const eq = '<span class="o10-op">=</span>';
   // výsledek je ozvěnou i na konci prvního řádku, šipky viz `drawArrows()`
   const echoC = '<span class="o10-num ba-echo is-empty" data-cell=".ba-rows .ba-c"></span>';
+  /* Ta horní (za příkladem) jde i napsat - klepnutí přepne kurzor do výsledku
+     dole a číslo se objeví na obou místech (přání uživatele 18. 11. 2026,
+     ať dítě, které počítá zpaměti, píše hned za příklad). */
+  const echoTop = '<span class="o10-num ba-echo ba-echo-top is-empty" data-cell=".ba-rows .ba-c" role="button" aria-label="Napiš výsledek"></span>';
   return `${coinsHelpHTML(ex)}<div class="ba" data-op="${ex.op}" data-arrows="ba">
       <svg class="o10-arrows" aria-hidden="true"></svg>
       <div class="ba-top">
         <div class="ba-split">
-          <span class="o10-num ba-b"><span class="ba-b-pre"><span class="o10-num">${ex.a}</span><span class="o10-op">${sign}</span></span>${ex.b}<span class="ba-b-eq"><span class="o10-op">=</span>${echoC}</span></span>
+          <span class="o10-num ba-b"><span class="ba-b-pre"><span class="o10-num">${ex.a}</span><span class="o10-op">${sign}</span></span>${ex.b}<span class="ba-b-eq"><span class="o10-op">=</span>${echoTop}</span></span>
           <svg class="ba-legs" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true">
             <line x1="50" y1="1" x2="23" y2="23" class="ba-leg-tens"/><line x1="50" y1="1" x2="77" y2="23" class="ba-leg-ones"/>
           </svg>
@@ -2140,12 +2146,21 @@ function renderPexStatus(ex) {
 
 // otazník s korunami nesmí vzít políčku kurzor, jinak by klávesnice psala jinam
 el('exerciseBody').addEventListener('pointerdown', (e) => {
-  if (e.target.closest('.coins-btn')) e.preventDefault();
+  if (e.target.closest('.coins-btn, .ba-echo-top')) e.preventDefault();
 });
 el('exerciseBody').addEventListener('click', (e) => {
   const coinsBtn = e.target.closest('.coins-btn');
   if (coinsBtn) {
     coinsToggle(coinsBtn);
+    return;
+  }
+  // velké sčítání: okénko za příkladem píše do výsledku dole (viz `bigaddHTML`)
+  if (e.target.closest('.ba-echo-top')) {
+    const input = el('exerciseBody').querySelector('.ba-rows .ba-c input');
+    if (!locked && input) {
+      activeField = input;
+      input.focus({ preventScroll: true });
+    }
     return;
   }
   if (round[index]?.kind === 'abc') {

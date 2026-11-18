@@ -623,7 +623,8 @@ body.is-quiz .wrap { padding-top: 18px; }
 
 /* ---------- příklad ---------- */
 .card-exercise { padding: 26px 18px; text-align: center; }
-.exercise-hint { margin: 0 0 16px; font-weight: 800; color: var(--ink-soft); font-size: .98rem; }
+/* pre-line: `\n` v textu nápovědy je nový řádek (věta „stačí napsat jen výsledek“) */
+.exercise-hint { margin: 0 0 16px; font-weight: 800; color: var(--ink-soft); font-size: .98rem; white-space: pre-line; }
 
 .equation {
   display: flex; align-items: center; justify-content: center; gap: clamp(8px, 3vw, 18px);
@@ -1116,6 +1117,15 @@ body.is-quiz .wrap { padding-top: 18px; }
   display: inline-block; width: calc(var(--cell) * .55); height: calc(var(--o10-box) * .6);
   border: 2px dashed currentColor; border-radius: 8px; opacity: .55;
 }
+/* okénko za příkladem: klepne se do něj a píše se do výsledku dole */
+/* vypadá jako políčko na odpověď (`.slot`), prázdné i vyplněné */
+.ba .ba-echo-top, .ba .ba-echo-top.is-empty {
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+  min-width: var(--cell); height: var(--o10-box); padding: 0 6px; box-sizing: border-box;
+  border: 4px dashed var(--slot); border-radius: 16px; background: var(--slot-bg);
+  color: var(--violet); opacity: 1;
+}
+.ba:has(.ba-rows .ba-c input:focus) .ba-echo-top { box-shadow: 0 0 0 4px rgba(124, 92, 255, .35); }
 /* „Počítej přes 10“: (7 + 3) + 1 = 10 + 1 pod větvičkou */
 .o10-sum {
   margin-top: 12px; text-align: center; color: var(--ink);
