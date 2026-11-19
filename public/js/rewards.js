@@ -52,7 +52,7 @@ export const REWARD_RULES = {
      ulohu zvlast, ne az na hotovy prumer - jedna slovni uloha v sade tak
      opravdu prida cas na tri priklady. Drz cela cisla, nasobek se zobrazuje
      v navodu a desetinne cislo do textu pro dite nepatri. */
-  speedKindMultiplier: { equation: 1, word: 3, bond: 2, sign: 2, compare: 1, over10: 2, bigadd: 3, bigaddstep: 3, kvet: 3, riddle: 3, grid: 4, pexeso: 6, bigmul: 3, abc: 1, pos: 2, vety: 2, vetylist: 2, vyznam: 2, slova: 4, uu: 2, prav: 2, hudba: 2, geom: 1 },
+  speedKindMultiplier: { equation: 1, word: 3, bond: 2, sign: 2, compare: 1, over10: 2, bigadd: 3, bigaddstep: 3, kvet: 3, riddle: 3, grid: 4, pexeso: 6, bigmul: 3, abc: 1, pos: 2, vety: 2, vetylist: 2, vyznam: 2, slova: 4, uu: 2, prav: 2, hudba: 2, geom: 1, nasob: 1 },
   /* Druhy, u kterych se nasobek bere ZA KAZDE SLOVO, ne za celou ulohu -
      plocha s deviti slovy a s petadvaceti se lusti uplne jinak dlouho.
      Kolik slov na ploše bylo, posila app.js v `kindUnits`. List s pismeny
@@ -202,6 +202,8 @@ export function setCollections(data, list) {
 export function difficultyOf(config) {
   if (!config) return 'easy';
   if (config.mode && config.mode !== 'calc') {
+    // `expert` (jen Velké sčítání, „Dvojciferná“) se počítá jako těžká
+    if (config.level === 'expert') return 'hard';
     return ['easy', 'medium', 'hard'].includes(config.level) ? config.level : 'easy';
   }
   const ops = Array.isArray(config.ops) ? config.ops : [];
@@ -223,7 +225,7 @@ const kindWeight = (kind) => REWARD_RULES.speedKindMultiplier[kind] ?? 1;
 
 /* Druh, kterym nahradime ulohy bez rozpisu - stara ulozena data i souhrn,
    ktery `kindCounts` neposlal. */
-const DEFAULT_KIND_BY_MODE = { riddle: 'riddle', grid: 'grid', over10: 'over10', bigadd: 'bigadd', kvet: 'kvet', pexeso: 'pexeso', bigmul: 'bigmul', abc: 'abc', pos: 'pos', vety: 'vety', vyznam: 'vyznam', uu: 'uu', prav: 'prav', hudba: 'hudba', klavir: 'hudba', sluch: 'hudba', geom: 'geom' };
+const DEFAULT_KIND_BY_MODE = { riddle: 'riddle', grid: 'grid', over10: 'over10', bigadd: 'bigadd', kvet: 'kvet', pexeso: 'pexeso', bigmul: 'bigmul', abc: 'abc', pos: 'pos', vety: 'vety', vyznam: 'vyznam', uu: 'uu', prav: 'prav', hudba: 'hudba', klavir: 'hudba', sluch: 'hudba', geom: 'geom', nasob: 'equation' };
 const defaultKind = (mode) => DEFAULT_KIND_BY_MODE[mode] || 'equation';
 
 /* Casovy rozpocet cele sady v sekundach. Kazda uloha si prispeje vlastnim

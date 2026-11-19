@@ -114,6 +114,7 @@ neodklízej (`stash`, `checkout`) — zeptej se uživatele.
 | `public/js/bigadd.js` | generátor velkého sčítání do 100 — rozklad na desítky a jednotky, skoky po ose |
 | `public/js/kvet.js` | generátor Kytiček — lístky, které dají dohromady číslo uprostřed |
 | `public/js/pexeso.js` | generátor ploch pro „Najdi dvojice" (stejně samostatný jako `grid.js`) |
+| `public/js/nasob.js` | Malá násobilka: násobilky podle obtížnosti, plocha pexesa, příklady na psaní a výběr |
 | `public/js/bigmul.js` | generátor velkého násobení — rozklad a tři kroky s dvojí volbou |
 | `public/js/abc.js` | Abeceda: seznam slov, výběr podle obtížnosti, čisté funkce přesunu kartiček |
 | `public/js/pos.js` | Slovní druhy: ručně určené věty podle obtížnosti, výběr kola, vyhodnocení a vysvětlení |
@@ -206,7 +207,7 @@ Co z toho plyne pro psaní kódu:
 - **`mergePayload()` v `transfer.js` neukládá.** Slučování je čistá operace v paměti,
   která vrátí souhrn změn; zapisuje až `acceptIncoming()` v `app.js`.
 
-## Sedmnáct režimů hry
+## Osmnáct režimů hry
 
 Na úvodní obrazovce se vybírá karta **„Co si zahrajeme?"**. Nad kartami jsou tři
 záložky **🔢 Matematika / 📖 Čeština / 🎵 Hudba** (`SUBJECTS`, u každého režimu `subject` v `MODES`).
@@ -224,6 +225,7 @@ záložky.
 | **Obrázkové hádanky** | `riddle` | operace, „něco navíc" |
 | **Mřížka** | `grid` | „něco navíc", **počet příkladů** (jedna mřížka = jedno kolo) |
 | **Najdi dvojice** | `pexeso` | „něco navíc", **počet příkladů** (jedna plocha = jedno kolo) |
+| **Malá násobilka** | `nasob` | „něco navíc", **rozsah**; karta s operacemi vybírá úlohy; se samotným pexesem i **počet** |
 | **Velké násobení** | `bigmul` | operace (je to vždy násobení), „něco navíc" |
 | **Geometrie** | `geom` | „něco navíc", **rozsah**; karta s operacemi vybírá úlohy; počet = počet úloh |
 | **Abeceda** (Čeština) | `abc` | operace, „něco navíc", **rozsah „Do kolika"**; počet se vybírá ze slov |
@@ -527,10 +529,22 @@ Ještě zbývá přičíst jednotky: 92 + 5 =               (97 / 96)
 Dřív byl první krok „Rozdělíme 23 na: 20 a 3 / 2 a 3" a pod zadáním kostičky — uživateli
 to na lehkou úroveň přišlo nejasné, kostičky patří k přechodu přes desítku. **Nevracet.**
 Poznámka „8 si schováme…" jako zvláštní řádek pod otázkou se taky zkoušela a opakovala
-otázku. Je to druh **`bigaddstep`** a jede přes ovladač velkého
+otázku.
+
+**Od 19. 11. 2026 (přání uživatele) má čtyři obtížnosti:** lehká (jednociferné druhé číslo, krok po kroku,
+přechod napůl), střední (jednociferné bez přechodu, 81 + 7), těžká (jednociferné přes 10, 83 + 9)
+a **„Dvojciferná“ s klíčem `expert`** (47 + 25, vždy přes 10). `expert` je v `LEVEL_ALL`, ale ostatní hry ho
+nemají — `fitLevel()` v `app.js` ho při přepnutí hry srazí na `hard`, odměny ho počítají jako těžkou
+(`difficultyOf()`). Chip „přes 10“ byl jeden den a uživatel ho nahradil touhle čtveřicí — nevracet.
+Příklad nahoře je první řádek mřížky zápisu (`.ba-top` ve `.ba-rows`, 4 sloupce), takže „=“ a výsledek
+stojí pod sebou. Obrázky se liší jen rozkladem (`ex.form` v `makeBigadd()`, zápis `baLayout()` v `app.js`):
+`tens` 47 + 25 → [47 + 20] + 5 (těžká); `ten` 83 + 9 → 9 = 7 + 2, [83 + 7] + 2 (s přechodem, doplnění
+do desítky); `units` 81 + 7 → větvička pod **prvním** číslem 80 a 1, zápis 80 + [1 + 7] (bez přechodu).
+Lehká má u jednociferného čísla jen dva kroky. Popis výš (62 + 35) platí pro těžkou podobu.
+Je to druh **`bigaddstep`** a jede přes ovladač velkého
 násobení (`STEP_KINDS`, `bigTap`, `bigmulHTML`). Na rozdíl od násobení je popisek kroku
-**nad** výsledkem — je to začátek věty, ne komentář. **Střední** je obrázek
-s větvičkou a psaním, přes desítku napůl; **těžká** totéž, ale vždycky přes desítku.
+**nad** výsledkem — je to začátek věty, ne komentář. **Střední** a **těžká** jsou obrázek
+s větvičkou a psaním (přes desítku podle chipu, viz níž).
 Rozsah je strop, ale nejvýš 100. **V nastavení jsou jen chipy do 50 a do 100**
 (`BIGADD_MAX_PRESETS`); uložený menší rozsah z jiné hry se nemění, jen se ukáže jako
 „do 100“ (`bigaddMax`). Hláška o malém rozsahu tam byla a uživatel ji odmítl — nevracet.
@@ -543,7 +557,7 @@ Rozsah je strop, ale nejvýš 100. **V nastavení jsou jen chipy do 50 a do 100*
   po kouscích“ ve vysvětlení by jinak bylo „− 0“.
 - Tagy chyb `bigaddSplit` / `bigaddTens` / `bigaddOnes` podle prvního špatného kroku.
 - Barvy desítek a jednotek jsou `--pair-task` / `--pair-result` (mimo témata).
-- **Nápověda s korunami** (lehká a střední, 7. 11. 2026, `coinsHelpHTML()` v `app.js`): otazník nad
+- **Nápověda s korunami** (všechny úrovně, těžká od 19. 11. 2026; zavedeno 7. 11. 2026, `coinsHelpHTML()` v `app.js`): otazník nad
   zadáním, po klepnutí mince (vlastní kresba podobná skutečným, ne fotky — rozhodl uživatel).
   Postup krok po kroku: co máme → odebereme/přidáme desetikoruny → koruny (při nedostatku
   rozměníme desetikorunu) → co zůstane → „Celkem máme …, to je … Kč“. Koruny po pěti pod sebou.
@@ -640,6 +654,22 @@ Pár věcí, které se snadno rozbijí:
 - **Zadání je na kartičce bez mezer** (`7+5`, `100÷10`) — s mezerami se na 320 px
   do kartičky nevejde ani při nejmenším písmu. Ve vysvětlení po chybě mezery má.
 - `<button>` **nedědí barvu textu**, takže si ji kartička nastavuje sama.
+
+## Malá násobilka
+
+Hra pod Matematikou (`config.mode` = `nasob`, přidaná 19. 11. 2026), předlohou modul „Násobení
+a dělení I“ na umimematiku.cz. Tři úlohy na kartě „Co budeme dělat?“ (`config.nasobTasks`, klíče
+`pex` / `napis` / `vyber` — `pex`, ne `pexeso`, aby se barva chipu netloukla s režimem), počet
+10 / 20 / 30 (`config.nasobCount`). **Obtížnost = které násobilky** (rozhodl uživatel): lehká 2, 3, 4,
+5, 10; střední 6–9; těžká 1–10 a u „Napiš“ v 40 % chybí činitel. Generátor `makeNasobRound()`
+v `nasob.js`, převod na úlohy `buildNasobRound()` v `generator.js`:
+
+- **Pexeso** je obyčejný druh `pexeso` (ovladač „Najdi dvojice“, `pexesoMismatchAllowance`),
+  v kole nejvýš jedno a na začátku; výsledky na ploše různé. Samotné pexeso = jedna plocha, počet se schová.
+- **Napiš výsledek** je obyčejný `equation` s `op: 'mul'` (společná cesta `submit()`, klávesnice).
+- **Vyber si** je druh `nasob` přes ovladač výběru (`CHOICE_HTML.nasob`): dvě možnosti, špatná je
+  typická chyba (o násobek vedle, sousední násobilka, prohozené číslice), tag `nasobVedle`.
+- Rozsah se neukazuje, do odměn jde `max: 0`.
 
 ## Velké násobení
 

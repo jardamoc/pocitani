@@ -15,6 +15,7 @@ import { makePravRound, pravExplain, pravText } from './pravopis.js';
 import { makeHudbaRound, makeKlavirRound, makeSluchRound, hudbaExplain, hudbaText, HUDBA_TAGS } from './hudba.js';
 import { makeBigmul, bigmulExplain, bigmulText } from './bigmul.js';
 import { makeGeomRound, geomExplain, geomText, GEOM_TAGS } from './geometrie.js';
+import { makeNasobRound, nasobExplain, nasobText } from './nasob.js';
 
 export const OPS = {
   add: { symbol: '+', label: 'Sčítání', name: 'sčítání', emoji: '➕' },
@@ -578,6 +579,30 @@ export function buildHudbaRound(config) {
 /* Geometrie - stejný tvar jako hudební nauka: co úloha, to jeden obrázek
    nebo věc, `missing` nese úlohu (`utvar` / `najdi` / `cary` / `kolem`).
    `op: 'add'` je jen zástupné, nic se nepočítá. */
+/* Malá násobilka: plocha pexesa (`pexeso`, jede přes ovladač „Najdi
+   dvojice“), obyčejný příklad (`equation`, společná cesta `submit()`)
+   a výběr ze dvou možností (`nasob`, ovladač výběru). `op: 'mul'` je
+   u příkladů poctivé násobení, u plochy jen zástupné `add` jako jinde. */
+export function buildNasobRound(config) {
+  return makeNasobRound(config.level, config.nasobTasks, config.nasobCount).map((p) => {
+    if (p.task === 'pex') {
+      return {
+        // na kartičkách je jen násobení - `mul`, ať se plocha počítá do „Násobení ti jde“
+        op: 'mul', kind: 'pexeso', missing: 'c', a: 0, b: 0, c: 0, cross: false,
+        skill: `nasob:pexeso:${p.level}`, answer: '', ...p,
+      };
+    }
+    if (p.task === 'napis') {
+      const ex = finalize({ op: 'mul', kind: 'equation', missing: p.missing, a: p.a, b: p.b, c: p.c });
+      return { ...ex, level: config.level, task: 'napis' };
+    }
+    return {
+      op: 'mul', kind: 'nasob', cross: false, level: config.level,
+      skill: `nasob:vyber:${config.level}`, ...p,
+    };
+  });
+}
+
 export function buildGeomRound(config) {
   return makeGeomRound(config.level, config.geomTasks, config.geomCount).map((p) => ({
     op: 'add',
@@ -732,6 +757,7 @@ export function exToText(ex, reveal = false) {
   if (ex.kind === 'prav') return pravText(ex, reveal);
   if (ex.kind === 'hudba') return hudbaText(ex, reveal);
   if (ex.kind === 'geom') return geomText(ex, reveal);
+  if (ex.kind === 'nasob') return nasobText(ex, reveal);
   if (ex.kind === 'bigmul') return bigmulText(ex, reveal);
   if (ex.kind === 'riddle') return riddleText(ex, reveal);
   if (ex.kind === 'sign') {
@@ -799,6 +825,7 @@ export function explain(ex) {
   if (kind === 'prav') return pravExplain(ex);
   if (kind === 'hudba') return hudbaExplain(ex);
   if (kind === 'geom') return geomExplain(ex);
+  if (kind === 'nasob') return nasobExplain(ex);
   if (kind === 'bigmul') return bigmulExplain(ex);
   if (kind === 'riddle') return riddleExplain(ex);
 
@@ -931,6 +958,7 @@ export const TAGS = {
   bigaddTens: 'chyba při počítání s desítkami',
   bigaddOnes: 'chyba při počítání s jednotkami',
   pexesoMiss: 'moc chybných otočení',
+  nasobVedle: 'spletená násobilka',
   abcMiss: 'slova ve špatném pořadí',
   posSwap: 'záměna podstatného jména a slovesa',
   posExtra: 'označené slovo navíc',
@@ -1002,6 +1030,8 @@ export function diagnose(ex, given) {
   if (kind === 'hudba') return 'hudbaNazev';
   // geometrie taky - tag podle zvolené možnosti zapisuje ovladač
   if (kind === 'geom') return 'geomUtvar';
+  // malá násobilka - tag zvolené možnosti zapisuje ovladač výběru
+  if (kind === 'nasob') return 'nasobVedle';
 
   /* Význam slov taky - tag podle zvolené možnosti zapisuje ovladač,
      u plochy se souřadnými slovy je "odpovědí" počet chybných spojení. */

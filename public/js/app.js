@@ -1,4 +1,5 @@
-import { OPS, COMPARES, EXTRA_KINDS, MISSING_LABEL, kindOps, usableKinds, buildRound, buildRiddleRound, buildGridRound, buildOver10Round, buildBigaddRound, buildKvetRound, buildPexesoRound, buildBigmulRound, buildAbcRound, buildPosRound, buildVetyRound, buildVyznamRound, buildPravRound, buildHudbaRound, buildKlavirRound, buildSluchRound, buildGeomRound, explain, diagnose } from './generator.js';
+import { OPS, COMPARES, EXTRA_KINDS, MISSING_LABEL, kindOps, usableKinds, buildRound, buildRiddleRound, buildGridRound, buildOver10Round, buildBigaddRound, buildKvetRound, buildPexesoRound, buildBigmulRound, buildAbcRound, buildPosRound, buildVetyRound, buildVyznamRound, buildPravRound, buildHudbaRound, buildKlavirRound, buildSluchRound, buildGeomRound, buildNasobRound, explain, diagnose } from './generator.js';
+import { NASOB_TASKS, NASOB_TASK_KEYS, NASOB_COUNTS, NASOB_LEVELS, NASOB_LEVEL_KEYS } from './nasob.js';
 import {
   HUDBA_TASKS, HUDBA_TASK_KEYS, HUDBA_COUNTS, HUDBA_LEVELS, HUDBA_LEVEL_KEYS, NOTE_LETTERS, CLEFS, stepOf, PIANO_KEYS,
   KLAVIR_FORMS, KLAVIR_FORM_KEYS, KLAVIR_LEVELS, KLAVIR_LEVEL_KEYS,
@@ -67,6 +68,7 @@ const MODES = {
      ne paměťová hra. Klíč se schválně nepřejmenovává: je v uloženém
      nastavení i v historii kol. */
   pexeso: { subject: 'math', grade: 1, label: 'Najdi dvojice', icon: '🔗', sub: 'Spoj příklad s jeho výsledkem' },
+  nasob: { subject: 'math', grade: 2, label: 'Malá násobilka', icon: '🔢', sub: 'Násobilka do 100: pexeso, psaní, výběr' },
   bigmul: { subject: 'math', grade: 3, label: 'Velké násobení', icon: '✖️', sub: 'Rozlož si ho na desítky a jednotky' },
   geom: { subject: 'math', grade: 2, label: 'Geometrie', icon: '📐', sub: 'Útvary, tělesa a čáry' },
   abc: { subject: 'czech', grade: 2, label: 'Abeceda', icon: '🔤', sub: 'Seřaď slova podle abecedy' },
@@ -115,18 +117,26 @@ const HUDBA_COUNT_DEFAULT = 10;
 const LEVEL_TABLES = {
   riddle: RIDDLE_LEVELS, grid: GRID_LEVELS, over10: OVER10_LEVELS, bigadd: BIGADD_LEVELS, kvet: KVET_LEVELS, pexeso: PEXESO_LEVELS, bigmul: BIGMUL_LEVELS,
   abc: ABC_LEVELS, pos: POS_LEVELS, vety: VETY_LEVELS, vyznam: VYZNAM_LEVELS, prav: PRAV_LEVELS, hudba: HUDBA_LEVELS, klavir: KLAVIR_LEVELS, sluch: SLUCH_LEVELS,
-  geom: GEOM_LEVELS,
+  geom: GEOM_LEVELS, nasob: NASOB_LEVELS,
 };
 const LEVEL_KEYS = {
   riddle: RIDDLE_LEVEL_KEYS, grid: GRID_LEVEL_KEYS, over10: OVER10_LEVEL_KEYS, bigadd: BIGADD_LEVEL_KEYS, kvet: KVET_LEVEL_KEYS, pexeso: PEXESO_LEVEL_KEYS,
   bigmul: BIGMUL_LEVEL_KEYS, abc: ABC_LEVEL_KEYS, pos: POS_LEVEL_KEYS, vety: VETY_LEVEL_KEYS,
   vyznam: VYZNAM_LEVEL_KEYS, prav: PRAV_LEVEL_KEYS, hudba: HUDBA_LEVEL_KEYS, klavir: KLAVIR_LEVEL_KEYS, sluch: SLUCH_LEVEL_KEYS,
-  geom: GEOM_LEVEL_KEYS,
+  geom: GEOM_LEVEL_KEYS, nasob: NASOB_LEVEL_KEYS,
 };
 
 /* Společná množina klíčů obtížnosti. Tabulky výš ji musí mít všechny stejnou,
    aby přepnutí režimu nastavení nezahodilo. */
-const LEVEL_ALL = ['easy', 'medium', 'hard'];
+const LEVEL_ALL = ['easy', 'medium', 'hard', 'expert'];
+
+/* `expert` („Dvojciferná“) má jen Velké sčítání. Hra, která ho nezná,
+   dostane místo něj těžkou - jinak by `levelTable()[config.level]` spadlo. */
+function fitLevel(cfg) {
+  const keys = LEVEL_KEYS[cfg.mode];
+  if (keys && !keys.includes(cfg.level)) cfg.level = keys.includes('hard') ? 'hard' : keys[0];
+  return cfg;
+}
 
 /* Rozklad přes desítku umí sčítání i odčítání. Výběr má vlastní klíč
    `config.over10Ops` - `config.ops` patří režimu Počítání a jsou v něm
@@ -264,6 +274,7 @@ const VYCHOZI_CONFIG = () => ({
   klavirForms: [...KLAVIR_FORM_KEYS], klavirCount: HUDBA_COUNT_DEFAULT,
   sluchForms: [...SLUCH_FORM_KEYS], sluchCount: HUDBA_COUNT_DEFAULT,
   geomTasks: [...GEOM_TASK_KEYS], geomCount: GEOM_COUNTS[0],
+  nasobTasks: [...NASOB_TASK_KEYS], nasobCount: NASOB_COUNTS[0],
 });
 
 /* Stav se jen deklaruje. Naplni ho `boot()` na konci souboru, protoze
@@ -322,11 +333,12 @@ function normalizeConfig(raw) {
   const klavirForms = Array.isArray(raw.klavirForms) ? raw.klavirForms.filter((t) => KLAVIR_FORM_KEYS.includes(t)) : [];
   const sluchForms = Array.isArray(raw.sluchForms) ? raw.sluchForms.filter((t) => SLUCH_FORM_KEYS.includes(t)) : [];
   const geomTasks = Array.isArray(raw.geomTasks) ? raw.geomTasks.filter((t) => GEOM_TASK_KEYS.includes(t)) : [];
+  const nasobTasks = Array.isArray(raw.nasobTasks) ? raw.nasobTasks.filter((t) => NASOB_TASK_KEYS.includes(t)) : [];
   /* Samostatná hra „Doplň u, ú, ů“ je teď téma Pravopisu - kdo ji měl
      vybranou, dostane Pravopis jen s tímhle tématem a se stejným počtem. */
   const wasUu = raw.mode === 'uu';
   if (wasUu) pravTopics.splice(0, pravTopics.length, 'uu');
-  return {
+  return fitLevel({
     // starší uložené nastavení režim nezná a bylo vždycky "počítání"
     mode: wasUu ? 'prav' : raw.mode in MODES ? raw.mode : 'calc',
     /* Obtížnost se hlídá proti společné množině klíčů, ne proti tabulce
@@ -361,7 +373,10 @@ function normalizeConfig(raw) {
     // starší uložené nastavení geometrii nezná - prázdný výběr = všechny úlohy
     geomTasks: geomTasks.length ? geomTasks : [...GEOM_TASK_KEYS],
     geomCount: GEOM_COUNTS.includes(Number(raw.geomCount)) ? Number(raw.geomCount) : GEOM_COUNTS[0],
-  };
+    // starší uložené nastavení malou násobilku nezná - prázdný výběr = všechny úlohy
+    nasobTasks: nasobTasks.length ? nasobTasks : [...NASOB_TASK_KEYS],
+    nasobCount: NASOB_COUNTS.includes(Number(raw.nasobCount)) ? Number(raw.nasobCount) : NASOB_COUNTS[0],
+  });
 }
 
 /* Volby se ukladaji hned pri kazde zmene, ne az po dohranem kole. Bez toho
@@ -399,6 +414,9 @@ const isGeomMode = () => config.mode === 'geom';
 const isVetyBoardOnly = () => isVetyMode() && config.vetyTasks.every((t) => t === 'list');
 /* Význam slov se samotným spojováním je jedna plocha - počet úloh odpadá. */
 const isVyznamBoardOnly = () => isVyznamMode() && config.vyznamTasks.every((t) => t === 'spoj');
+/* Malá násobilka: pexeso + psaní + výběr; se samotným pexesem je to jedna plocha. */
+const isNasobMode = () => config.mode === 'nasob';
+const isNasobBoardOnly = () => isNasobMode() && config.nasobTasks.every((t) => t === 'pex');
 /* Režimy, které mají obtížnost místo výběru druhů úloh. */
 const usesLevel = () => config.mode !== 'calc';
 const levelTable = () => LEVEL_TABLES[config.mode] || RIDDLE_LEVELS;
@@ -527,19 +545,20 @@ function renderModeCards() {
   el('card-kinds').hidden = usesLevel();
   el('card-level').hidden = !usesLevel();
   // jedna mřížka i jedna plocha pexesa jsou celé kolo - počet příkladů odpadá
-  el('card-count').hidden = grid || pexeso || isVyznamBoardOnly() || isVetyBoardOnly();
+  el('card-count').hidden = grid || pexeso || isVyznamBoardOnly() || isVetyBoardOnly() || isNasobBoardOnly();
   // v abecedě ani ve slovních druzích se nepočítá, rozsah čísel tam nic neříká
-  // u kytiček velikost čísla uprostřed řídí obtížnost
-  el('card-max').hidden = abc || pos || vety || vyznam || prav || hudba || isKvetMode();
+  // u kytiček velikost čísla uprostřed řídí obtížnost, u násobilky vybrané násobilky
+  const nasob = isNasobMode();
+  el('card-max').hidden = abc || pos || vety || vyznam || prav || hudba || nasob || isKvetMode();
   // u češtiny se vybírá jen z pevných počtů slov / vět
-  el('countCustomWrap').hidden = abc || pos || vety || vyznam || prav || hudba;
+  el('countCustomWrap').hidden = abc || pos || vety || vyznam || prav || hudba || nasob;
   /* Ve slovních druzích karta s operacemi zůstává, jen se v ní místo
      operací vybírá, co se ve větách hledá. */
   el('opsTitle').innerHTML = pos
     ? '<span aria-hidden="true">🎯</span> Co budeme hledat?'
     : prav
     ? '<span aria-hidden="true">🎯</span> Co budeme procvičovat?'
-    : vety || vyznam || hudba
+    : vety || vyznam || hudba || nasob
     ? '<span aria-hidden="true">🎯</span> Co budeme dělat?'
     : '<span aria-hidden="true">🎯</span> Co budeme počítat?';
   el('countTitle').innerHTML = isRiddleMode()
@@ -611,6 +630,19 @@ function renderModeCards() {
     return;
   }
 
+  if (nasob) {
+    el('levelNote').textContent = `${level.label} – ${level.note}.`;
+    opsNote.textContent = isNasobBoardOnly()
+      ? 'Zahraješ si jedno pexeso s příklady a výsledky.'
+      : config.nasobTasks.includes('pex')
+        ? 'Kolo začne pexesem, pak přijdou příklady.'
+        : config.nasobTasks.length > 1
+          ? 'Psaní a výběr se budou v kole střídat.'
+          : 'Můžeš si zapnout víc úloh naráz, pak se budou střídat.';
+    opsNote.hidden = false;
+    return;
+  }
+
   if (vyznam) {
     el('levelNote').textContent = `${level.label} – ${level.note}.`;
     opsNote.textContent = isVyznamBoardOnly()
@@ -644,7 +676,7 @@ function renderModeCards() {
 
   if (isBigaddMode()) {
     maxNote.textContent = bigaddRangeNote(config.max)
-      || 'Rozsah řídí, jak velká čísla budou. Jestli se půjde přes desítku, si vybíráš výš u obtížnosti.';
+      || 'Rozsah řídí, jak velká čísla budou.';
     el('levelNote').textContent = `${level.label} – ${level.note}. Čísla do ${bigaddMax(config.max)}.`;
     opsNote.textContent = config.over10Ops.length > 1
       ? 'Sčítání i odčítání se budou v kole střídat.'
@@ -771,6 +803,10 @@ function renderConfigScreen() {
     ? GEOM_TASK_KEYS
       .map((key) => chipHTML(key, `${GEOM_TASKS[key].emoji} ${GEOM_TASKS[key].label}`, config.geomTasks.includes(key)))
       .join('')
+    : isNasobMode()
+    ? NASOB_TASK_KEYS
+      .map((key) => chipHTML(key, `${NASOB_TASKS[key].emoji} ${NASOB_TASKS[key].label}`, config.nasobTasks.includes(key)))
+      .join('')
     : opKeys
       .map((key) => chipHTML(key, `${OPS[key].emoji} ${OPS[key].label}`, opOn.includes(key)))
       .join('');
@@ -797,6 +833,8 @@ function renderConfigScreen() {
       ? HUDBA_COUNTS.map((n) => chipHTML(n, `${n} úloh`, config.sluchCount === n)).join('')
       : isGeomMode()
       ? GEOM_COUNTS.map((n) => chipHTML(n, `${n} úloh`, config.geomCount === n)).join('')
+      : isNasobMode()
+      ? NASOB_COUNTS.map((n) => chipHTML(n, `${n} příkladů`, config.nasobCount === n)).join('')
       : COUNT_PRESETS.map((n) => chipHTML(n, `${n} příkladů`, config.count === n)).join('');
 
   /* Velké sčítání má smysl jen od 40 výš - malé rozsahy se tam vůbec
@@ -908,7 +946,7 @@ function renderLastHint() {
       ? ' Obrázky se pokaždé vylosují jiné.'
     : isOver10Mode()
       ? ' Každý rozklad je pokaždé nový.'
-      : isBigmulMode() || isBigaddMode()
+      : isBigmulMode() || isBigaddMode() || isNasobMode()
         ? ' Každý příklad je pokaždé nový.'
         : state.missed.length
         ? ` Do dalšího kola zařadím ${Math.min(state.missed.length, 12)} podobných příkladů, které minule nevyšly.`
@@ -930,6 +968,7 @@ el('modeChips').addEventListener('click', (e) => {
   if (!chip) return;
   config.mode = chip.dataset.value;
   lastModeBySubject[MODES[config.mode].subject] = config.mode;
+  fitLevel(config);
   saveConfig();
   renderConfigScreen();
 });
@@ -944,6 +983,7 @@ el('subjectTabs').addEventListener('click', (e) => {
   const subject = tab.dataset.value;
   config.mode = lastModeBySubject[subject]
     || Object.keys(MODES).find((k) => MODES[k].subject === subject);
+  fitLevel(config);
   saveConfig();
   renderConfigScreen();
 });
@@ -978,8 +1018,9 @@ el('opChips').addEventListener('click', (e) => {
   const sluch = isSluchMode();
   const prav = isPravMode();
   const geom = isGeomMode();
+  const nasob = isNasobMode();
   const current = prav ? config.pravTopics : pos ? config.posTypes : vety ? config.vetyTasks : vyznam ? config.vyznamTasks
-    : geom ? config.geomTasks : hudba ? config.hudbaTasks : klavir ? config.klavirForms : sluch ? config.sluchForms : over10 ? config.over10Ops : config.ops;
+    : nasob ? config.nasobTasks : geom ? config.geomTasks : hudba ? config.hudbaTasks : klavir ? config.klavirForms : sluch ? config.sluchForms : over10 ? config.over10Ops : config.ops;
   const next = current.includes(value) ? current.filter((o) => o !== value) : [...current, value];
   if (!next.length) {
     const err = el('opsError');
@@ -991,6 +1032,7 @@ el('opChips').addEventListener('click', (e) => {
   else if (pos) config.posTypes = next;
   else if (vety) config.vetyTasks = next;
   else if (vyznam) config.vyznamTasks = next;
+  else if (nasob) config.nasobTasks = next;
   else if (geom) config.geomTasks = next;
   else if (hudba) config.hudbaTasks = next;
   else if (klavir) config.klavirForms = next;
@@ -1026,6 +1068,7 @@ el('countChips').addEventListener('click', (e) => {
   else if (isKlavirMode()) config.klavirCount = Number(chip.dataset.value);
   else if (isSluchMode()) config.sluchCount = Number(chip.dataset.value);
   else if (isGeomMode()) config.geomCount = Number(chip.dataset.value);
+  else if (isNasobMode()) config.nasobCount = Number(chip.dataset.value);
   else config.count = Number(chip.dataset.value);
   saveConfig();
   renderConfigScreen();
@@ -1220,6 +1263,7 @@ function startRound() {
     klavir: () => buildKlavirRound(config), // taky
     sluch: () => buildSluchRound(config),   // taky
     geom: () => buildGeomRound(config),     // úloha po úloze
+    nasob: () => buildNasobRound(config),   // nejvýš jedno pexeso na začátku, pak příklady
   };
   round = (build[config.mode] || build.calc)();
   index = 0;
@@ -1281,7 +1325,8 @@ function renderExercise() {
     ? `Mřížka ${ex.size}×${ex.size}`
     /* Rozměry plochy, ne počet dvojic: "Dvojice · 8 dvojic" je na 320 px
        delší, než se do horní lišty vejde, a roztáhlo by stránku. */
-    : ex.kind === 'pexeso' || (ex.kind === 'slova' && round.length === 1)
+    // v Malé násobilce je pexeso první z víc úloh - pak patří do lišty pořadí
+    : (ex.kind === 'pexeso' || ex.kind === 'slova') && round.length === 1
       ? `Dvojice ${ex.cols}×${ex.rows}`
       /* Krátce - "Abeceda · 12" už se na 320 px do lišty nevešlo. */
       : ex.kind === 'abc'
@@ -1339,7 +1384,8 @@ function renderExercise() {
      a slepé sáhnutí na něj by tady spadlo. */
   const input = el('answerInput');
   if (input) {
-    input.maxLength = String(config.max).length + 1;
+    // malá násobilka nemá rozsah, výsledek je nejvýš 100
+    input.maxLength = isNasobMode() ? 3 : String(config.max).length + 1;
     input.focus({ preventScroll: true });
   }
   shownAt = Date.now();
@@ -1404,6 +1450,10 @@ function hintFor(ex) {
       : 'Přečti si obě slova a rozmysli si, jak spolu souvisí. Pak klepni na správné slovo.';
   }
   if (ex.kind === 'geom') return GEOM_HINT[ex.task] || '';
+  if (ex.kind === 'nasob') return 'Spočítej příklad a klepni na správný výsledek.';
+  if (ex.task === 'napis') {
+    return ex.missing === 'c' ? 'Spočítej příklad a napiš výsledek.' : 'Které číslo chybí? Vzpomeň si na násobilku a napiš ho.';
+  }
   if (ex.kind === 'hudba') return HUDBA_HINT[ex.task === 'takt' || ex.task === 'klavir' || ex.task === 'sluch' ? `${ex.task}:${ex.form}` : ex.task] || '';
   if (ex.kind === 'bigmul') {
     return 'Rozlož si násobení na desítky a jednotky. V každém kroku klepni na tu možnost, která je správně.';
@@ -1673,8 +1723,22 @@ function over10FrameHTML(ex) {
    zápis po krocích jako na Umíme to (uživatel to tak chtěl místo skoků
    po číselné ose): 39 + 50 + 1 → = [89] + 1 → = [90]. */
 const BA_LABEL = {
-  tens: 'Desítky druhého čísla', ones: 'Jednotky druhého čísla', mid: 'Výsledek po desítkách', c: 'Výsledek',
+  tens: { tens: 'Desítky druhého čísla', ten: 'Kolik chybí do desítky', units: 'Desítky prvního čísla' },
+  ones: { tens: 'Jednotky druhého čísla', ten: 'Zbytek druhého čísla', units: 'Jednotky prvního čísla' },
+  mid: { tens: 'Výsledek po desítkách', ten: 'Celá desítka', units: 'Součet jednotek' },
+  c: { tens: 'Výsledek', ten: 'Výsledek', units: 'Výsledek' },
 };
+const baForm = (ex) => ex.form || 'tens'; // starší uložené úlohy `form` nemají
+
+/* Zápis pod větvičkou podle tvaru rozkladu (viz `makeBigadd`):
+     tens / ten:  [a ± díl1] ± díl2 =      units:  díl1 + [díl2 ± b] =
+   `pair` je dvojice v rámečku, `before` / `after` číslo před a za ním.
+   Díly jsou klíče políček (ozvěna), čísla jsou pevná. */
+function baLayout(ex) {
+  const s = OPS[ex.op].symbol;
+  if (baForm(ex) === 'units') return { before: 'tens', pair: ['ones', ex.b], after: null, outer: '+', inner: s };
+  return { before: null, pair: [ex.a, 'tens'], after: 'ones', outer: s, inner: s };
+}
 
 /* Ozvěny v zápisu ukazují, co dítě napsalo do větvičky. Hodnota políčka
    se mění bez události `input` (klávesnice, druhý pokus, odhalení), proto
@@ -1709,8 +1773,9 @@ const ARROWS = {
     ['.o10-pair', '.o10-round'],
   ],
   ba: [
-    ['.ba-parts .ba-tens', '.ba-rows [data-of="tens"]'],
-    ['.ba-parts .ba-ones', '.ba-rows [data-of="ones"]'],
+    // cíl je ozvěna v prvním řádku zápisu (ne ta v poznámce pod rámečkem)
+    ['.ba-parts .ba-tens', '.ba-rows .ba-to-tens'],
+    ['.ba-parts .ba-ones', '.ba-rows .ba-to-ones'],
     // z celého bloku i s poznámkou, jinak by šipka škrtala text
     ['.ba-rows .ba-head-1', '.ba-rows .ba-mid'],
   ],
@@ -1746,6 +1811,14 @@ const BA_DIGITS = { tens: 2, ones: 1, mid: 3, c: 3 };
    ten dítě píše o řádek níž; druhé číslo je ozvěna políčka z větvičky.
    První číslo nikdy nekončí nulou, takže „0 si schováme“ nevznikne. */
 function bigaddNoteHTML(ex, sign) {
+  const form = baForm(ex);
+  if (form === 'ten') {
+    return `<span class="ba-note"><span>Nejdřív ${ex.op === 'sub' ? 'ubereme' : 'doplníme'} do celé desítky,</span>
+      <span>pak ${ex.op === 'sub' ? 'odečteme' : 'přičteme'} zbytek.</span></span>`;
+  }
+  if (form === 'units') {
+    return '<span class="ba-note"><span>Desítky si schováme</span><span>a nejdřív spočítáme jednotky.</span></span>';
+  }
   const ones = ex.a % 10;
   return `<span class="ba-note"><span><b class="ba-note-ones">${ones}</b> si schováme,</span>
       <span>počítáme <b class="ba-note-tens">${ex.a - ones}</b> ${sign} <span class="ba-echo ba-echo-tens is-empty" data-of="tens"></span></span>
@@ -1754,18 +1827,35 @@ function bigaddNoteHTML(ex, sign) {
 
 function bigaddHTML(ex) {
   const sign = OPS[ex.op].symbol;
+  const form = baForm(ex);
   const cell = (key) => {
     const idx = ex.hidden.indexOf(key);
     const slotId = idx === 0 ? ' id="answerSlot"' : '';
     const inputId = idx === 0 ? ' id="answerInput"' : '';
     return `<span class="o10-cell slot ba-cell ba-${key}"${slotId}><input${inputId} class="o10-input ba-input" type="text"
       inputmode="none" autocomplete="off" data-idx="${idx}" maxlength="${BA_DIGITS[key]}"
-      aria-label="${BA_LABEL[key]}"></span>`;
+      aria-label="${BA_LABEL[key][form]}"></span>`;
   };
   // ozvěna políčka z větvičky - číslo, které tam dítě napsalo
-  const echo = (key) => `<span class="o10-num ba-echo ba-echo-${key} is-empty" data-of="${key}"></span>`;
+  const echo = (key, to = '') => `<span class="o10-num ba-echo ba-echo-${key}${to ? ` ba-to-${key}` : ''} is-empty" data-of="${key}"></span>`;
   const op = `<span class="o10-op">${sign}</span>`;
   const eq = '<span class="o10-op">=</span>';
+  const L = baLayout(ex);
+  const outer = `<span class="o10-op">${L.outer}</span>`;
+  const inner = `<span class="o10-op">${L.inner}</span>`;
+  // díl zápisu: klíč políčka = ozvěna (v prvním řádku cíl šipky), číslo = pevné
+  const piece = (p, first) => (typeof p === 'string' ? echo(p, first) : `<span class="o10-num">${p}</span>`);
+  const pre = (first) => (L.before ? `${piece(L.before, first)}${outer}` : '');
+  const post = (first) => (L.after ? `${outer}${piece(L.after, first)}` : '');
+  /* Větvička je pod druhým číslem; u `units` pod prvním (druhé je
+     jednociferné). Větvička s políčky má nulovou šířku (`.ba-under`), takže
+     rozkládané číslo zůstane přesně nad ní a zbytek příkladu stojí těsně vedle. */
+  const splitA = form === 'units';
+  const preTop = splitA ? '' : `<span class="ba-tx"><span class="o10-num">${ex.a}</span><span class="o10-op">${sign}</span></span>`;
+  const postTop = splitA ? `<span class="ba-tx"><span class="o10-op">${sign}</span><span class="o10-num">${ex.b}</span></span>` : '';
+  const legs = `<svg class="ba-legs" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true">
+            <line x1="50" y1="1" x2="23" y2="23" class="ba-leg-tens"/><line x1="50" y1="1" x2="77" y2="23" class="ba-leg-ones"/>
+          </svg>`;
   // výsledek je ozvěnou i na konci prvního řádku, šipky viz `drawArrows()`
   const echoC = '<span class="o10-num ba-echo is-empty" data-cell=".ba-rows .ba-c"></span>';
   /* Ta horní (za příkladem) jde i napsat - klepnutí přepne kurzor do výsledku
@@ -1774,20 +1864,17 @@ function bigaddHTML(ex) {
   const echoTop = '<span class="o10-num ba-echo ba-echo-top is-empty" data-cell=".ba-rows .ba-c" role="button" aria-label="Napiš výsledek"></span>';
   return `${coinsHelpHTML(ex)}<div class="ba" data-op="${ex.op}" data-arrows="ba">
       <svg class="o10-arrows" aria-hidden="true"></svg>
-      <div class="ba-top">
-        <div class="ba-split">
-          <span class="o10-num ba-b"><span class="ba-b-pre"><span class="o10-num">${ex.a}</span><span class="o10-op">${sign}</span></span>${ex.b}<span class="ba-b-eq"><span class="o10-op">=</span>${echoTop}</span></span>
-          <svg class="ba-legs" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true">
-            <line x1="50" y1="1" x2="23" y2="23" class="ba-leg-tens"/><line x1="50" y1="1" x2="77" y2="23" class="ba-leg-ones"/>
-          </svg>
-          <div class="ba-parts">${cell('tens')}${cell('ones')}</div>
-        </div>
-      </div>
       <div class="ba-rows">
-        <span class="ba-head ba-head-1"><span class="ba-pair"><span class="o10-num">${ex.a}</span>${op}${echo('tens')}</span>${bigaddNoteHTML(ex, sign)}</span>
-        <span class="ba-tail">${op}${echo('ones')}${eq}${echoC}</span>
-        <span class="ba-head">${cell('mid')}</span>
-        <span class="ba-tail">${op}${echo('ones')}${eq}${cell('c')}</span>
+        <span class="ba-top">${preTop}<span class="ba-split">
+            <span class="o10-num ba-b ba-tx">${splitA ? ex.a : ex.b}</span>
+            <span class="ba-under">${legs}<span class="ba-parts">${cell('tens')}${cell('ones')}</span></span>
+          </span>${postTop}</span>
+        <span class="ba-tx ba-eqc ba-top-eq">${eq}</span>
+        <span class="ba-tx ba-top-res">${echoTop}</span>
+        <span class="ba-head ba-head-1"><span class="ba-line">${pre(true)}<span class="ba-pair">${piece(L.pair[0], true)}${inner}${piece(L.pair[1], true)}</span></span>${bigaddNoteHTML(ex, sign)}</span>
+        <span class="ba-tail">${post(true)}</span><span class="ba-eqc">${eq}</span><span class="ba-res">${echoC}</span>
+        <span class="ba-head">${pre(false)}${cell('mid')}</span>
+        <span class="ba-tail">${post(false)}</span><span class="ba-eqc">${eq}</span><span class="ba-res">${cell('c')}</span>
       </div>
     </div>`;
 }
@@ -1856,7 +1943,8 @@ function pexesoHTML(ex) {
    Nápověda nic nestojí, na odměny nemá vliv. Stav drží `coinsOpen`, protože
    lehká úroveň se po každém kroku překresluje. */
 let coinsOpen = false;
-const COINS_LEVELS = new Set(['easy', 'medium']);
+// od 19. 11. 2026 i na těžké - střední a těžká se liší jen počtem číslic (přání uživatele)
+const COINS_LEVELS = new Set(['easy', 'medium', 'hard', 'expert']);
 // 1 desetikoruna, 2-4 desetikoruny, 5+ desetikorun
 const czPlural = (n, one, few, many) => `${n} ${n === 1 ? one : n >= 2 && n <= 4 ? few : many}`;
 const tensWord = (n) => czPlural(n, 'desetikoruna', 'desetikoruny', 'desetikorun');
@@ -1900,17 +1988,21 @@ function coinsHelpHTML(ex) {
   if (sub) {
     // nejdřív co máme, pak krok po kroku, co odebíráme (přání uživatele)
     parts.push(row(tA, oA));
-    parts.push(`<p>Nejdřív odebereme ${T(tB)}:</p>`);
-    parts.push(row(tA, oA, { goneT: tB }));
+    // jednociferné druhé číslo (lehká a střední): desetikoruny se neodebírají
+    if (tB) {
+      parts.push(`<p>Nejdřív odebereme ${T(tB)}:</p>`);
+      parts.push(row(tA, oA, { goneT: tB }));
+    }
+    const pak = tB ? 'Pak odebereme' : 'Odebereme';
     endT = tA - tB;
     endO = oA;
     if (oB && oB <= oA) {
-      parts.push(`<p>Pak odebereme ${O(oB)}:</p>`);
+      parts.push(`<p>${pak} ${O(oB)}:</p>`);
       parts.push(row(endT, oA, { goneO: oB }));
       endO = oA - oB;
     } else if (oB) {
       // korun je málo: jedna desetikoruna se rozmění na deset korun
-      parts.push(`<p>Pak máme odebrat ${O(oB)}, ale máme jen ${O(oA)}. Jednu desetikorunu proto rozměníme na deset korun:</p>`);
+      parts.push(`<p>${tB ? 'Pak máme' : 'Máme'} odebrat ${O(oB)}, ale máme jen ${O(oA)}. Jednu desetikorunu proto rozměníme na deset korun:</p>`);
       endT -= 1;
       parts.push(row(endT, oA + 10));
       parts.push(`<p>Teď odebereme ${O(oB)}:</p>`);
@@ -1919,7 +2011,7 @@ function coinsHelpHTML(ex) {
     }
   } else {
     parts.push(row(tA, oA));
-    parts.push(`<p>Přidáme ${T(tB)}${oB ? ` a pak ${O(oB)}` : ''}:</p>`);
+    parts.push(`<p>Přidáme ${tB ? `${T(tB)}${oB ? ` a pak ${O(oB)}` : ''}` : O(oB)}:</p>`);
     parts.push(row(tB, oB, { sign: true }));
     endT = tA + tB;
     endO = oA + oB;
@@ -1952,18 +2044,29 @@ function coinsToggle(btn) {
    uživatele. Kostičky tu byly a uživatel je vyřadil (patří k přechodu
    přes desítku, tady jsou navíc). */
 function bigaddTaskHTML(ex) {
-  const t = Math.floor(ex.b / 10);
-  const o = ex.b % 10;
-  return `${coinsHelpHTML(ex)}<div class="bm-task bas">
-      <span class="bas-lead">Vypočítej</span>
-      <b class="bas-a">${ex.a}</b><b class="bas-op">${OPS[ex.op].symbol}</b>
-      <span class="bas-b">
-        <b class="bas-num"><span class="bas-t">${t}</span><span class="bas-o">${o}</span></b>
+  const form = baForm(ex);
+  /* Rozkládá se druhé číslo, u `units` první (druhé je jednociferné).
+     Číslice dvojciferného čísla se obarví jako jeho desítky a jednotky;
+     u `ten` (9 = 7 + 2) to desítky a jednotky nejsou, číslo zůstane černé. */
+  const branch = (n) => {
+    const num = form === 'ten'
+      ? `<b class="bas-num">${n}</b>`
+      : `<b class="bas-num"><span class="bas-t">${Math.floor(n / 10)}</span><span class="bas-o">${n % 10}</span></b>`;
+    return `<span class="bas-b">
+        ${num}
         <svg class="bas-legs" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true">
           <line x1="50" y1="2" x2="25" y2="22" class="ba-leg-tens"/><line x1="50" y1="2" x2="75" y2="22" class="ba-leg-ones"/>
         </svg>
         <span class="bas-parts"><b class="bas-t">${ex.tens}</b><b class="bas-o">${ex.ones}</b></span>
-      </span>
+      </span>`;
+  };
+  const op = `<b class="bas-op">${OPS[ex.op].symbol}</b>`;
+  const body = form === 'units'
+    ? `${branch(ex.a)}${op}<b class="bas-a">${ex.b}</b>`
+    : `<b class="bas-a">${ex.a}</b>${op}${branch(ex.b)}`;
+  return `${coinsHelpHTML(ex)}<div class="bm-task bas">
+      <span class="bas-lead">Vypočítej</span>
+      ${body}
     </div>
     ${bigaddPlanHTML(ex)}`;
 }
@@ -1973,17 +2076,20 @@ function bigaddTaskHTML(ex) {
    (přání uživatele). Po dvou krocích (desítky, schovaná jednotka zpátky)
    se rámeček změní na výsledek dvojice: „[55] + 8". */
 function bigaddPlanHTML(ex) {
-  const sign = OPS[ex.op].symbol;
-  const pairDone = bigStep >= 2;
+  // rámeček je hotový po posledním kroku před přičtením zbytku
+  const pairDone = bigStep >= ex.steps.length - 1;
+  const L = baLayout(ex);
+  // klíč dílu = číslo z větvičky v jeho barvě, jinak pevné číslo
+  const piece = (p) => (typeof p === 'string' ? `<b class="${p === 'tens' ? 'bas-t' : 'bas-o'}">${ex[p]}</b>` : `<b>${p}</b>`);
   const pair = pairDone
     ? `<b>${ex.mid}</b>`
-    : `<b>${ex.a}</b> ${sign} <b class="bas-t">${ex.tens}</b>`;
+    : `${piece(L.pair[0])} ${L.inner} ${piece(L.pair[1])}`;
   // po dvojici už popisek neříká nic, co by neříkala otázka pod ním
   const cap = pairDone ? '' : 'Nejdřív spočítáme čísla v rámečku.';
   return `<div class="bas-plan">
       <span class="bas-plan-lead">Rozepíšeme:</span>
-      <span class="bas-plan-row"><span class="bas-pair${pairDone ? ' is-done' : ''}">${pair}</span>
-        ${sign} <b class="bas-o">${ex.ones}</b></span>
+      <span class="bas-plan-row">${L.before ? `${piece(L.before)} ${L.outer} ` : ''}<span class="bas-pair${pairDone ? ' is-done' : ''}">${pair}</span>${L.after ? `
+        ${L.outer} ${piece(L.after)}` : ''}</span>
     </div>
     <p class="bas-cap">${cap}</p>`; // prázdný odstavec drží mezeru, ať zápis neposkočí
 }
@@ -2025,11 +2131,11 @@ const BODY_HTML = {
   bond: bondHTML, word: wordHTML, riddle: riddleHTML, sign: signHTML, grid: gridHTML,
   compare: compareHTML, over10: over10HTML, bigadd: bigaddHTML, bigaddstep: bigmulHTML, kvet: kvetHTML, pexeso: pexesoHTML, bigmul: bigmulHTML, abc: abcHTML,
   pos: posHTML, vety: vetyHTML, vyznam: vyznamHTML, slova: pexesoHTML, vetylist: vetyListHTML, prav: uuHTML,
-  hudba: hudbaHTML, geom: geomHTML,
+  hudba: hudbaHTML, geom: geomHTML, nasob: nasobHTML,
 };
 
 /* Druhy, které se ovládají jen klepáním - bez klávesnice a bez `submit()`. */
-const TAP_ONLY = new Set(['pexeso', 'bigmul', 'bigaddstep', 'abc', 'pos', 'vety', 'vyznam', 'slova', 'vetylist', 'prav', 'hudba', 'geom']);
+const TAP_ONLY = new Set(['pexeso', 'bigmul', 'bigaddstep', 'abc', 'pos', 'vety', 'vyznam', 'slova', 'vetylist', 'prav', 'hudba', 'geom', 'nasob']);
 
 /* Plochy se spojováním dvojic: čísla v „Najdi dvojice“ a souřadná slova
    ve „Význam slov“. Ovladač je pro obě tentýž. */
@@ -3227,7 +3333,16 @@ function geomHTML(ex) {
       <div class="vt-opts">${choiceButtons(ex, (o) => o.text)}</div></div>`;
 }
 
-const CHOICE_HTML = { vety: vetyHTML, vyznam: vyznamHTML, hudba: hudbaHTML, geom: geomHTML };
+/* Malá násobilka - „Vyber si“: příklad a dvě možnosti vedle sebe
+   (rozhodovačka jako na umimematiku). */
+function nasobHTML(ex) {
+  return `<div class="vt nasob">
+      <p class="nasob-task">${ex.a} × ${ex.b} = ?</p>
+      <div class="vt-opts nasob-opts">${choiceButtons(ex, (o) => o.text)}</div>
+    </div>`;
+}
+
+const CHOICE_HTML = { vety: vetyHTML, vyznam: vyznamHTML, hudba: hudbaHTML, geom: geomHTML, nasob: nasobHTML };
 
 /* Index první špatné volby u úloh s druhým pokusem (`ex.retry`). */
 let choiceMiss = null;
@@ -3737,6 +3852,15 @@ const RETRY_NOTE = {
   },
   bigadd: (wrong, ex) => {
     const policka = wrong === 1 ? 'políčko ještě nesedí' : wrong <= 4 ? 'políčka ještě nesedí' : 'políček ještě nesedí';
+    const form = baForm(ex);
+    if (form === 'ten') {
+      return `${wrong} ${policka} (červená). Modrá větev je, kolik ${ex.op === 'sub' ? `ubrat z ${ex.a}` : `přidat k ${ex.a}`}
+        do celé desítky, oranžová zbytek čísla ${ex.b}.`;
+    }
+    if (form === 'units') {
+      return `${wrong} ${policka} (červená). Modrá větev jsou desítky čísla ${ex.a}, oranžová jednotky.
+        Nejdřív spočítej jednotky, pak přidej desítky.`;
+    }
     return `${wrong} ${policka} (červená). Modrá větev jsou desítky čísla ${ex.b}, oranžová jednotky.
       Od ${ex.a} skoč nejdřív o desítky, a od toho čísla o jednotky.`;
   },
@@ -3929,6 +4053,7 @@ function comboLabels() {
   if (isKlavirMode()) return vyber(KLAVIR_FORM_KEYS, KLAVIR_FORMS, config.klavirForms);
   if (isHudbaMode()) return vyber(HUDBA_TASK_KEYS, HUDBA_TASKS, config.hudbaTasks);
   if (isGeomMode()) return vyber(GEOM_TASK_KEYS, GEOM_TASKS, config.geomTasks);
+  if (isNasobMode()) return vyber(NASOB_TASK_KEYS, NASOB_TASKS, config.nasobTasks);
   if (isAddSubMode()) return vyber(OVER10_OPS, OPS, config.over10Ops);
   if (config.mode === 'calc') {
     return [...vyber(Object.keys(OPS), OPS, config.ops), ...vyber(Object.keys(EXTRA_KINDS), EXTRA_KINDS, config.kinds)];
@@ -3996,7 +4121,8 @@ function grantRewards(report) {
     mode: config.mode,
     level: rewards.difficultyOf(config),
     // v abecedě se nepočítá - rozsah čísel by jí jinak přidal epického
-    max: isAbcMode() || isPosMode() || isVetyMode() || isVyznamMode() || isPravMode() || isMusicMode() || isGeomMode() ? 0
+    // malá násobilka rozsah nemá (výsledky do 100 jsou dané), epického za rozsah nedostane
+    max: isAbcMode() || isPosMode() || isVetyMode() || isVyznamMode() || isPravMode() || isMusicMode() || isGeomMode() || isNasobMode() ? 0
       : isKvetMode() ? KVET_LEVELS[config.level]?.hi ?? 0 : config.max,
     kindUnits,
     // druhy navic (slovni ulohy, pyramidy, znamenka) - podminka raritniho
@@ -4164,7 +4290,7 @@ function renderResult(r) {
     ? 'Příště přijdou nové hádanky s jinými obrázky.'
     : isOver10Mode()
       ? 'Příště přijdou nové příklady na rozklad.'
-      : isBigmulMode() || isBigaddMode() || isKvetMode()
+      : isBigmulMode() || isBigaddMode() || isKvetMode() || isNasobMode()
         ? 'Příště přijdou nová čísla.'
         : isPosMode() || isVetyMode()
           ? 'Příště se vylosují jiné věty.'

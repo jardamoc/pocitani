@@ -76,7 +76,7 @@ export function sanitizeState(raw) {
 }
 
 /* Druhy úloh, které se nedají z descriptoru znovu poskládat. */
-const NO_REPEAT = new Set(['riddle', 'grid', 'over10', 'bigadd', 'bigaddstep', 'kvet', 'pexeso', 'bigmul', 'abc', 'pos', 'vety', 'vetylist', 'vyznam', 'slova', 'uu', 'prav', 'hudba', 'geom']);
+const NO_REPEAT = new Set(['riddle', 'grid', 'over10', 'bigadd', 'bigaddstep', 'kvet', 'pexeso', 'bigmul', 'abc', 'pos', 'vety', 'vetylist', 'vyznam', 'slova', 'uu', 'prav', 'hudba', 'geom', 'nasob']);
 
 const descriptor = (ex) => ({
   op: ex.op,
@@ -153,6 +153,7 @@ const KIND_LABEL = {
   'bigadd:c': { acc: 'velká sčítání', gen: 'velkých sčítání' },
   'bigaddstep:c': { acc: 'velká sčítání po krocích', gen: 'velkých sčítání po krocích' },
   'pexeso:c': { acc: 'plochy s dvojicemi', gen: 'ploch s dvojicemi' },
+  'nasob:c': { all: 'všechny', acc: 'příklady na výběr', gen: 'příkladů na výběr' },
   'bigmul:c': { acc: 'velká násobení', gen: 'velkých násobení' },
   'abc:c': { acc: 'řady slov', gen: 'řad slov' },
   'pos:noun': { all: 'všechna', acc: 'podstatná jména', gen: 'podstatných jmen' },
@@ -205,8 +206,9 @@ function mostMissedFactor(attempts) {
   return best?.f ?? null;
 }
 
-const LEVEL_ORDER = ['easy', 'medium', 'hard'];
-const LEVEL_NAME = { easy: 'Lehké', medium: 'Střední', hard: 'Těžké' };
+const LEVEL_ORDER = ['easy', 'medium', 'hard', 'expert'];
+// `expert` má jen Velké sčítání („Dvojciferná“)
+const LEVEL_NAME = { easy: 'Lehké', medium: 'Střední', hard: 'Těžké', expert: 'Dvojciferné' };
 
 /* Jak se v rozpadu podle obtížnosti pojmenuje jedna úloha daného režimu.
    Rod i číslo musí sedět na věty "Lehké mřížky ti jdou výborně". */
@@ -242,7 +244,8 @@ export function analyze(state, config, attempts) {
      operací ani do přechodu přes desítku nepatří, jinak by "sčítání ti jde"
      stálo z půlky na úlohách, kde se nic nesčítá. */
   const PLACEHOLDER_OP = new Set(['compare', 'pexeso', 'kvet', 'abc', 'pos', 'vety', 'vetylist', 'vyznam', 'slova', 'uu', 'prav', 'hudba', 'geom']);
-  const scored = attempts.filter((a) => !PLACEHOLDER_OP.has(a.ex.kind));
+  // pexeso Malé násobilky má samé násobení (`op: 'mul'`), to se počítá
+  const scored = attempts.filter((a) => !PLACEHOLDER_OP.has(a.ex.kind) || (a.ex.kind === 'pexeso' && a.ex.op === 'mul'));
   const byOp = group(scored, (a) => a.ex.op).sort((x, y) => y.seen - x.seen);
   const byLevel = group(attempts, (a) => a.ex.level || null)
     .sort((x, y) => LEVEL_ORDER.indexOf(x.key) - LEVEL_ORDER.indexOf(y.key));
@@ -498,10 +501,20 @@ export function analyze(state, config, attempts) {
       tips.push('U jednotek si pomoz desítkou: 67 + 5 → 67 + 3 = 70, pak 70 + 2 = 72.');
     }
     if (pct >= 90) {
-      const harder = { easy: 'střední', medium: 'těžkou' }[config.level];
+      const harder = { easy: 'střední', medium: 'těžkou', hard: 'dvojcifernou' }[config.level];
       tips.push(harder
         ? `Šlo ti to skvěle – zkus příště ${harder} obtížnost.`
         : 'Šlo ti to skvěle – zkus si zapnout i odčítání.');
+    }
+  } else if (config.mode === 'nasob') {
+    const f = mostMissedFactor(attempts);
+    if (f) tips.push(`Zopakuj si násobilku ${f} – právě u ní se objevilo nejvíc chyb. Řekni si ji nahlas po řadě: ${[1, 2, 3, 4, 5].map((k) => f * k).join(', ')}…`);
+    if (tags.get('nasobVedle')) tips.push('Když si nejsi jistá, vezmi příklad, který znáš (třeba 5 × 7 = 35), a přidej nebo uber jedno číslo navíc.');
+    if (pct >= 90) {
+      const harder = { easy: 'střední', medium: 'těžkou' }[config.level];
+      tips.push(harder
+        ? `Šlo ti to skvěle – zkus příště ${harder} obtížnost, přijdou další násobilky.`
+        : 'Šlo ti to skvěle – umíš celou malou násobilku!');
     }
   } else if (over10Mode) {
     if (pct < 100) {

@@ -424,8 +424,7 @@ h1, h2, h3, .num, .box-value, .key, .score-big { font-family: 'Baloo 2', 'Nunito
 .chip.is-on[data-value="add"] { background: linear-gradient(135deg, #34d399, #0ea672); }
 .chip.is-on[data-value="sub"] { background: linear-gradient(135deg, #60a5fa, #2563eb); }
 .chip.is-on[data-value="mul"] { background: linear-gradient(135deg, #c084fc, #7c3aed); }
-.chip.is-on[data-value="div"] { background: linear-gradient(135deg, #fb923c, #ea580c); }
-.chips:not(.chips-ops) .chip.is-on { background: linear-gradient(135deg, #38bdf8, #6366f1); }
+.chip.is-on[data-value="div"] { background: linear-gradient(135deg, #fb923c, #ea580c); }.chips:not(.chips-ops) .chip.is-on { background: linear-gradient(135deg, #38bdf8, #6366f1); }
 /* Specificita musi dorovnat pravidlo vys, jinak by obecny modry gradient vyhral. */
 .chips .chip.is-on[data-value="word"] { background: linear-gradient(135deg, #fbbf24, #f97316); }
 .chips .chip.is-on[data-value="bond"] { background: linear-gradient(135deg, #2dd4bf, #0d9488); }
@@ -958,6 +957,8 @@ body.is-quiz .wrap { padding-top: 18px; }
 }
 /* místo na šipky mezi rozkladem a zápisem i mezi řádky zápisu */
 .o10-wrap .o10-sum, .ba .ba-rows { margin-top: clamp(26px, 8vw, 40px); row-gap: clamp(20px, 6vw, 30px); }
+/* u velkého sčítání je příklad nahoře přímo v mřížce, mezeru pod ním dělá `row-gap` */
+.ba .ba-rows { margin-top: 12px; }
 
 /* Barvy obou čísel jsou stejné jako kroužky nad příkladem - dítě tak vidí,
    která hromádka je která. Selektor má dvě třídy schválně: obecné
@@ -1022,23 +1023,25 @@ body.is-quiz .wrap { padding-top: 18px; }
 /* Znaménko je menší písmem než čísla - zarovnané na účaří viselo dole.
    Všechny tři kusy proto dostanou stejně vysoký řádek a znaménko se
    vystředí na výšku (stejně jako v zápisu pod rozkladem). */
-.ba-top { display: flex; justify-content: center; --ba-op-gap: clamp(6px, 2vw, 12px); }
-.ba-split > .o10-num {
-  height: calc(var(--o10-font) * 1.1); display: flex; align-items: center; line-height: 1;
+/* Příklad nahoře je první řádek téže mřížky jako zápis pod ním (19. 11. 2026,
+   přání uživatele): „=“ i výsledek stojí ve stejném sloupci jako dole
+   a příklad je přisazený k „=“, takže šipky z větvičky míří skoro dolů. */
+.ba-top {
+  grid-column: 1 / 3; justify-self: end; align-self: start;
+  display: flex; align-items: flex-start; gap: var(--ba-op-gap);
+  margin-bottom: clamp(6px, 2vw, 10px);
 }
-/* První číslo se znaménkem a „=“ visí po stranách druhého čísla mimo tok:
-   druhé číslo tak zůstane přesně nad větvičkou a mezery kolem znaménka
-   jsou na obou stranách stejné (s odhadnutým posunutím nebyly). */
-.ba-b { position: relative; }
-.ba-b-pre, .ba-b-eq {
-  position: absolute; top: 0; height: 100%; display: flex; align-items: center;
-  gap: var(--ba-op-gap);
+.ba-rows { --ba-op-gap: clamp(6px, 2vw, 12px); }
+/* kousky na výšku řádku s čísly - znaménko se vystředí, políčko přeteče rovnoměrně */
+.ba-tx {
+  height: calc(var(--o10-font) * 1.1); display: flex; align-items: center;
+  gap: var(--ba-op-gap); line-height: 1;
 }
-.ba-b-pre { right: 100%; margin-right: var(--ba-op-gap); }
-.ba-b-eq { left: 100%; margin-left: var(--ba-op-gap); }
-.ba-b-pre .o10-num, .ba-b-pre .o10-op,
-.ba-b-eq .o10-num, .ba-b-eq .o10-op { line-height: 1; }
+.ba-top-eq, .ba-top-res { align-self: start; }
 .ba-split { display: flex; flex-direction: column; align-items: center; }
+/* větvička s políčky má nulovou šířku a přetéká na obě strany stejně -
+   rozkládané číslo tak zůstane přesně nad ní a sousedé stojí těsně u něj */
+.ba-under { width: 0; display: flex; flex-direction: column; align-items: center; }
 .ba-legs {
   width: calc(var(--cell) * 2 + var(--ba-gap)); height: clamp(16px, 5vw, 26px);
   overflow: visible; stroke-width: 3; stroke-linecap: round;
@@ -1059,13 +1062,15 @@ body.is-quiz .wrap { padding-top: 18px; }
 /* Dva sloupce: vlevo „55 + 10“ a pod tím mezivýsledek (uprostřed),
    vpravo „+ 6 =“ v obou řádcích přesně pod sebou. */
 .ba-rows {
-  display: grid; grid-template-columns: auto auto; align-items: center;
+  display: grid; grid-template-columns: auto auto auto auto; align-items: center;
   width: max-content; max-width: 100%; margin: 14px auto 0;
   row-gap: 8px; column-gap: clamp(4px, 1.6vw, 8px);
 }
 .ba-head, .ba-tail { display: flex; align-items: center; gap: clamp(4px, 1.6vw, 8px); }
 .ba-head { justify-self: center; }
 .ba-tail { justify-self: start; }
+.ba-eqc { justify-self: center; display: flex; }
+.ba-res { justify-self: start; display: flex; }
 .ba-rows .o10-num, .ba-rows .o10-op { line-height: 1; }
 .ba-echo { min-width: 1.2ch; text-align: center; }
 /* Nápověda s korunami (Velké sčítání, lehká a střední) */
@@ -1163,6 +1168,8 @@ body.is-quiz .wrap { padding-top: 18px; }
 }
 /* pod rámečkem drobně „8 si schováme, počítáme 40 − 30“ */
 .ba-head-1 { flex-direction: column; gap: 4px; }
+/* „80 + [1 + 7]“ - číslo před rámečkem a rámeček v jednom řádku */
+.ba-line { display: flex; align-items: center; gap: clamp(4px, 1.6vw, 8px); }
 .ba-note {
   font-family: 'Nunito', system-ui, sans-serif; font-weight: 700; font-size: clamp(.78rem, 3.4vw, .95rem);
   line-height: 1.3; text-align: center; color: var(--ink-soft);
@@ -1538,6 +1545,17 @@ body.is-dark { --pair-task: #93c5fd; --pair-result: #fdba74; }
 .chips .chip.is-on[data-value="najdi"] { background: linear-gradient(135deg, #34d399, #0f766e); }
 .chips .chip.is-on[data-value="cary"] { background: linear-gradient(135deg, #fb923c, #ea580c); }
 .chips .chip.is-on[data-value="kolem"] { background: linear-gradient(135deg, #f472b6, #be185d); }
+/* Malá násobilka: úlohy na kartě „Co budeme dělat?“ */
+.chips .chip.is-on[data-value="pex"] { background: linear-gradient(135deg, #c084fc, #7c3aed); }
+.chips .chip.is-on[data-value="napis"] { background: linear-gradient(135deg, #60a5fa, #2563eb); }
+.chips .chip.is-on[data-value="vyber"] { background: linear-gradient(135deg, #fb923c, #ea580c); }
+/* „Vyber si“: velký příklad a dvě možnosti vedle sebe */
+.nasob-task {
+  margin: 8px 0 18px; text-align: center; color: var(--ink);
+  font-family: 'Baloo 2', sans-serif; font-weight: 800; font-size: clamp(2rem, 10vw, 3rem); line-height: 1.1;
+}
+.nasob .nasob-opts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.nasob .vt-opt { font-size: clamp(1.6rem, 8vw, 2.2rem); padding: 12px 4px; min-width: 0; }
 .geo-svg { display: block; width: 100%; height: auto; overflow: visible; }
 .geo-svg .geo-f1, .geo-svg .geo-f2, .geo-svg .geo-f3 {
   fill: #3b82f6; stroke: currentColor; stroke-width: 2.5; stroke-linejoin: round;
